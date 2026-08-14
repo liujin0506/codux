@@ -51,6 +51,52 @@ void main() {
 
     expect(addIcon.color, isNot(activeIcon.color));
   });
+
+  testWidgets('sessions tab lists history after worktrees', (tester) async {
+    var opened = 0;
+    var requested = 0;
+    await tester.pumpWidget(
+      _wrap(
+        _switcher(
+          terminals: const [
+            TerminalInfo(
+              id: 'term-1',
+              title: 'One',
+              projectId: 'project-1',
+            ),
+          ],
+          activeTerminalId: 'term-1',
+          aiSessions: const [
+            AISessionRecord(
+              id: 'sess-1',
+              title: 'Fix the toolbar',
+              tool: 'claude',
+              model: 'opus',
+              time: 1755200000,
+              size: 1200,
+            ),
+          ],
+          onOpenSessions: () => requested += 1,
+          onOpenSession: (_) => opened += 1,
+        ),
+      ),
+    );
+
+    expect(find.text('Terminals'), findsOneWidget);
+    expect(find.text('Worktree'), findsOneWidget);
+    expect(find.text('Sessions'), findsOneWidget);
+
+    await tester.tap(find.text('Sessions'));
+    await tester.pump();
+
+    expect(requested, 1);
+    expect(find.text('Fix the toolbar'), findsOneWidget);
+    expect(find.textContaining('claude'), findsOneWidget);
+
+    await tester.tap(find.text('Fix the toolbar'));
+    await tester.pump();
+    expect(opened, 1);
+  });
 }
 
 Widget _wrap(Widget child) {
@@ -69,6 +115,9 @@ TerminalSwitcherScreen _switcher({
   required List<TerminalInfo> terminals,
   required String? activeTerminalId,
   bool creating = false,
+  List<AISessionRecord> aiSessions = const [],
+  VoidCallback? onOpenSessions,
+  ValueChanged<AISessionRecord>? onOpenSession,
 }) {
   return TerminalSwitcherScreen(
     topInset: 0,
@@ -93,5 +142,11 @@ TerminalSwitcherScreen _switcher({
     onOpenWorktrees: () {},
     onRefreshWorktrees: () {},
     onRefreshTerminals: () {},
+    aiSessions: aiSessions,
+    onOpenSessions: onOpenSessions ?? () {},
+    onRefreshSessions: () {},
+    onOpenSession: onOpenSession ?? (_) {},
+    onRenameSession: (_) {},
+    onDeleteSession: (_) {},
   );
 }
