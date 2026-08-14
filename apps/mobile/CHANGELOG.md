@@ -8,6 +8,10 @@ Important changes to this project are documented here.
 
 - Added a Sessions tab to the phone terminal switcher, after Worktrees, using the same AI session history as desktop and pad.
 
+### Fixed
+
+- Migrated the Android Kotlin `jvmTarget` setting to the `compilerOptions` DSL required by Kotlin 2.3.
+
 ## [2.0.5] - 2026-08-15
 
 ### Changed
