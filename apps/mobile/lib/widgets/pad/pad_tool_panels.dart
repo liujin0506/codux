@@ -1397,12 +1397,29 @@ class _GitMenuEntry {
     this.danger = false,
     this.current = false,
     this.enabled = true,
-    this.isDivider = false,
-    this.note,
-  });
+  }) : isDivider = false,
+       note = null;
 
-  _GitMenuEntry.divider() : this(isDivider: true);
-  _GitMenuEntry.note(String text) : this(note: text);
+  _GitMenuEntry.divider()
+    : icon = null,
+      label = null,
+      onTap = null,
+      child = null,
+      danger = false,
+      current = false,
+      enabled = true,
+      isDivider = true,
+      note = null;
+
+  _GitMenuEntry.note(this.note)
+    : icon = null,
+      label = null,
+      onTap = null,
+      child = null,
+      danger = false,
+      current = false,
+      enabled = true,
+      isDivider = false;
 
   final IconData? icon;
   final String? label;
