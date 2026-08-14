@@ -56,10 +56,10 @@ void main() {
     await tester.pump();
 
     expect(sent, ['\u0003']);
-    expect(find.text('ctrl'), findsNothing);
+    expect(find.text('ctrl'), findsOneWidget);
   });
 
-  testWidgets('ime open expands the toolbar to two rows', (tester) async {
+  testWidgets('toolbar keeps both rows without the IME', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildAppTheme(),
@@ -70,7 +70,7 @@ void main() {
           child: SizedBox(
             width: 360,
             height: 720,
-            child: _pane(keyboardVisible: true),
+            child: _pane(),
           ),
         ),
       ),

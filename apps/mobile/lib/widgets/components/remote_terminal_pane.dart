@@ -137,18 +137,20 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
     }
     final showTerminalToolbar =
         widget.workspaceMode == WorkspaceMode.terminal && widget.connected;
+    final viewPadding = MediaQuery.viewPaddingOf(context);
     final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
-    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
-    final keyboardActiveThreshold = bottomInset + 8.0;
+    final bottomInset = viewPadding.bottom;
+    final edgeInset = Toolbar.edgeInsetFor(viewPadding);
+    final keyboardActiveThreshold = math.max(bottomInset + 8.0, 80.0);
     final effectiveKeyboardHeight = keyboardHeight > keyboardActiveThreshold
         ? keyboardHeight
         : 0.0;
+    final imeOpen = widget.keyboardVisible || effectiveKeyboardHeight > 0;
     final toolbarBottom = effectiveKeyboardHeight > 0
         ? effectiveKeyboardHeight
-        : bottomInset;
-    final toolbarExpanded =
-        widget.keyboardVisible || effectiveKeyboardHeight > 0;
-    final toolbarBaseHeight = Toolbar.heightFor(expanded: toolbarExpanded);
+        : 0.0;
+    final toolbarSafeBottom = imeOpen ? 0.0 : edgeInset;
+    final toolbarBaseHeight = Toolbar.height;
     final keyboardLift = effectiveKeyboardHeight > 0
         ? (effectiveKeyboardHeight - bottomInset).clamp(0.0, double.infinity)
         : 0.0;
@@ -162,7 +164,7 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
       child: ClipRect(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final terminalToolbarHeight = toolbarBaseHeight + bottomInset;
+            final terminalToolbarHeight = toolbarBaseHeight + toolbarSafeBottom;
             final viewportHeight = constraints.maxHeight.isFinite
                 ? constraints.maxHeight
                 : MediaQuery.sizeOf(context).height;
@@ -277,8 +279,8 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
                     child: Toolbar(
                       onSendKey: widget.onSendKey,
                       applicationCursor: false,
-                      keyboardVisible: toolbarExpanded,
-                      bottomInset: 0,
+                      keyboardVisible: imeOpen,
+                      bottomInset: toolbarSafeBottom,
                       onToggleKeyboard: widget.onToggleKeyboard,
                       onPaste: widget.onPaste,
                       onCopy: widget.onCopy,

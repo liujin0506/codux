@@ -4,6 +4,13 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.6] - 2026-08-15
+
+### Changed
+
+- Kept both terminal toolbar rows visible by default, with interrupt at the bottom-left, the keyboard toggle at the top-right, and an inverted-T arrow cluster on the right.
+- Matched the toolbar's bottom safe inset to the left and right corner inset instead of lifting the bar by the full Home Indicator gap.
+
 ## [2.0.5] - 2026-08-15
 
 ### Added

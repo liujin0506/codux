@@ -23,10 +23,18 @@ class Toolbar extends StatefulWidget {
   static const double verticalPadding = 4;
   static const double rowGap = 4;
   static const double cornerInset = 16;
+  static const double height =
+      verticalPadding * 2 + rowHeight * 2 + rowGap;
 
-  static double heightFor({required bool expanded}) {
-    final rows = expanded ? 2 : 1;
-    return verticalPadding * 2 + rowHeight * rows + (expanded ? rowGap : 0);
+  static double heightFor({bool expanded = true}) => height;
+
+  /// Left, right, and bottom use the same safe inset so the bar clears the
+  /// rounded corners without lifting a full Home Indicator gap.
+  static double edgeInsetFor(EdgeInsets viewPadding) {
+    return math.max(
+      math.max(viewPadding.left, viewPadding.right),
+      cornerInset,
+    );
   }
 
   final ValueChanged<String> onSendKey;
@@ -72,26 +80,38 @@ class _ToolbarState extends State<Toolbar> {
   Widget build(BuildContext context) {
     final prefs = AppPreferences.of(context);
     final viewPadding = MediaQuery.viewPaddingOf(context);
-    final leftInset = math.max(viewPadding.left, Toolbar.cornerInset);
-    final rightInset = math.max(viewPadding.right, Toolbar.cornerInset);
+    final edgeInset = Toolbar.edgeInsetFor(viewPadding);
+    final leftInset = edgeInset;
+    final rightInset = edgeInset;
+    final bottomInset = widget.bottomInset;
     final row1 = [
-      _ToolItem(
-        label: 'esc',
-        kind: _ToolKind.special,
-        onTap: () => _send('escape'),
-      ),
       _ToolItem(
         label: 'tab',
         kind: _ToolKind.special,
         onTap: () => _send('tab'),
       ),
       _ToolItem(
-        label: '^C',
-        kind: _ToolKind.danger,
-        onTap: () {
-          widget.onSendKey('\u0003');
-          _clearModifiers();
-        },
+        label: 'ctrl',
+        kind: _ToolKind.modifier,
+        active: _ctrl,
+        onTap: () => setState(() => _ctrl = !_ctrl),
+      ),
+      _ToolItem(
+        label: '/',
+        kind: _ToolKind.special,
+        onTap: () => _send('/', keyChar: '/'),
+      ),
+      _ToolItem(
+        icon: Icons.content_copy_rounded,
+        label: 'copy',
+        kind: _ToolKind.special,
+        onTap: widget.onCopy,
+      ),
+      _ToolItem(
+        label: 'shft',
+        kind: _ToolKind.modifier,
+        active: _shift,
+        onTap: () => setState(() => _shift = !_shift),
       ),
       _ToolItem(
         icon: Icons.keyboard_arrow_up_rounded,
@@ -99,19 +119,6 @@ class _ToolbarState extends State<Toolbar> {
         kind: _ToolKind.icon,
         repeatable: true,
         onTap: () => _send('up'),
-      ),
-      _ToolItem(
-        icon: Icons.keyboard_arrow_down_rounded,
-        label: '↓',
-        kind: _ToolKind.icon,
-        repeatable: true,
-        onTap: () => _send('down'),
-      ),
-      _ToolItem(
-        icon: Icons.keyboard_return_rounded,
-        label: prefs.t('toolbar.enter'),
-        kind: _ToolKind.enter,
-        onTap: () => _send('enter'),
       ),
       _ToolItem(
         icon: widget.keyboardVisible
@@ -122,65 +129,65 @@ class _ToolbarState extends State<Toolbar> {
         onTap: widget.onToggleKeyboard,
       ),
     ];
-    final row2 = widget.keyboardVisible
-        ? [
-            _ToolItem(
-              label: 'ctrl',
-              kind: _ToolKind.modifier,
-              active: _ctrl,
-              onTap: () => setState(() => _ctrl = !_ctrl),
-            ),
-            _ToolItem(
-              label: '/',
-              kind: _ToolKind.special,
-              onTap: () => _send('/', keyChar: '/'),
-            ),
-            _ToolItem(
-              icon: Icons.content_paste_rounded,
-              label: 'paste',
-              kind: _ToolKind.special,
-              onTap: widget.onPaste,
-            ),
-            _ToolItem(
-              icon: Icons.keyboard_arrow_left_rounded,
-              label: '←',
-              kind: _ToolKind.icon,
-              repeatable: true,
-              onTap: () => _send('left'),
-            ),
-            _ToolItem(
-              icon: Icons.keyboard_arrow_right_rounded,
-              label: '→',
-              kind: _ToolKind.icon,
-              repeatable: true,
-              onTap: () => _send('right'),
-            ),
-            _ToolItem(
-              label: 'shft',
-              kind: _ToolKind.modifier,
-              active: _shift,
-              onTap: () => setState(() => _shift = !_shift),
-            ),
-            _ToolItem(
-              icon: Icons.content_copy_rounded,
-              label: 'copy',
-              kind: _ToolKind.special,
-              onTap: widget.onCopy,
-            ),
-          ]
-        : const <_ToolItem>[];
+    final row2 = [
+      _ToolItem(
+        label: '^C',
+        kind: _ToolKind.danger,
+        onTap: () {
+          widget.onSendKey('\u0003');
+          _clearModifiers();
+        },
+      ),
+      _ToolItem(
+        label: 'esc',
+        kind: _ToolKind.special,
+        onTap: () => _send('escape'),
+      ),
+      _ToolItem(
+        icon: Icons.content_paste_rounded,
+        label: 'paste',
+        kind: _ToolKind.special,
+        onTap: widget.onPaste,
+      ),
+      _ToolItem(
+        icon: Icons.keyboard_return_rounded,
+        label: prefs.t('toolbar.enter'),
+        kind: _ToolKind.enter,
+        onTap: () => _send('enter'),
+      ),
+      _ToolItem(
+        icon: Icons.keyboard_arrow_left_rounded,
+        label: '←',
+        kind: _ToolKind.icon,
+        repeatable: true,
+        onTap: () => _send('left'),
+      ),
+      _ToolItem(
+        icon: Icons.keyboard_arrow_down_rounded,
+        label: '↓',
+        kind: _ToolKind.icon,
+        repeatable: true,
+        onTap: () => _send('down'),
+      ),
+      _ToolItem(
+        icon: Icons.keyboard_arrow_right_rounded,
+        label: '→',
+        kind: _ToolKind.icon,
+        repeatable: true,
+        onTap: () => _send('right'),
+      ),
+    ];
 
     return Container(
       color: AppColors.terminalChrome,
       child: SizedBox(
-        height: Toolbar.heightFor(expanded: widget.keyboardVisible) +
-            widget.bottomInset,
+        height: Toolbar.height + bottomInset,
         child: Padding(
           padding: EdgeInsets.fromLTRB(
             leftInset,
             Toolbar.verticalPadding,
             rightInset,
-            Toolbar.verticalPadding + widget.bottomInset,
+            Toolbar.verticalPadding + bottomInset,
           ),
           child: _ToolGrid(row1: row1, row2: row2),
         ),
