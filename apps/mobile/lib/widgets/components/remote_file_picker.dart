@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../i18n.dart';
 import '../../models/remote_models.dart';
 import '../../theme/app_theme.dart';
+import 'project_files_panel.dart';
 
 class RemoteFilePicker extends StatelessWidget {
   const RemoteFilePicker({
@@ -89,17 +90,8 @@ class RemoteFilePicker extends StatelessWidget {
                       if (value == 'root') onOpenRoot();
                       if (value == 'volumes') onOpenVolumes();
                     },
-                    itemBuilder: (_) => [
-                      const PopupMenuItem(value: 'home', child: Text('Home')),
-                      PopupMenuItem(
-                        value: 'volumes',
-                        child: Text(prefs.t('storage.volumes')),
-                      ),
-                      PopupMenuItem(
-                        value: 'root',
-                        child: Text(prefs.t('storage.root')),
-                      ),
-                    ],
+                    constraints: const BoxConstraints(minWidth: 220),
+                    itemBuilder: (_) => storageShortcutMenuItems(prefs),
                   ),
                 ],
               ),

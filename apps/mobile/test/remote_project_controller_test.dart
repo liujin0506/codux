@@ -58,6 +58,47 @@ void main() {
     );
   });
 
+  test('scopes AI session envelopes to the selected worktree path', () {
+    const worktree = RemoteWorktreeInfo(
+      id: 'worktree-1',
+      projectId: 'project-1',
+      name: 'feat',
+      branch: 'feat',
+      path: '/repo/.codux/worktrees/feat',
+      status: 'clean',
+      isDefault: false,
+      exists: true,
+      changes: 0,
+      incoming: 0,
+      outgoing: 0,
+      additions: 0,
+      deletions: 0,
+    );
+
+    final list = controller.aiSessionListEnvelope(project, worktree: worktree);
+    expect(list.type, 'ai.session');
+    expect((list.payload as Map)['op'], 'list');
+    expect((list.payload as Map)['projectId'], 'project-1');
+    expect((list.payload as Map)['projectName'], 'feat');
+    expect((list.payload as Map)['projectPath'], '/repo/.codux/worktrees/feat');
+    expect((list.payload as Map)['worktreeId'], 'worktree-1');
+
+    final restore = controller.aiSessionRestoreEnvelope(
+      project,
+      'sess-1',
+      worktree: worktree,
+    );
+    expect((restore.payload as Map)['projectPath'], '/repo/.codux/worktrees/feat');
+    expect((restore.payload as Map)['worktreeId'], 'worktree-1');
+  });
+
+  test('AI session envelopes fall back to the project path', () {
+    final list = controller.aiSessionListEnvelope(project);
+    expect((list.payload as Map)['projectPath'], '/repo');
+    expect((list.payload as Map).containsKey('worktreeId'), isFalse);
+    expect((list.payload as Map)['projectName'], 'Project');
+  });
+
   test('builds project utility envelopes', () {
     expect(controller.removeEnvelope(project).type, 'project.remove');
     expect(controller.aiStatsEnvelope(project).type, 'ai.stats');

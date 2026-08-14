@@ -261,40 +261,67 @@ impl RemoteHostRuntime {
 
     /// Serve `ai.session` for a remote controller. Same channel + DTO the agent
     /// uses; the host owns the AI history, so it sends the lean session list.
+    /// History is indexed per worktree cwd (same as the desktop sidebar), so a
+    /// `worktreeId` resolves to that worktree's path when `projectPath` is empty.
     pub(super) fn handle_ai_session(&self, envelope: &RemoteEnvelope) {
         let payload = &envelope.payload;
         let op = payload.get("op").and_then(Value::as_str).unwrap_or("");
+        let store = ProjectStore::new(self.support_dir.clone());
+        let snapshot = store.snapshot();
+        let worktree_id = payload
+            .get("worktreeId")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty());
+        let worktree = worktree_id.and_then(|id| {
+            snapshot
+                .worktrees
+                .iter()
+                .find(|worktree| worktree.id == id)
+                .cloned()
+        });
         let project_path = payload
             .get("projectPath")
             .and_then(Value::as_str)
             .filter(|value| !value.is_empty())
             .map(str::to_string)
+            .or_else(|| worktree.as_ref().map(|worktree| worktree.path.clone()))
             .or_else(|| {
                 let project_id = payload
                     .get("projectId")
                     .and_then(Value::as_str)
                     .unwrap_or_default();
-                let store = ProjectStore::new(self.support_dir.clone());
-                store
-                    .projects_snapshot()
-                    .into_iter()
+                snapshot
+                    .projects
+                    .iter()
                     .find(|project| project.id == project_id)
-                    .or_else(|| store.projects_snapshot().into_iter().next())
-                    .map(|project| project.path)
+                    .or_else(|| snapshot.projects.first())
+                    .map(|project| project.path.clone())
             })
             .unwrap_or_default();
         let service = codux_ai_sessions::AIHistoryService::new(self.support_dir.clone());
         let project = AIHistoryProjectRequest {
-            id: payload
-                .get("projectId")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-            name: payload
-                .get("projectName")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
+            id: worktree
+                .as_ref()
+                .map(|worktree| worktree.id.clone())
+                .or_else(|| {
+                    payload
+                        .get("projectId")
+                        .and_then(Value::as_str)
+                        .filter(|value| !value.is_empty())
+                        .map(str::to_string)
+                })
+                .unwrap_or_default(),
+            name: worktree
+                .as_ref()
+                .map(|worktree| worktree.name.clone())
+                .or_else(|| {
+                    payload
+                        .get("projectName")
+                        .and_then(Value::as_str)
+                        .filter(|value| !value.is_empty())
+                        .map(str::to_string)
+                })
+                .unwrap_or_default(),
             path: project_path,
         };
         match codux_ai_sessions::session_op_result_with_indexer(

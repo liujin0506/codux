@@ -12,6 +12,9 @@ use rusqlite::{Connection, OptionalExtension};
 
 impl AIHistoryService {
     pub fn project_summary(&self, project_path: &str) -> AIHistorySummary {
+        let project_path = codux_ai_history::normalized::normalized_history_path(project_path)
+            .unwrap_or_else(|| project_path.trim().to_string());
+        let project_path = project_path.as_str();
         if !self.database_path.is_file() {
             return AIHistorySummary {
                 error: Some("ai-usage.sqlite3 not found".to_string()),

@@ -171,26 +171,13 @@ class ProjectFilesPanelActions extends StatelessWidget {
             padding: EdgeInsets.zero,
             icon: Icon(Icons.storage_rounded, color: accent, size: 19),
             color: menuColor ?? AppColors.bgSurface,
-            constraints: BoxConstraints.tightFor(
-              width: buttonSize,
-              height: buttonSize,
-            ),
+            constraints: const BoxConstraints(minWidth: 220),
             onSelected: (value) {
               if (value == 'home') onOpenHome();
               if (value == 'root') onOpenRoot();
               if (value == 'volumes') onOpenVolumes();
             },
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'home', child: Text('Home')),
-              PopupMenuItem(
-                value: 'volumes',
-                child: Text(prefs.t('storage.volumes')),
-              ),
-              PopupMenuItem(
-                value: 'root',
-                child: Text(prefs.t('storage.root')),
-              ),
-            ],
+            itemBuilder: (_) => storageShortcutMenuItems(prefs),
           ),
         ),
         if (onRefresh != null)
@@ -230,18 +217,88 @@ class ProjectFilesPanelActions extends StatelessWidget {
         ),
         Offset.zero & overlay.size,
       ),
-      items: [
-        const PopupMenuItem(value: 'home', child: Text('Home')),
-        PopupMenuItem(
-          value: 'volumes',
-          child: Text(prefs.t('storage.volumes')),
-        ),
-        PopupMenuItem(value: 'root', child: Text(prefs.t('storage.root'))),
-      ],
+      items: storageShortcutMenuItems(prefs),
     );
     if (value == 'home') onOpenHome();
     if (value == 'root') onOpenRoot();
     if (value == 'volumes') onOpenVolumes();
+  }
+}
+
+List<PopupMenuEntry<String>> storageShortcutMenuItems(AppPreferences prefs) {
+  return [
+    PopupMenuItem(
+      value: 'home',
+      child: _StorageShortcutLabel(
+        icon: Icons.home_outlined,
+        title: prefs.t('storage.home'),
+        subtitle: '~',
+      ),
+    ),
+    PopupMenuItem(
+      value: 'volumes',
+      child: _StorageShortcutLabel(
+        icon: Icons.sd_storage_outlined,
+        title: prefs.t('storage.volumes'),
+        subtitle: '/Volumes',
+      ),
+    ),
+    PopupMenuItem(
+      value: 'root',
+      child: _StorageShortcutLabel(
+        icon: Icons.folder_open_outlined,
+        title: prefs.t('storage.root'),
+        subtitle: '/',
+      ),
+    ),
+  ];
+}
+
+class _StorageShortcutLabel extends StatelessWidget {
+  const _StorageShortcutLabel({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: AppColors.textMuted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: AppTextSize.body,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: AppTextSize.small,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

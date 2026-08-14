@@ -4,19 +4,21 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.5] - 2026-08-15
+
 ### Added
 
 - Added a Sessions tab to the phone terminal switcher, after Worktrees, using the same AI session history as desktop and pad.
 
-### Fixed
-
-- Migrated the Android Kotlin `jvmTarget` setting to the `compilerOptions` DSL required by Kotlin 2.3.
-
-## [2.0.5] - 2026-08-15
-
 ### Changed
 
 - Slimmed the mobile terminal toolbar to one row of coding keys by default, and expanded it to two rows only after the IME opens.
+
+### Fixed
+
+- Migrated the Android Kotlin `jvmTarget` setting to the `compilerOptions` DSL required by Kotlin 2.3.
+- Stopped the files storage menu from squeezing Home, Disk, and root into a 40px popup.
+- Scoped the mobile session list to the selected worktree path so phone and pad show the same history as desktop.
 
 ## [2.0.4] - 2026-08-14
 

@@ -148,7 +148,7 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
   RemoteGitDiff? _gitDiff;
   String? _gitDiffPath;
   List<AISessionRecord> _aiSessions = const [];
-  String? _aiSessionsProjectId;
+  String? _aiSessionsScopeId;
   List<RemoteSshProfile> _sshProfiles = const [];
   String? _toastMessage;
   String? _blockingLoadingMessage;
@@ -329,6 +329,15 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
   List<RemoteWorktreeInfo> get _worktrees => _remoteRuntime.worktrees;
 
   String? get _selectedWorktreeId => _remoteRuntime.selectedWorktreeId;
+
+  RemoteWorktreeInfo? get _selectedWorktree {
+    final id = _selectedWorktreeId;
+    if (id == null || id.isEmpty) return null;
+    for (final worktree in _selectedProjectWorktrees) {
+      if (worktree.id == id) return worktree;
+    }
+    return null;
+  }
 
   List<String> get _worktreeBaseBranches {
     final projectId = _selectedProjectId ?? _remoteRuntime.selectedProjectId;

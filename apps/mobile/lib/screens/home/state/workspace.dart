@@ -30,6 +30,7 @@ extension _HomePageWorkspace on HomeController {
 
   Future<void> _openTerminalSwitcher() async {
     await _terminalActions.openTerminalSwitcher(_showTerminalSwitcher);
+    _requestAISessions();
   }
 
   void _closeTerminalSwitcher() {
@@ -197,9 +198,13 @@ extension _HomePageWorkspace on HomeController {
   void _requestAISessions({bool force = false}) {
     final project = _selectedProject;
     if (project == null) return;
-    if (!force && _aiSessionsProjectId == project.id) return;
-    _aiSessionsProjectId = project.id;
-    _send(_projectController.aiSessionListEnvelope(project));
+    final worktree = _selectedWorktree;
+    final scopeId = '${project.id}/${worktree?.id ?? ''}';
+    if (!force && _aiSessionsScopeId == scopeId) return;
+    _aiSessionsScopeId = scopeId;
+    _send(
+      _projectController.aiSessionListEnvelope(project, worktree: worktree),
+    );
   }
 
   void _handleAISessionResult(Object? payload) {
@@ -208,17 +213,27 @@ extension _HomePageWorkspace on HomeController {
     final result = payload['result'];
     switch (op) {
       case 'list':
-        if (result is! List) return;
+        final rows = result is List
+            ? result
+            : (result is Map ? result['sessions'] : null);
+        if (rows is! List) {
+          CoduxLog.warn(
+            '[codux-flutter-sessions] list reply missing rows op=$op',
+          );
+          return;
+        }
         if (!mounted) return;
-        _applyState(() {
-          _aiSessions = result
-              .whereType<Map>()
-              .map(
-                (item) =>
-                    AISessionRecord.fromJson(Map<String, dynamic>.from(item)),
-              )
-              .toList();
-        });
+        final next = rows
+            .whereType<Map>()
+            .map(
+              (item) =>
+                  AISessionRecord.fromJson(Map<String, dynamic>.from(item)),
+            )
+            .toList();
+        CoduxLog.debug(
+          '[codux-flutter-sessions] list count=${next.length} scope=${_aiSessionsScopeId ?? ''}',
+        );
+        _applyState(() => _aiSessions = next);
       case 'rename':
       case 'remove':
         // The host applied the change; pull a fresh list so the row updates.
@@ -242,7 +257,13 @@ extension _HomePageWorkspace on HomeController {
   Future<void> _openAISession(AISessionRecord session) async {
     final project = _selectedProject;
     if (project == null) return;
-    _send(_projectController.aiSessionRestoreEnvelope(project, session.id));
+    _send(
+      _projectController.aiSessionRestoreEnvelope(
+        project,
+        session.id,
+        worktree: _selectedWorktree,
+      ),
+    );
   }
 
   Future<void> _renameAISession(AISessionRecord session) async {
@@ -262,7 +283,12 @@ extension _HomePageWorkspace on HomeController {
     final trimmed = nextTitle?.trim();
     if (trimmed == null || trimmed.isEmpty || trimmed == session.title) return;
     _send(
-      _projectController.aiSessionRenameEnvelope(project, session.id, trimmed),
+      _projectController.aiSessionRenameEnvelope(
+        project,
+        session.id,
+        trimmed,
+        worktree: _selectedWorktree,
+      ),
     );
   }
 
@@ -283,7 +309,13 @@ extension _HomePageWorkspace on HomeController {
       ),
     );
     if (confirmed != true) return;
-    _send(_projectController.aiSessionRemoveEnvelope(project, session.id));
+    _send(
+      _projectController.aiSessionRemoveEnvelope(
+        project,
+        session.id,
+        worktree: _selectedWorktree,
+      ),
+    );
   }
 
   void _requestSshProfiles() {
