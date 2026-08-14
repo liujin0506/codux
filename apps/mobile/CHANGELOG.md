@@ -4,6 +4,12 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.4] - 2026-08-14
+
+### Changed
+
+- Published the personal GitHub Android release pipeline from `apps/mobile`, using the shared monorepo source and signed APK artifacts.
+
 ## [2.0.3] - 2026-07-17
 
 ### Changed

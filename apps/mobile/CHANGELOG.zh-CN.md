@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [2.0.4] - 2026-08-14
+
+### 调整
+
+- 从 `apps/mobile` 接通个人 GitHub Android 发版流水线，使用 monorepo 源码构建并产出签名 APK。
+
 ## [2.0.3] - 2026-07-17
 
 ### 调整
