@@ -8,6 +8,21 @@ All notable changes to this project will be documented in this file.
 
 - Paused automatic memory queue processing when no eligible extraction provider is configured, preventing repeated failures and UI refresh churn while preserving queued work until a provider becomes available.
 
+## [2.0.4] - 2026-08-14
+
+### Added
+
+- Added SSH and tool-permission handling for hosted remote agent runtimes.
+
+### Changed
+
+- Restyled settings, workspace sidebars, and project badges. Projects without a custom icon now use the first character of the name.
+- Switched the desktop updater to the personal signing public key used by this GitHub release pipeline.
+
+### Fixed
+
+- Enabled `notify-rust` zbus support on Linux so native desktop notifications compile.
+
 ## [2.0.3] - 2026-07-21
 
 ### Added
