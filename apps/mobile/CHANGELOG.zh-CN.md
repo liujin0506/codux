@@ -4,19 +4,21 @@
 
 ## [Unreleased]
 
+## [2.0.5] - 2026-08-15
+
 ### 新增
 
 - 手机终端切换页在 Worktree 后增加「会话」页签，复用桌面端 / 平板的 AI 会话记录。
 
-### 修复
-
-- Android Kotlin 的 `jvmTarget` 改为 Kotlin 2.3 要求的 `compilerOptions` DSL。
-
-## [2.0.5] - 2026-08-15
-
 ### 调整
 
 - 移动端终端工具栏默认只保留一行编码快捷键，呼出输入法后再展开为两行。
+
+### 修复
+
+- Android Kotlin 的 `jvmTarget` 改为 Kotlin 2.3 要求的 `compilerOptions` DSL。
+- 修复文件页存储菜单把 Home、磁盘、根目录挤在 40px 弹层里的问题。
+- 会话列表按当前 worktree 路径查询，手机和平板与桌面端显示同一份历史。
 
 ## [2.0.4] - 2026-08-14
 

@@ -126,14 +126,16 @@ class RemoteProjectController {
 
   /// Request the AI conversation-history list for a project (same `ai.session`
   /// channel + DTO both hosts serve). Host replies `ai.session.result`.
-  RelayEnvelope aiSessionListEnvelope(ProjectInfo project) {
+  ///
+  /// History is indexed by worktree cwd on the host (same as the desktop
+  /// sidebar), so a selected worktree's path is sent as `projectPath`.
+  RelayEnvelope aiSessionListEnvelope(
+    ProjectInfo project, {
+    RemoteWorktreeInfo? worktree,
+  }) {
     return RelayEnvelope(
       type: RemoteMessageType.aiSession,
-      payload: {
-        'op': 'list',
-        'projectId': project.id,
-        if (project.path != null) 'projectPath': project.path,
-      },
+      payload: {'op': 'list', ...aiSessionScope(project, worktree)},
     );
   }
 
@@ -142,14 +144,14 @@ class RemoteProjectController {
   RelayEnvelope aiSessionRenameEnvelope(
     ProjectInfo project,
     String sessionId,
-    String title,
-  ) {
+    String title, {
+    RemoteWorktreeInfo? worktree,
+  }) {
     return RelayEnvelope(
       type: RemoteMessageType.aiSession,
       payload: {
         'op': 'rename',
-        'projectId': project.id,
-        if (project.path != null) 'projectPath': project.path,
+        ...aiSessionScope(project, worktree),
         'sessionId': sessionId,
         'title': title,
       },
@@ -157,13 +159,16 @@ class RemoteProjectController {
   }
 
   /// Remove a session from the host's AI history. Host replies with op `remove`.
-  RelayEnvelope aiSessionRemoveEnvelope(ProjectInfo project, String sessionId) {
+  RelayEnvelope aiSessionRemoveEnvelope(
+    ProjectInfo project,
+    String sessionId, {
+    RemoteWorktreeInfo? worktree,
+  }) {
     return RelayEnvelope(
       type: RemoteMessageType.aiSession,
       payload: {
         'op': 'remove',
-        'projectId': project.id,
-        if (project.path != null) 'projectPath': project.path,
+        ...aiSessionScope(project, worktree),
         'sessionId': sessionId,
       },
     );
@@ -172,16 +177,39 @@ class RemoteProjectController {
   /// Ask the host for the resume command that re-opens a session in its CLI tool
   /// (e.g. `claude --resume <id>`). Host replies with op `restore`; we write the
   /// returned command into the active terminal.
-  RelayEnvelope aiSessionRestoreEnvelope(ProjectInfo project, String sessionId) {
+  RelayEnvelope aiSessionRestoreEnvelope(
+    ProjectInfo project,
+    String sessionId, {
+    RemoteWorktreeInfo? worktree,
+  }) {
     return RelayEnvelope(
       type: RemoteMessageType.aiSession,
       payload: {
         'op': 'restore',
-        'projectId': project.id,
-        if (project.path != null) 'projectPath': project.path,
+        ...aiSessionScope(project, worktree),
         'sessionId': sessionId,
       },
     );
+  }
+
+  /// Wire fields the host's `ai.session` ops use to resolve indexed history.
+  /// Desktop queries by worktree path when one is selected; we do the same.
+  Map<String, String> aiSessionScope(
+    ProjectInfo project, [
+    RemoteWorktreeInfo? worktree,
+  ]) {
+    final worktreePath = worktree?.path.trim() ?? '';
+    final projectPath = worktreePath.isNotEmpty
+        ? worktreePath
+        : (project.path?.trim() ?? '');
+    final worktreeId = worktree?.id.trim() ?? '';
+    final worktreeName = worktree?.name.trim() ?? '';
+    return {
+      'projectId': project.id,
+      'projectName': worktreeName.isNotEmpty ? worktreeName : project.name,
+      if (projectPath.isNotEmpty) 'projectPath': projectPath,
+      if (worktreeId.isNotEmpty) 'worktreeId': worktreeId,
+    };
   }
 
   /// Request the host's saved SSH profiles (host-wide; the host owns them).

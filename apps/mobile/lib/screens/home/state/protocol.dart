@@ -409,6 +409,9 @@ extension _HomePageProtocol on HomeController {
     if (plan.hasRuntimeAction) {
       _applyRuntimePlan(plan, reason: 'worktree-updated');
     }
+    if (affectsCurrentProject) {
+      _requestAISessions();
+    }
     _closeTerminalSwitcherIfPendingWorktreeReady();
 
     // After creating a worktree the host auto-selects it but never received a

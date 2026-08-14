@@ -18,6 +18,24 @@ pub fn session_op_result_with_indexer(
 ) -> Result<Value, String> {
     let op = payload.get("op").and_then(Value::as_str).unwrap_or("");
     let session_id = string_field(payload, "sessionId");
+    if op == "list"
+        && let Ok(state) = indexer.project_state(project.clone())
+    {
+        if let Some(error) = state.error {
+            return Err(error);
+        }
+        if let Some(snapshot) = state.snapshot {
+            let summary = crate::project_summary_from_normalized_snapshot(snapshot);
+            return serde_json::to_value(
+                summary
+                    .sessions
+                    .into_iter()
+                    .map(codux_protocol::RemoteAISessionSummary::from)
+                    .collect::<Vec<_>>(),
+            )
+            .map_err(|error| error.to_string());
+        }
+    }
     let state = match op {
         "indexedRename" => {
             indexer.rename_session(project, session_id, string_field(payload, "title"))
