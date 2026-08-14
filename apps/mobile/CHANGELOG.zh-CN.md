@@ -569,7 +569,7 @@
 - 新增第一版 Codux Mobile Flutter 客户端，通过 relay 服务连接 macOS 端 Codux。
 - 支持扫码配对、设备管理、项目切换、终端分屏切换、文件浏览、图片上传和 AI 用量面板。
 - 新增基于 Termux TerminalView 的 Android 原生终端 Flutter 插件，支持远程输出、用户输入、滚动历史、文字选择、快捷键和输入法避让。
-- 新增 GitHub 更新检查，读取 `duxweb/codux-flutter` 最新 Release。
+- 新增 GitHub 更新检查，读取 `liujin0506/codux-flutter` 最新 Release。
 
 ### 调整
 

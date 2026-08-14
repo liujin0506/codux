@@ -14,7 +14,7 @@ use gpui_component::{Size, progress::Progress};
 const STAR_PROMPT_AFTER_DAYS: i64 = 3;
 
 const CODUX_WEBSITE_URL: &str = "https://codux.dux.cn";
-const CODUX_GITHUB_URL: &str = "https://github.com/duxweb/codux";
+const CODUX_GITHUB_URL: &str = "https://github.com/liujin0506/codux";
 const CODUX_IDENTIFIER: &str = "com.duxweb.codux";
 const UPDATE_DIALOG_WIDTH: f32 = 440.0;
 const UPDATE_DIALOG_DEFAULT_HEIGHT: f32 = 210.0;

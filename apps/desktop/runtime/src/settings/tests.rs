@@ -597,7 +597,7 @@ mod tests {
         crate::config::flush_all_config_writes();
         let updated = fs::read_to_string(support_dir.join("settings.json")).expect("updated");
         assert!(updated.contains(
-            "\"endpoint\": \"https://raw.githubusercontent.com/duxweb/codux/main/updates/beta/latest.json\""
+            "\"endpoint\": \"https://raw.githubusercontent.com/liujin0506/codux/main/updates/beta/latest.json\""
         ));
 
         let summary = service
@@ -607,7 +607,7 @@ mod tests {
         crate::config::flush_all_config_writes();
         let updated = fs::read_to_string(support_dir.join("settings.json")).expect("updated");
         assert!(updated.contains(
-            "\"endpoint\": \"https://raw.githubusercontent.com/duxweb/codux/main/updates/stable/latest.json\""
+            "\"endpoint\": \"https://raw.githubusercontent.com/liujin0506/codux/main/updates/stable/latest.json\""
         ));
 
         fs::remove_dir_all(support_dir).ok();
@@ -638,7 +638,7 @@ mod tests {
         crate::config::flush_all_config_writes();
         let updated = fs::read_to_string(support_dir.join("settings.json")).expect("updated");
         assert!(updated.contains(
-            "\"endpoint\": \"https://raw.githubusercontent.com/duxweb/codux/main/updates/beta/latest.json\""
+            "\"endpoint\": \"https://raw.githubusercontent.com/liujin0506/codux/main/updates/beta/latest.json\""
         ));
 
         fs::remove_dir_all(support_dir).ok();

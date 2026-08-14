@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/duxweb/codux-flutter/releases">
+  <a href="https://github.com/liujin0506/codux-flutter/releases">
     <img src="https://img.shields.io/badge/version-0.1.5-22d3ee?style=flat-square" alt="Version">
   </a>
   <a href="LICENSE">
@@ -17,9 +17,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/duxweb/codux">Codux for macOS</a> &middot;
-  <a href="https://github.com/duxweb/codux-flutter/releases">Download</a> &middot;
-  <a href="https://github.com/duxweb/codux-flutter/issues">Feedback</a>
+  <a href="https://github.com/liujin0506/codux">Codux for macOS</a> &middot;
+  <a href="https://github.com/liujin0506/codux-flutter/releases">Download</a> &middot;
+  <a href="https://github.com/liujin0506/codux-flutter/issues">Feedback</a>
 </p>
 
 <p align="center">
@@ -56,7 +56,7 @@ The mobile client focuses on three things:
 | Quick Keys | Ready | Two-row terminal toolbar with Esc, Tab, Copy, Paste, Upload, arrows, Delete, Enter, Ctrl, Shift, Alt, keyboard toggle, and `^C`. |
 | Files | Ready | Browse project files, remember per-project path, open/edit files, rename, copy path, and delete through the Mac host. |
 | AI Stats | Ready | Shows current project and recent AI usage data forwarded by the Codux host. |
-| Updates | Ready | Checks the latest GitHub Release for `duxweb/codux-flutter`. |
+| Updates | Ready | Checks the latest GitHub Release for `liujin0506/codux-flutter`. |
 
 ## Architecture
 
@@ -135,16 +135,16 @@ The default is `warn`. Release workflows build with `warn` unless overridden.
 
 ## Release
 
-The mobile source lives in this monorepo under `apps/mobile`. Mobile signing and public releases stay in the existing `duxweb/codux-flutter` repository so the existing Android and iOS signing secrets do not need to be moved:
+The mobile source lives in this monorepo under `apps/mobile`. Mobile signing and public releases stay in the existing `liujin0506/codux-flutter` repository so the existing Android and iOS signing secrets do not need to be moved:
 
 - `CHANGELOG.md` and `CHANGELOG.zh-CN.md` keep versioned release notes.
 - `scripts/release/build-release-notes.sh` extracts bilingual release notes for GitHub Releases.
-- `duxweb/codux` is the source repository for desktop, shared crates, and mobile app code.
-- `duxweb/codux-flutter` is the mobile release repository. Its workflows build from the monorepo source and publish mobile GitHub Release / TestFlight artifacts with the existing mobile secrets.
+- `liujin0506/codux` is the source repository for desktop, shared crates, and mobile app code.
+- `liujin0506/codux-flutter` is the mobile release repository. Its workflows build from the monorepo source and publish mobile GitHub Release / TestFlight artifacts with the existing mobile secrets.
 
 ### Android Signing
 
-Published Android releases require these secrets in `duxweb/codux-flutter`:
+Published Android releases require these secrets in `liujin0506/codux-flutter`:
 
 - `CODUX_ANDROID_KEYSTORE_BASE64`
 - `CODUX_ANDROID_KEYSTORE_PASSWORD`
@@ -161,7 +161,7 @@ For local development without `android/key.properties`, release builds fall back
 
 ### iOS Signing
 
-TestFlight releases require these secrets in `duxweb/codux-flutter`:
+TestFlight releases require these secrets in `liujin0506/codux-flutter`:
 
 - `IOS_DISTRIBUTION_CERT_BASE64`
 - `IOS_DISTRIBUTION_CERT_PASSWORD`
@@ -174,7 +174,7 @@ TestFlight releases require these secrets in `duxweb/codux-flutter`:
 
 1. Add mobile notes under the target version in `apps/mobile/CHANGELOG.md` and `apps/mobile/CHANGELOG.zh-CN.md`.
 2. Update `pubspec.yaml` version if needed.
-3. Commit the release changes in `duxweb/codux`, then push `main` and the source tag:
+3. Commit the release changes in `liujin0506/codux`, then push `main` and the source tag:
 
 ```bash
 cd <codux-repo>
@@ -183,7 +183,7 @@ git push origin main
 git push origin v0.1.4
 ```
 
-4. Push the same tag in `duxweb/codux-flutter` to trigger the mobile release workflows:
+4. Push the same tag in `liujin0506/codux-flutter` to trigger the mobile release workflows:
 
 ```bash
 cd <codux-flutter-release-repo>
@@ -191,7 +191,7 @@ git tag v0.1.4
 git push origin v0.1.4
 ```
 
-The mobile release workflows in `duxweb/codux-flutter` build `apps/mobile` from the matching `duxweb/codux` tag, publish `Codux-Mobile-<version>-arm64-v8a-android.apk` and `SHA256SUMS.txt` to the mobile GitHub Release, and optionally upload the iOS IPA to TestFlight.
+The mobile release workflows in `liujin0506/codux-flutter` build `apps/mobile` from the matching `liujin0506/codux` tag, publish `Codux-Mobile-<version>-arm64-v8a-android.apk` and `SHA256SUMS.txt` to the mobile GitHub Release, and optionally upload the iOS IPA to TestFlight.
 
 ## Repository Layout
 
@@ -210,5 +210,5 @@ Codux Mobile is licensed under the GNU General Public License v3.0, the same lic
 
 ## Related Projects
 
-- [Codux for macOS](https://github.com/duxweb/codux)
-- [Codux Mobile Releases](https://github.com/duxweb/codux-flutter/releases)
+- [Codux for macOS](https://github.com/liujin0506/codux)
+- [Codux Mobile Releases](https://github.com/liujin0506/codux-flutter/releases)

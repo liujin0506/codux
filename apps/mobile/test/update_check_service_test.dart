@@ -21,7 +21,7 @@ void main() {
           jsonEncode({
             'tag_name': 'v1.7.2',
             'html_url':
-                'https://github.com/duxweb/codux-flutter/releases/tag/v1.7.2',
+                'https://github.com/liujin0506/codux-flutter/releases/tag/v1.7.2',
           }),
           200,
         ),

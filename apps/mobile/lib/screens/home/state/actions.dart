@@ -369,7 +369,7 @@ extension _HomePageActions on HomeController {
         body: _t('app.aboutText'),
         versionText: 'v${info.version}+${info.buildNumber}',
         closeLabel: _t('app.close'),
-        onOpenGithub: () => _openUrl('https://github.com/duxweb/codux-flutter'),
+        onOpenGithub: () => _openUrl('https://github.com/liujin0506/codux-flutter'),
       ),
     );
   }

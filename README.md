@@ -10,19 +10,19 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/duxweb/codux/releases/latest"><img src="https://img.shields.io/github/v/release/duxweb/codux?label=release&color=blue" alt="Latest release"></a>
-  <a href="https://github.com/duxweb/codux/releases"><img src="https://img.shields.io/github/downloads/duxweb/codux/total?label=downloads&color=brightgreen" alt="Total downloads"></a>
+  <a href="https://github.com/liujin0506/codux/releases/latest"><img src="https://img.shields.io/github/v/release/liujin0506/codux?label=release&color=blue" alt="Latest release"></a>
+  <a href="https://github.com/liujin0506/codux/releases"><img src="https://img.shields.io/github/downloads/liujin0506/codux/total?label=downloads&color=brightgreen" alt="Total downloads"></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-8250df" alt="Platform">
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/duxweb/codux?color=orange" alt="License"></a>
-  <a href="https://github.com/duxweb/codux/stargazers"><img src="https://img.shields.io/github/stars/duxweb/codux?color=yellow" alt="GitHub stars"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/liujin0506/codux?color=orange" alt="License"></a>
+  <a href="https://github.com/liujin0506/codux/stargazers"><img src="https://img.shields.io/github/stars/liujin0506/codux?color=yellow" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
   <a href="https://codux.work">Website</a> &middot;
   <a href="https://codux.work/getting-started/">Docs</a> &middot;
-  <a href="https://github.com/duxweb/codux/releases/latest">Download</a> &middot;
-  <a href="https://github.com/duxweb/codux-flutter/releases/latest">Mobile</a> &middot;
-  <a href="https://github.com/duxweb/codux/issues">Feedback</a>
+  <a href="https://github.com/liujin0506/codux/releases/latest">Download</a> &middot;
+  <a href="https://github.com/liujin0506/codux-flutter/releases/latest">Mobile</a> &middot;
+  <a href="https://github.com/liujin0506/codux/issues">Feedback</a>
 </p>
 
 <p align="center">
@@ -159,9 +159,9 @@ Or download directly:
 
 | Platform | Download |
 | :--- | :--- |
-| macOS · Apple Silicon | [⬇ `codux-macos-aarch64.dmg`](https://github.com/duxweb/codux/releases/latest/download/codux-macos-aarch64.dmg) |
-| macOS · Intel | [⬇ `codux-macos-x86_64.dmg`](https://github.com/duxweb/codux/releases/latest/download/codux-macos-x86_64.dmg) |
-| Windows 11 · x64 | [⬇ `codux-windows-x86_64-setup.exe`](https://github.com/duxweb/codux/releases/latest/download/codux-windows-x86_64-setup.exe) |
+| macOS · Apple Silicon | [⬇ `codux-macos-aarch64.dmg`](https://github.com/liujin0506/codux/releases/latest/download/codux-macos-aarch64.dmg) |
+| macOS · Intel | [⬇ `codux-macos-x86_64.dmg`](https://github.com/liujin0506/codux/releases/latest/download/codux-macos-x86_64.dmg) |
+| Windows 11 · x64 | [⬇ `codux-windows-x86_64-setup.exe`](https://github.com/liujin0506/codux/releases/latest/download/codux-windows-x86_64-setup.exe) |
 
 Open the macOS `.dmg` and drag Codux to Applications; double-click the Windows installer. Then open a project, start your AI CLI, and go.
 
@@ -169,7 +169,7 @@ Open the macOS `.dmg` and drag Codux to Applications; double-click the Windows i
 
 **Mobile app**
 
-Download the Android APK from the [latest Codux Mobile release](https://github.com/duxweb/codux-flutter/releases/latest), or get the iOS app on the [App Store](https://apps.apple.com/cn/app/codux/id6772156906).
+Download the Android APK from the [latest Codux Mobile release](https://github.com/liujin0506/codux-flutter/releases/latest), or get the iOS app on the [App Store](https://apps.apple.com/cn/app/codux/id6772156906).
 
 > **Why is the iOS app paid?** Codux is fully open source (GPL-3.0); desktop and Android are free. The iOS price only covers Apple’s $99/year developer fee and revenue cut, and supports ongoing development — no subscriptions, no in-app purchases. Prefer not to pay? Build the identical app yourself from this repo's [`apps/mobile`](apps/mobile) source.
 
@@ -178,18 +178,18 @@ Download the Android APK from the [latest Codux Mobile release](https://github.c
 macOS / Linux — one line (auto-detects OS/arch, installs as `codux` on your `PATH`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/duxweb/codux/main/apps/agent/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/liujin0506/codux/main/apps/agent/scripts/install.sh | sh
 ```
 
 Flags: `--beta` · `--version <x.y.z>` · `--dir <path>` · `--setup` · `--mirror <prefix>` (if GitHub is slow where you are) · `--uninstall`. Or download the binary directly:
 
 | Platform | Download |
 | :--- | :--- |
-| macOS · Apple Silicon | [⬇ `codux-macos-aarch64`](https://github.com/duxweb/codux/releases/latest/download/codux-macos-aarch64) |
-| macOS · Intel | [⬇ `codux-macos-x86_64`](https://github.com/duxweb/codux/releases/latest/download/codux-macos-x86_64) |
-| Linux · arm64 | [⬇ `codux-linux-aarch64`](https://github.com/duxweb/codux/releases/latest/download/codux-linux-aarch64) |
-| Linux · x64 | [⬇ `codux-linux-x86_64`](https://github.com/duxweb/codux/releases/latest/download/codux-linux-x86_64) |
-| Windows · x64 | [⬇ `codux-windows-x86_64.exe`](https://github.com/duxweb/codux/releases/latest/download/codux-windows-x86_64.exe) |
+| macOS · Apple Silicon | [⬇ `codux-macos-aarch64`](https://github.com/liujin0506/codux/releases/latest/download/codux-macos-aarch64) |
+| macOS · Intel | [⬇ `codux-macos-x86_64`](https://github.com/liujin0506/codux/releases/latest/download/codux-macos-x86_64) |
+| Linux · arm64 | [⬇ `codux-linux-aarch64`](https://github.com/liujin0506/codux/releases/latest/download/codux-linux-aarch64) |
+| Linux · x64 | [⬇ `codux-linux-x86_64`](https://github.com/liujin0506/codux/releases/latest/download/codux-linux-x86_64) |
+| Windows · x64 | [⬇ `codux-windows-x86_64.exe`](https://github.com/liujin0506/codux/releases/latest/download/codux-windows-x86_64.exe) |
 
 Put the binary on your `PATH` as `codux`, then run `codux config` → `codux install` → `codux qrcode`.
 
@@ -250,7 +250,7 @@ Customize everything in **Settings → Shortcuts**.
 
 ## Feedback
 
-Found a bug or have a feature request? Open an [issue on GitHub](https://github.com/duxweb/codux/issues).
+Found a bug or have a feature request? Open an [issue on GitHub](https://github.com/liujin0506/codux/issues).
 
 For bug reports, use **Help → Export Diagnostics** and attach the generated `.zip` — it bundles runtime logs, rotated logs, performance summaries, saved app state, invalid-state backups, and matching macOS diagnostic reports when available.
 
@@ -271,8 +271,8 @@ Codux recognizes and supports the [LINUX DO](https://linux.do) community.
 Thanks to everyone who has contributed code, issues, testing, and feedback to Codux.
 
 <p align="center">
-  <a href="https://github.com/duxweb/codux/graphs/contributors">
-    <img src="https://readme-contribs.as93.net/contributors/duxweb/codux" alt="Codux contributors">
+  <a href="https://github.com/liujin0506/codux/graphs/contributors">
+    <img src="https://readme-contribs.as93.net/contributors/liujin0506/codux" alt="Codux contributors">
   </a>
 </p>
 
@@ -280,11 +280,11 @@ Thanks to everyone who has contributed code, issues, testing, and feedback to Co
 
 If Codux ever rescued one of your long agent runs, a ⭐ helps more people find it.
 
-<a href="https://www.star-history.com/?repos=duxweb%2Fcodux&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=liujin0506%2Fcodux&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=duxweb/codux&type=date&theme=dark&legend=top-left&sealed_token=hYXmcj_MIXkk4COkJV3llI2Vncn3-XEuwNNDVBZSDAnWmo3FHKZPS3sdLNsV5xv2SankP2QgPa7CX8vr6TvHzGolQTRk7sTLnTIM3sFHCIvUFOR_QPLWsA" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=duxweb/codux&type=date&legend=top-left&sealed_token=hYXmcj_MIXkk4COkJV3llI2Vncn3-XEuwNNDVBZSDAnWmo3FHKZPS3sdLNsV5xv2SankP2QgPa7CX8vr6TvHzGolQTRk7sTLnTIM3sFHCIvUFOR_QPLWsA" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=duxweb/codux&type=date&legend=top-left&sealed_token=hYXmcj_MIXkk4COkJV3llI2Vncn3-XEuwNNDVBZSDAnWmo3FHKZPS3sdLNsV5xv2SankP2QgPa7CX8vr6TvHzGolQTRk7sTLnTIM3sFHCIvUFOR_QPLWsA" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=liujin0506/codux&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=liujin0506/codux&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=liujin0506/codux&type=date&legend=top-left" />
  </picture>
 </a>
 

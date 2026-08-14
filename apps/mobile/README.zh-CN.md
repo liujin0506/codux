@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/duxweb/codux-flutter/releases">
+  <a href="https://github.com/liujin0506/codux-flutter/releases">
     <img src="https://img.shields.io/badge/版本-0.1.1-22d3ee?style=flat-square" alt="版本">
   </a>
   <a href="LICENSE">
@@ -17,9 +17,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/duxweb/codux">macOS 端 Codux</a> &middot;
-  <a href="https://github.com/duxweb/codux-flutter/releases">下载</a> &middot;
-  <a href="https://github.com/duxweb/codux-flutter/issues">反馈</a>
+  <a href="https://github.com/liujin0506/codux">macOS 端 Codux</a> &middot;
+  <a href="https://github.com/liujin0506/codux-flutter/releases">下载</a> &middot;
+  <a href="https://github.com/liujin0506/codux-flutter/issues">反馈</a>
 </p>
 
 <p align="center">
@@ -56,7 +56,7 @@ Codux Desktop 负责真实项目、终端会话、AI 工具运行、Git/worktree
 | 快捷键 | 可用 | 双排工具栏包含 Esc、Tab、复制、粘贴、上传、方向键、删除、回车、Ctrl、Shift、Alt、键盘开关和 `^C`。 |
 | 文件 | 可用 | 浏览项目文件、记忆每个项目目录、打开/编辑文件、重命名、复制路径、删除。 |
 | AI 统计 | 可用 | 展示 macOS 端转发的当前项目和近期 AI 用量。 |
-| 更新检查 | 可用 | 读取 `duxweb/codux-flutter` 最新 GitHub Release。 |
+| 更新检查 | 可用 | 读取 `liujin0506/codux-flutter` 最新 GitHub Release。 |
 
 ## 架构
 
@@ -135,16 +135,16 @@ flutter build apk --release --dart-define=CODUX_LOG_LEVEL=warn
 
 ## 发布
 
-移动端源码维护在当前 monorepo 的 `apps/mobile` 下。移动端签名和公开发布继续放在遗留的 `duxweb/codux-flutter` 仓库，这样不需要迁移已有 Android / iOS 签名 secrets：
+移动端源码维护在当前 monorepo 的 `apps/mobile` 下。移动端签名和公开发布继续放在遗留的 `liujin0506/codux-flutter` 仓库，这样不需要迁移已有 Android / iOS 签名 secrets：
 
 - `CHANGELOG.md` 和 `CHANGELOG.zh-CN.md` 记录版本更新。
 - `scripts/release/build-release-notes.sh` 从中英文更新日志提取 GitHub Release 内容。
-- `duxweb/codux` 是桌面端、共享 crates 和移动端源码仓库。
-- `duxweb/codux-flutter` 是移动端发布仓库。它的 workflows 从 monorepo 源码构建，并使用现有移动端 secrets 发布 GitHub Release / TestFlight 产物。
+- `liujin0506/codux` 是桌面端、共享 crates 和移动端源码仓库。
+- `liujin0506/codux-flutter` 是移动端发布仓库。它的 workflows 从 monorepo 源码构建，并使用现有移动端 secrets 发布 GitHub Release / TestFlight 产物。
 
 ### Android 签名
 
-Android 正式发布需要在 `duxweb/codux-flutter` 配置这些 secrets：
+Android 正式发布需要在 `liujin0506/codux-flutter` 配置这些 secrets：
 
 - `CODUX_ANDROID_KEYSTORE_BASE64`
 - `CODUX_ANDROID_KEYSTORE_PASSWORD`
@@ -161,7 +161,7 @@ base64 -i codux-release.jks | pbcopy
 
 ### iOS 签名
 
-TestFlight 发布需要在 `duxweb/codux-flutter` 配置这些 secrets：
+TestFlight 发布需要在 `liujin0506/codux-flutter` 配置这些 secrets：
 
 - `IOS_DISTRIBUTION_CERT_BASE64`
 - `IOS_DISTRIBUTION_CERT_PASSWORD`
@@ -174,7 +174,7 @@ TestFlight 发布需要在 `duxweb/codux-flutter` 配置这些 secrets：
 
 1. 在 `apps/mobile/CHANGELOG.md` 和 `apps/mobile/CHANGELOG.zh-CN.md` 写入目标版本更新记录。
 2. 如有需要，同步更新 `pubspec.yaml` 版本号。
-3. 在 `duxweb/codux` 提交发布变更，然后推送 `main` 和源码 tag：
+3. 在 `liujin0506/codux` 提交发布变更，然后推送 `main` 和源码 tag：
 
 ```bash
 cd <codux-repo>
@@ -183,7 +183,7 @@ git push origin main
 git push origin v0.1.1
 ```
 
-4. 在 `duxweb/codux-flutter` 推送同名 tag，触发移动端发布 workflows：
+4. 在 `liujin0506/codux-flutter` 推送同名 tag，触发移动端发布 workflows：
 
 ```bash
 cd <codux-flutter-release-repo>
@@ -191,7 +191,7 @@ git tag v0.1.1
 git push origin v0.1.1
 ```
 
-`duxweb/codux-flutter` 的移动端发布 workflows 会从匹配的 `duxweb/codux` tag 构建 `apps/mobile`，把 `Codux-Mobile-<version>-arm64-v8a-android.apk` 和 `SHA256SUMS.txt` 发布到移动端 GitHub Release，并可选上传 iOS IPA 到 TestFlight。
+`liujin0506/codux-flutter` 的移动端发布 workflows 会从匹配的 `liujin0506/codux` tag 构建 `apps/mobile`，把 `Codux-Mobile-<version>-arm64-v8a-android.apk` 和 `SHA256SUMS.txt` 发布到移动端 GitHub Release，并可选上传 iOS IPA 到 TestFlight。
 
 ## 目录结构
 
@@ -210,5 +210,5 @@ Codux Mobile 使用 GNU General Public License v3.0，和 macOS 端 Codux 保持
 
 ## 相关项目
 
-- [Codux for macOS](https://github.com/duxweb/codux)
-- [Codux Mobile Releases](https://github.com/duxweb/codux-flutter/releases)
+- [Codux for macOS](https://github.com/liujin0506/codux)
+- [Codux Mobile Releases](https://github.com/liujin0506/codux-flutter/releases)

@@ -9,13 +9,13 @@ use std::time::Duration;
 
 use crate::{cmd_service, cmd_start, runstate};
 
-const LATEST_RELEASE_API: &str = "https://api.github.com/repos/duxweb/codux/releases/latest";
-const RELEASES_API: &str = "https://api.github.com/repos/duxweb/codux/releases";
+const LATEST_RELEASE_API: &str = "https://api.github.com/repos/liujin0506/codux/releases/latest";
+const RELEASES_API: &str = "https://api.github.com/repos/liujin0506/codux/releases";
 const STABLE_MANIFEST_URL: &str =
-    "https://raw.githubusercontent.com/duxweb/codux/main/updates/stable/latest.json";
+    "https://raw.githubusercontent.com/liujin0506/codux/main/updates/stable/latest.json";
 const BETA_MANIFEST_URL: &str =
-    "https://raw.githubusercontent.com/duxweb/codux/main/updates/beta/latest.json";
-const REPO_DOWNLOAD_BASE: &str = "https://github.com/duxweb/codux/releases/download";
+    "https://raw.githubusercontent.com/liujin0506/codux/main/updates/beta/latest.json";
+const REPO_DOWNLOAD_BASE: &str = "https://github.com/liujin0506/codux/releases/download";
 const USER_AGENT: &str = "codux-agent-updater";
 
 #[derive(Deserialize)]
@@ -321,7 +321,7 @@ mod tests {
         assert!(release.assets.iter().any(|asset| {
             asset.browser_download_url
                 == format!(
-                    "https://github.com/duxweb/codux/releases/download/v2.0.0-beta.10/{expected}"
+                    "https://github.com/liujin0506/codux/releases/download/v2.0.0-beta.10/{expected}"
                 )
         }));
     }

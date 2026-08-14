@@ -10,19 +10,19 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/duxweb/codux/releases/latest"><img src="https://img.shields.io/github/v/release/duxweb/codux?label=release&color=blue" alt="Latest release"></a>
-  <a href="https://github.com/duxweb/codux/releases"><img src="https://img.shields.io/github/downloads/duxweb/codux/total?label=downloads&color=brightgreen" alt="Total downloads"></a>
+  <a href="https://github.com/liujin0506/codux/releases/latest"><img src="https://img.shields.io/github/v/release/liujin0506/codux?label=release&color=blue" alt="Latest release"></a>
+  <a href="https://github.com/liujin0506/codux/releases"><img src="https://img.shields.io/github/downloads/liujin0506/codux/total?label=downloads&color=brightgreen" alt="Total downloads"></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-8250df" alt="Platform">
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/duxweb/codux?color=orange" alt="License"></a>
-  <a href="https://github.com/duxweb/codux/stargazers"><img src="https://img.shields.io/github/stars/duxweb/codux?color=yellow" alt="GitHub stars"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/liujin0506/codux?color=orange" alt="License"></a>
+  <a href="https://github.com/liujin0506/codux/stargazers"><img src="https://img.shields.io/github/stars/liujin0506/codux?color=yellow" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
   <a href="https://codux.work">웹사이트</a> &middot;
   <a href="https://codux.work/getting-started/">문서</a> &middot;
-  <a href="https://github.com/duxweb/codux/releases/latest">다운로드</a> &middot;
-  <a href="https://github.com/duxweb/codux-flutter/releases/latest">모바일</a> &middot;
-  <a href="https://github.com/duxweb/codux/issues">피드백</a>
+  <a href="https://github.com/liujin0506/codux/releases/latest">다운로드</a> &middot;
+  <a href="https://github.com/liujin0506/codux-flutter/releases/latest">모바일</a> &middot;
+  <a href="https://github.com/liujin0506/codux/issues">피드백</a>
 </p>
 
 <p align="center">
@@ -159,9 +159,9 @@ brew install --cask duxweb/tap/codux
 
 | 플랫폼 | 다운로드 |
 | :--- | :--- |
-| macOS · Apple Silicon | [⬇ `codux-macos-aarch64.dmg`](https://github.com/duxweb/codux/releases/latest/download/codux-macos-aarch64.dmg) |
-| macOS · Intel | [⬇ `codux-macos-x86_64.dmg`](https://github.com/duxweb/codux/releases/latest/download/codux-macos-x86_64.dmg) |
-| Windows 11 · x64 | [⬇ `codux-windows-x86_64-setup.exe`](https://github.com/duxweb/codux/releases/latest/download/codux-windows-x86_64-setup.exe) |
+| macOS · Apple Silicon | [⬇ `codux-macos-aarch64.dmg`](https://github.com/liujin0506/codux/releases/latest/download/codux-macos-aarch64.dmg) |
+| macOS · Intel | [⬇ `codux-macos-x86_64.dmg`](https://github.com/liujin0506/codux/releases/latest/download/codux-macos-x86_64.dmg) |
+| Windows 11 · x64 | [⬇ `codux-windows-x86_64-setup.exe`](https://github.com/liujin0506/codux/releases/latest/download/codux-windows-x86_64-setup.exe) |
 
 macOS에서는 `.dmg`를 열고 Codux를 Applications로 드래그합니다. Windows에서는 설치 프로그램을 더블 클릭합니다. 그런 다음 프로젝트를 열고 AI CLI를 시작하면 됩니다.
 
@@ -169,7 +169,7 @@ macOS에서는 `.dmg`를 열고 Codux를 Applications로 드래그합니다. Win
 
 **모바일 앱**
 
-[최신 Codux Mobile 릴리스](https://github.com/duxweb/codux-flutter/releases/latest) 에서 Android APK를 다운로드하고, iOS는 [App Store](https://apps.apple.com/cn/app/codux/id6772156906) 에서 받으세요.
+[최신 Codux Mobile 릴리스](https://github.com/liujin0506/codux-flutter/releases/latest) 에서 Android APK를 다운로드하고, iOS는 [App Store](https://apps.apple.com/cn/app/codux/id6772156906) 에서 받으세요.
 
 > **iOS 앱은 왜 유료인가요?** Codux는 완전한 오픈소스(GPL-3.0)이며 데스크톱과 Android 버전은 무료입니다. iOS 가격은 Apple의 연간 99달러 개발자 비용과 수수료를 충당하고 지속적인 개발을 지원하기 위한 것으로, 구독이나 인앱 결제는 없습니다. 원치 않으시면 이 저장소의 [`apps/mobile`](apps/mobile) 소스로 직접 빌드하세요. 기능은 동일합니다.
 
@@ -178,18 +178,18 @@ macOS에서는 `.dmg`를 열고 Codux를 Applications로 드래그합니다. Win
 macOS / Linux: 한 줄로 설치합니다(OS / arch 자동 감지, `codux`로 `PATH`에 설치).
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/duxweb/codux/main/apps/agent/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/liujin0506/codux/main/apps/agent/scripts/install.sh | sh
 ```
 
 Flags: `--beta` · `--version <x.y.z>` · `--dir <path>` · `--setup` · `--mirror <prefix>`(GitHub가 느린 지역용) · `--uninstall`. 또는 바이너리를 직접 다운로드할 수 있습니다.
 
 | 플랫폼 | 다운로드 |
 | :--- | :--- |
-| macOS · Apple Silicon | [⬇ `codux-macos-aarch64`](https://github.com/duxweb/codux/releases/latest/download/codux-macos-aarch64) |
-| macOS · Intel | [⬇ `codux-macos-x86_64`](https://github.com/duxweb/codux/releases/latest/download/codux-macos-x86_64) |
-| Linux · arm64 | [⬇ `codux-linux-aarch64`](https://github.com/duxweb/codux/releases/latest/download/codux-linux-aarch64) |
-| Linux · x64 | [⬇ `codux-linux-x86_64`](https://github.com/duxweb/codux/releases/latest/download/codux-linux-x86_64) |
-| Windows · x64 | [⬇ `codux-windows-x86_64.exe`](https://github.com/duxweb/codux/releases/latest/download/codux-windows-x86_64.exe) |
+| macOS · Apple Silicon | [⬇ `codux-macos-aarch64`](https://github.com/liujin0506/codux/releases/latest/download/codux-macos-aarch64) |
+| macOS · Intel | [⬇ `codux-macos-x86_64`](https://github.com/liujin0506/codux/releases/latest/download/codux-macos-x86_64) |
+| Linux · arm64 | [⬇ `codux-linux-aarch64`](https://github.com/liujin0506/codux/releases/latest/download/codux-linux-aarch64) |
+| Linux · x64 | [⬇ `codux-linux-x86_64`](https://github.com/liujin0506/codux/releases/latest/download/codux-linux-x86_64) |
+| Windows · x64 | [⬇ `codux-windows-x86_64.exe`](https://github.com/liujin0506/codux/releases/latest/download/codux-windows-x86_64.exe) |
 
 바이너리를 `codux`라는 이름으로 `PATH`에 두고 `codux config` → `codux install` → `codux qrcode`를 실행합니다.
 
@@ -250,7 +250,7 @@ Codux Desktop에서 페어링된 headless host를 제어할 때, 지구본 **Web
 
 ## 피드백
 
-버그나 기능 요청이 있으면 [GitHub Issues](https://github.com/duxweb/codux/issues)에 남겨 주세요.
+버그나 기능 요청이 있으면 [GitHub Issues](https://github.com/liujin0506/codux/issues)에 남겨 주세요.
 
 버그 보고 시 **Help → Export Diagnostics** 를 사용해 생성된 `.zip`을 첨부하는 것을 권장합니다. runtime logs, rotated logs, performance summaries, 저장된 app state, invalid-state backups, 일치하는 macOS diagnostic reports가 포함됩니다.
 
@@ -271,8 +271,8 @@ Codux는 [LINUX DO](https://linux.do) 커뮤니티를 응원합니다.
 Codux에 코드, issue, 테스트, 피드백으로 기여해 주신 모든 분께 감사드립니다.
 
 <p align="center">
-  <a href="https://github.com/duxweb/codux/graphs/contributors">
-    <img src="https://readme-contribs.as93.net/contributors/duxweb/codux" alt="Codux contributors">
+  <a href="https://github.com/liujin0506/codux/graphs/contributors">
+    <img src="https://readme-contribs.as93.net/contributors/liujin0506/codux" alt="Codux contributors">
   </a>
 </p>
 
@@ -280,11 +280,11 @@ Codux에 코드, issue, 테스트, 피드백으로 기여해 주신 모든 분�
 
 Codux가 긴 agent 실행을 구해 준 적이 있다면, ⭐ 는 더 많은 사람이 Codux를 찾는 데 도움이 됩니다.
 
-<a href="https://www.star-history.com/?repos=duxweb%2Fcodux&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=liujin0506%2Fcodux&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=duxweb/codux&type=date&theme=dark&legend=top-left&sealed_token=hYXmcj_MIXkk4COkJV3llI2Vncn3-XEuwNNDVBZSDAnWmo3FHKZPS3sdLNsV5xv2SankP2QgPa7CX8vr6TvHzGolQTRk7sTLnTIM3sFHCIvUFOR_QPLWsA" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=duxweb/codux&type=date&legend=top-left&sealed_token=hYXmcj_MIXkk4COkJV3llI2Vncn3-XEuwNNDVBZSDAnWmo3FHKZPS3sdLNsV5xv2SankP2QgPa7CX8vr6TvHzGolQTRk7sTLnTIM3sFHCIvUFOR_QPLWsA" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=duxweb/codux&type=date&legend=top-left&sealed_token=hYXmcj_MIXkk4COkJV3llI2Vncn3-XEuwNNDVBZSDAnWmo3FHKZPS3sdLNsV5xv2SankP2QgPa7CX8vr6TvHzGolQTRk7sTLnTIM3sFHCIvUFOR_QPLWsA" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=liujin0506/codux&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=liujin0506/codux&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=liujin0506/codux&type=date&legend=top-left" />
  </picture>
 </a>
 

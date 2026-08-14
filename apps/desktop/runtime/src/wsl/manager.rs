@@ -372,7 +372,7 @@ dir="$(dirname "$target")"
 tmp="$target.tmp"
 trap 'rm -f "$tmp"' EXIT
 mkdir -p "$dir"
-url="https://github.com/duxweb/codux/releases/download/v{version}/$asset"
+url="https://github.com/liujin0506/codux/releases/download/v{version}/$asset"
 if command -v curl >/dev/null 2>&1; then
   curl -fL --progress-bar "$url" -o "$tmp"
 elif command -v wget >/dev/null 2>&1; then

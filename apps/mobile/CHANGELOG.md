@@ -569,7 +569,7 @@ Important changes to this project are documented here.
 - Initial Codux Mobile Flutter client for connecting to Codux on macOS through the relay service.
 - Added QR pairing, device management, project switching, terminal split switching, file browsing, image upload, and AI usage panels.
 - Added native Android terminal rendering through a Termux TerminalView based Flutter platform view, including remote output, user input, scrollback, text selection, quick keys, and IME avoidance.
-- Added GitHub update checking against the latest `duxweb/codux-flutter` release.
+- Added GitHub update checking against the latest `liujin0506/codux-flutter` release.
 
 ### Changed
 

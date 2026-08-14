@@ -187,6 +187,6 @@ function buildDownloadGuide() {
 }
 
 function releaseAssetUrl(assetName) {
-  const repo = process.env.GITHUB_REPOSITORY || "duxweb/codux";
+  const repo = process.env.GITHUB_REPOSITORY || "liujin0506/codux";
   return `https://github.com/${repo}/releases/latest/download/${encodeURIComponent(assetName)}`;
 }
