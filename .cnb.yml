@@ -13,6 +13,7 @@ main:
         volumes:
           - /root/.cargo/registry
           - /root/.cargo/git
+          - /root/.rustup
       env:
         CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
         RELEASE_BUILD_ID: linux-x86_64
@@ -27,6 +28,13 @@ main:
               rm -f /tmp/node.tar.gz
             fi
             node -v
+        - name: Install Rust
+          script: |
+            set -eu
+            rustup toolchain install stable
+            rustup default stable
+            rustup target add "${CARGO_BUILD_TARGET}"
+            rustc -V
         - name: Check
           script: cargo check --workspace --exclude codux --target "${CARGO_BUILD_TARGET}"
         - name: Test release scripts
