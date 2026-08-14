@@ -54,6 +54,7 @@ android {
 }
 
 tasks.register("buildCoduxProtocolRustAndroid", Exec) {
+    onlyIf { System.getenv("CODUX_SKIP_ANDROID_FFI_BUILD") != "1" }
     workingDir = projectDir
     commandLine("bash", "../scripts/build-android.sh")
 }
