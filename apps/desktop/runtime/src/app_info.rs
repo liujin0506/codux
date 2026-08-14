@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use url::Url;
 
-const TAURI_UPDATER_PUBLIC_KEY: &str = "RWTIDGGsK4geAihw4QK08H+tw5BUDYrQDww6GRCVQKWtH6RvOVe/huaA";
+const TAURI_UPDATER_PUBLIC_KEY: &str = "RWRdhOeis05Epph1IzCfucxiWaN9fF9BakmwdlOh+BUXiRtEXHSIE5c0";
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppAboutMetadata {
