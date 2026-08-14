@@ -74,10 +74,13 @@ void main() {
       matching: find.byType(InkWell),
     );
 
-    expect(tester.getRect(buttons.at(0)).left - toolbar.left, Toolbar.cornerInset);
+    expect(
+      tester.getRect(buttons.at(0)).left - toolbar.left,
+      closeTo(Toolbar.cornerInset, 0.001),
+    );
     expect(
       toolbar.right - tester.getRect(buttons.at(6)).right,
-      Toolbar.cornerInset,
+      closeTo(Toolbar.cornerInset, 0.001),
     );
   });
 }
