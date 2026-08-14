@@ -20,10 +20,11 @@ main:
       stages:
         - name: Setup Node
           script: |
-            set -euo pipefail
+            set -eu
             if ! command -v node >/dev/null 2>&1; then
-              curl -fsSL https://nodejs.org/dist/v22.16.0/node-v22.16.0-linux-x64.tar.gz \
-                | tar -xz -C /usr/local --strip-components=1
+              curl -fsSL -o /tmp/node.tar.gz https://nodejs.org/dist/v22.16.0/node-v22.16.0-linux-x64.tar.gz
+              tar -xz -C /usr/local --strip-components=1 -f /tmp/node.tar.gz
+              rm -f /tmp/node.tar.gz
             fi
             node -v
         - name: Check
@@ -66,7 +67,7 @@ v*:
       stages:
         - name: Resolve release metadata
           script: |
-            set -euo pipefail
+            set -eu
             mkdir -p dist
             node apps/desktop/scripts/release/prepare-release.mjs "${CNB_BRANCH}" auto
         - name: Create release
@@ -108,7 +109,7 @@ v*:
             key: agent-linux-amd64
         - name: Resolve release metadata
           script: |
-            set -euo pipefail
+            set -eu
             mkdir -p dist
             node apps/desktop/scripts/release/prepare-release.mjs "${CNB_BRANCH}" auto
         - name: Build Linux agent on Debian 10 baseline
