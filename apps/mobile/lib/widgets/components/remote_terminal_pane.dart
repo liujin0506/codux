@@ -43,8 +43,6 @@ class RemoteTerminalPane extends StatefulWidget {
     required this.onRequestKeyboard,
     required this.onPaste,
     required this.onCopy,
-    required this.onUpload,
-    required this.onVoiceInput,
     required this.handedAway,
     required this.onTakeOver,
   });
@@ -78,8 +76,6 @@ class RemoteTerminalPane extends StatefulWidget {
   final VoidCallback onRequestKeyboard;
   final VoidCallback onPaste;
   final VoidCallback onCopy;
-  final VoidCallback onUpload;
-  final VoidCallback onVoiceInput;
   // Handoff: the desktop (or another device) currently owns this session. Show a
   // placeholder instead of the live terminal; onTakeOver reclaims it to here.
   final bool handedAway;
@@ -150,7 +146,9 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
     final toolbarBottom = effectiveKeyboardHeight > 0
         ? effectiveKeyboardHeight
         : bottomInset;
-    const toolbarBaseHeight = 76.0;
+    final toolbarExpanded =
+        widget.keyboardVisible || effectiveKeyboardHeight > 0;
+    final toolbarBaseHeight = Toolbar.heightFor(expanded: toolbarExpanded);
     final keyboardLift = effectiveKeyboardHeight > 0
         ? (effectiveKeyboardHeight - bottomInset).clamp(0.0, double.infinity)
         : 0.0;
@@ -279,14 +277,11 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
                     child: Toolbar(
                       onSendKey: widget.onSendKey,
                       applicationCursor: false,
-                      keyboardVisible: widget.keyboardVisible,
+                      keyboardVisible: toolbarExpanded,
                       bottomInset: 0,
                       onToggleKeyboard: widget.onToggleKeyboard,
-                      uploading: widget.terminalUploadLoading,
                       onPaste: widget.onPaste,
                       onCopy: widget.onCopy,
-                      onUpload: widget.onUpload,
-                      onVoiceInput: widget.onVoiceInput,
                     ),
                   ),
               ],

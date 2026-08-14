@@ -4,6 +4,12 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.5] - 2026-08-15
+
+### Changed
+
+- Slimmed the mobile terminal toolbar to one row of coding keys by default, and expanded it to two rows only after the IME opens.
+
 ## [2.0.4] - 2026-08-14
 
 ### Changed
