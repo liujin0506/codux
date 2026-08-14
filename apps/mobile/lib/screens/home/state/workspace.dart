@@ -50,6 +50,11 @@ extension _HomePageWorkspace on HomeController {
     _worktreeActions.selectWorktree(worktree);
   }
 
+  void _openSessionFromSwitcher(AISessionRecord session) {
+    _closeTerminalSwitcher();
+    unawaited(_openAISession(session));
+  }
+
   Future<void> _createWorktree() async {
     await _worktreeActions.createWorktree();
   }

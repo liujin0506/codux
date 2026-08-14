@@ -4,6 +4,10 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added a Sessions tab to the phone terminal switcher, after Worktrees, using the same AI session history as desktop and pad.
+
 ## [2.0.5] - 2026-08-15
 
 ### Changed

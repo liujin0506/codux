@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../../i18n.dart';
 import '../../models/remote_models.dart';
 import '../../theme/app_theme.dart';
+import '../pad/pad_workspace_shared.dart';
 import 'swipe_list_tile.dart';
 
-enum TerminalSwitcherSection { terminals, worktrees }
+enum TerminalSwitcherSection { terminals, worktrees, sessions }
 
 class TerminalSwitcherScreen extends StatefulWidget {
   const TerminalSwitcherScreen({
@@ -32,6 +33,12 @@ class TerminalSwitcherScreen extends StatefulWidget {
     required this.onOpenWorktrees,
     required this.onRefreshWorktrees,
     required this.onRefreshTerminals,
+    required this.aiSessions,
+    required this.onOpenSessions,
+    required this.onRefreshSessions,
+    required this.onOpenSession,
+    required this.onRenameSession,
+    required this.onDeleteSession,
   });
 
   final double topInset;
@@ -56,6 +63,12 @@ class TerminalSwitcherScreen extends StatefulWidget {
   final VoidCallback onOpenWorktrees;
   final VoidCallback onRefreshWorktrees;
   final VoidCallback onRefreshTerminals;
+  final List<AISessionRecord> aiSessions;
+  final VoidCallback onOpenSessions;
+  final VoidCallback onRefreshSessions;
+  final ValueChanged<AISessionRecord> onOpenSession;
+  final ValueChanged<AISessionRecord> onRenameSession;
+  final ValueChanged<AISessionRecord> onDeleteSession;
 
   @override
   State<TerminalSwitcherScreen> createState() => _TerminalSwitcherScreenState();
@@ -111,6 +124,8 @@ class _TerminalSwitcherScreenState extends State<TerminalSwitcherScreen> {
                 setState(() => _section = next);
                 if (next == TerminalSwitcherSection.worktrees) {
                   widget.onOpenWorktrees();
+                } else if (next == TerminalSwitcherSection.sessions) {
+                  widget.onOpenSessions();
                 }
               },
             ),
@@ -120,10 +135,13 @@ class _TerminalSwitcherScreenState extends State<TerminalSwitcherScreen> {
                 color: accent,
                 backgroundColor: AppColors.bgSurface,
                 onRefresh: () async {
-                  if (_section == TerminalSwitcherSection.worktrees) {
-                    widget.onRefreshWorktrees();
-                  } else {
-                    widget.onRefreshTerminals();
+                  switch (_section) {
+                    case TerminalSwitcherSection.worktrees:
+                      widget.onRefreshWorktrees();
+                    case TerminalSwitcherSection.sessions:
+                      widget.onRefreshSessions();
+                    case TerminalSwitcherSection.terminals:
+                      widget.onRefreshTerminals();
                   }
                   // Brief delay so the pull-to-refresh spinner reads as an
                   // action; the host's reply arrives asynchronously.
@@ -151,6 +169,12 @@ class _TerminalSwitcherScreenState extends State<TerminalSwitcherScreen> {
                   onCreate: widget.onCreateWorktree,
                   onMerge: widget.onMergeWorktree,
                   onDelete: widget.onDeleteWorktree,
+                ),
+                TerminalSwitcherSection.sessions => _SessionList(
+                  sessions: widget.aiSessions,
+                  onOpen: widget.onOpenSession,
+                  onRename: widget.onRenameSession,
+                  onDelete: widget.onDeleteSession,
                 ),
                 },
               ),
@@ -188,6 +212,11 @@ class _SectionTabs extends StatelessWidget {
             label: prefs.t('switcher.worktrees'),
             active: value == TerminalSwitcherSection.worktrees,
             onTap: () => onChanged(TerminalSwitcherSection.worktrees),
+          ),
+          _Segment(
+            label: prefs.t('switcher.sessions'),
+            active: value == TerminalSwitcherSection.sessions,
+            onTap: () => onChanged(TerminalSwitcherSection.sessions),
           ),
         ],
       ),
@@ -415,6 +444,92 @@ class _WorktreeList extends StatelessWidget {
               ? Icon(Icons.check_rounded, color: accent, size: 20)
               : null,
           actions: actions,
+        );
+      },
+    );
+  }
+}
+
+class _SessionList extends StatelessWidget {
+  const _SessionList({
+    required this.sessions,
+    required this.onOpen,
+    required this.onRename,
+    required this.onDelete,
+  });
+
+  final List<AISessionRecord> sessions;
+  final ValueChanged<AISessionRecord> onOpen;
+  final ValueChanged<AISessionRecord> onRename;
+  final ValueChanged<AISessionRecord> onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = AppPreferences.of(context);
+    final accent = Theme.of(context).colorScheme.secondary;
+    if (sessions.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        children: [
+          SizedBox(
+            height: 200,
+            child: Center(
+              child: Text(
+                prefs.t('workspace.sessionsEmpty'),
+                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      itemCount: sessions.length,
+      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.s),
+      itemBuilder: (context, index) {
+        final session = sessions[index];
+        final title = session.title.trim().isNotEmpty
+            ? session.title.trim()
+            : session.id;
+        final time = formatEpochSeconds(session.time);
+        final tool = session.tool.trim();
+        final subtitle = [
+          if (tool.isNotEmpty) tool,
+          if (time.isNotEmpty) time,
+        ].join(' · ');
+        return SwipeListTile(
+          key: ValueKey('terminal-switcher-session-${session.id}'),
+          title: title,
+          subtitle: subtitle.isEmpty ? session.id : subtitle,
+          leadingIcon: Icons.forum_outlined,
+          onTap: () => onOpen(session),
+          trailing: session.size > 0
+              ? Text(
+                  formatTokenSize(session.size),
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                )
+              : null,
+          actions: [
+            SwipeListAction(
+              label: prefs.t('session.menuRename'),
+              color: accent,
+              icon: Icons.drive_file_rename_outline_rounded,
+              onTap: () => onRename(session),
+            ),
+            SwipeListAction(
+              label: prefs.t('session.menuDelete'),
+              color: AppColors.danger,
+              icon: Icons.delete_outline_rounded,
+              onTap: () => onDelete(session),
+            ),
+          ],
         );
       },
     );

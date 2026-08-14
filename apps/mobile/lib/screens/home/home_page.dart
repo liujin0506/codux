@@ -355,6 +355,12 @@ class _CoduxHomePageState extends State<CoduxHomePage>
       onOpenWorktrees: c._ensureSelectedProjectWorktrees,
       onRefreshWorktrees: () => c._requestWorktreeList(loading: true),
       onRefreshTerminals: () => c._requestTerminalList(resetRetry: true),
+      aiSessions: c._aiSessions,
+      onOpenSessions: () => c._requestAISessions(force: true),
+      onRefreshSessions: () => c._requestAISessions(force: true),
+      onOpenSession: c._openSessionFromSwitcher,
+      onRenameSession: c._renameAISession,
+      onDeleteSession: c._deleteAISession,
     );
   }
 
