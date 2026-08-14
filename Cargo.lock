@@ -6168,7 +6168,9 @@ dependencies = [
  "futures-lite 2.6.1",
  "log",
  "mac-notification-sys",
+ "serde",
  "tauri-winrt-notification",
+ "zbus",
 ]
 
 [[package]]
