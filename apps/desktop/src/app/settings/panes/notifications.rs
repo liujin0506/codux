@@ -43,52 +43,60 @@ pub(super) fn settings_notification_card(
         {
             let mut rows = vec![
                 div()
+                    .py(px(8.0))
                     .flex()
-                    .items_start()
-                    .justify_between()
-                    .gap(px(16.0))
+                    .flex_col()
+                    .gap(px(6.0))
                     .child(
                         div()
-                            .min_w_0()
+                            .w_full()
                             .flex()
-                            .flex_col()
+                            .items_center()
+                            .justify_between()
+                            .gap(px(16.0))
                             .child(
                                 div()
+                                    .flex_1()
+                                    .min_w(px(48.0))
+                                    .whitespace_nowrap()
                                     .text_size(rems(0.875))
                                     .line_height(rems(1.125))
+                                    .font_weight(FontWeight::MEDIUM)
                                     .text_color(color(theme::TEXT))
                                     .child(channel.label.clone()),
                             )
                             .child(
-                                div()
-                                    .mt(px(4.0))
-                                    .text_size(rems(0.75))
-                                    .line_height(rems(1.0))
-                                    .text_color(color(theme::TEXT_DIM))
-                                    .child(notification_channel_description(&channel.id, language)),
+                                div().flex_shrink_0().child(settings_toggle(
+                                    format!("settings-notification-enabled-{}", channel.id),
+                                    channel.enabled,
+                                    cx,
+                                    move |app, window, cx| {
+                                        let next = !app
+                                            .state
+                                            .notifications
+                                            .channels
+                                            .iter()
+                                            .find(|item| item.id == enabled_id)
+                                            .map(|item| item.enabled)
+                                            .unwrap_or(false);
+                                        app.set_notification_channel_enabled(
+                                            enabled_id.clone(),
+                                            next,
+                                            window,
+                                            cx,
+                                        )
+                                    },
+                                )),
                             ),
                     )
-                    .child(settings_toggle(
-                        format!("settings-notification-enabled-{}", channel.id),
-                        channel.enabled,
-                        cx,
-                        move |app, window, cx| {
-                            let next = !app
-                                .state
-                                .notifications
-                                .channels
-                                .iter()
-                                .find(|item| item.id == enabled_id)
-                                .map(|item| item.enabled)
-                                .unwrap_or(false);
-                            app.set_notification_channel_enabled(
-                                enabled_id.clone(),
-                                next,
-                                window,
-                                cx,
-                            )
-                        },
-                    ))
+                    .child(
+                        div()
+                            .w_full()
+                            .text_size(rems(0.75))
+                            .line_height(rems(1.0))
+                            .text_color(color(theme::TEXT_DIM))
+                            .child(notification_channel_description(&channel.id, language)),
+                    )
                     .into_any_element(),
             ];
             if channel.enabled {
@@ -144,6 +152,7 @@ pub(super) fn settings_notification_card(
                     )
                     .into_any_element(),
                     div()
+                        .py(px(8.0))
                         .flex()
                         .justify_end()
                         .child(settings_small_button_state(

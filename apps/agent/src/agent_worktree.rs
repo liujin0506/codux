@@ -1,4 +1,7 @@
-use crate::terminals::{TerminalFanout, TransportSlot, broadcast_terminal_list, create_terminal};
+use crate::projects::AgentProjectStore;
+use crate::terminals::{
+    TerminalFanout, TransportSlot, broadcast_project_list, broadcast_terminal_list, create_terminal,
+};
 use codux_protocol::REMOTE_WORKTREE_UPDATED;
 use codux_runtime_core::{
     agent_worktree::{AgentWorktreeCreateRequest, AgentWorktreeTerminalScope},
@@ -31,9 +34,13 @@ impl HeadlessAgentWorktreeHost {
     }
 
     fn broadcast_worktrees(&self, project_id: &str, project_path: &str) {
+        let (project_id, project_path) = AgentProjectStore::new()
+            .resolve_or_register(Some(project_id), Some(project_path))
+            .map(|project| (project.id, project.path))
+            .unwrap_or_else(|| (project_id.to_string(), project_path.to_string()));
         let envelope = json!({
             "type": REMOTE_WORKTREE_UPDATED,
-            "payload": crate::worktree::worktree_list_payload(project_id, project_path),
+            "payload": crate::worktree::worktree_list_payload(&project_id, &project_path),
         });
         let Ok(bytes) = serde_json::to_vec(&envelope) else {
             return;
@@ -67,8 +74,12 @@ impl AgentWorktreeHost for HeadlessAgentWorktreeHost {
             request.base_branch.as_deref(),
         )?;
         let path = codux_git::normalize_repository_path(&path.to_string_lossy());
+        let root_project_id = AgentProjectStore::new()
+            .resolve_or_register(Some(&scope.root_project_id), Some(&scope.root_project_path))
+            .map(|project| project.id)
+            .unwrap_or_else(|| scope.root_project_id.clone());
         let worktree = AgentWorktreeCreatedWorktree {
-            id: worktree_uuid(&scope.root_project_id, &path),
+            id: worktree_uuid(&root_project_id, &path),
             name: request.name.clone(),
             branch: request.name.clone(),
             path,
@@ -76,6 +87,7 @@ impl AgentWorktreeHost for HeadlessAgentWorktreeHost {
             source_branch,
         };
         self.broadcast_worktrees(&scope.root_project_id, &scope.root_project_path);
+        broadcast_project_list(&self.transport);
         Ok(worktree)
     }
 
@@ -116,6 +128,7 @@ impl AgentWorktreeHost for HeadlessAgentWorktreeHost {
             return Err("The headless runtime returned an unexpected terminal id.".to_string());
         }
         broadcast_terminal_list(&self.terminals, &self.transport, &self.fanout);
+        broadcast_project_list(&self.transport);
         Ok(())
     }
 

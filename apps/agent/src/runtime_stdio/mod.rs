@@ -40,6 +40,7 @@ pub fn run(version: &str) -> Result<(), String> {
     unsafe {
         std::env::set_var("CODUX_AGENT_DATA_DIR", &data_dir);
     }
+    crate::ssh::ensure_store()?;
     let runtime_root = data_dir.join("runtime-root");
     let runtime_temp = data_dir.join("runtime-temp");
     let home_dir = std::env::var_os("HOME")

@@ -1,4 +1,4 @@
-use super::overlays::remote_add_dropdown;
+use super::overlays::{remote_add_button, remote_share_button};
 use super::relay::settings_remote_relay_custom_fields;
 use super::*;
 
@@ -257,12 +257,25 @@ pub(in crate::app::settings) fn settings_remote_pane(
                     settings_row(
                         settings_text(language, "settings.remote.enabled", "Enable Remote Host"),
                         None,
-                        settings_toggle(
-                            "settings-remote-enabled",
-                            remote.enabled,
-                            cx,
-                            |app, window, cx| app.toggle_remote_host(window, cx),
-                        ),
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(10.0))
+                            .when(remote.enabled, |this| {
+                                this.child(remote_share_button(
+                                    language,
+                                    remote_pairing_creating,
+                                    false,
+                                    cx,
+                                ))
+                            })
+                            .child(settings_toggle(
+                                "settings-remote-enabled",
+                                remote.enabled,
+                                cx,
+                                |app, window, cx| app.toggle_remote_host(window, cx),
+                            ))
+                            .into_any_element(),
                     )
                     .into_any_element(),
                     {
@@ -346,11 +359,7 @@ pub(in crate::app::settings) fn settings_remote_pane(
                         .flex()
                         .items_center()
                         .gap(px(8.0))
-                        .child(div().child(remote_add_dropdown(
-                            language,
-                            remote_pairing_creating || !remote.enabled,
-                            cx,
-                        )))
+                        .child(div().child(remote_add_button(language, cx)))
                         .child(settings_icon_button_state(
                             "settings-remote-refresh",
                             HeroIconName::ArrowPath,

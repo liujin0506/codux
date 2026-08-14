@@ -363,7 +363,10 @@ mod tests {
         let memory_number = SettingsService::new(support_dir.clone())
             .set_ai_memory_number("maxExtractionTranscriptTokens", "12000")
             .expect("set transcript token limit");
-        assert_eq!(memory_number.memory_max_extraction_transcript_tokens, "12000");
+        assert_eq!(
+            memory_number.memory_max_extraction_transcript_tokens,
+            "12000"
+        );
 
         let terminal_font = SettingsService::new(support_dir.clone())
             .cycle_terminal_font_size()
@@ -515,9 +518,7 @@ mod tests {
         let updated = fs::read_to_string(support_dir.join("settings.json")).expect("updated");
         let updated: serde_json::Value = serde_json::from_str(&updated).expect("updated json");
         assert_eq!(
-            updated
-                .get("sleepMode")
-                .and_then(|value| value.as_str()),
+            updated.get("sleepMode").and_then(|value| value.as_str()),
             Some("powerAdapterOnly")
         );
 
@@ -543,6 +544,8 @@ mod tests {
             "assistant.ai.open",
             "assistant.ssh.open",
             "terminal.split.create",
+            "terminal.split.vertical",
+            "terminal.split.close",
             "editor.save",
             "editor.search",
             "close.active",
@@ -561,7 +564,11 @@ mod tests {
             assert!(!summary.shortcuts.contains_key(shortcut_id));
         }
 
-        assert!(service.set_shortcut("unsupported.shortcut", "Cmd+P").is_err());
+        assert!(
+            service
+                .set_shortcut("unsupported.shortcut", "Cmd+P")
+                .is_err()
+        );
         fs::remove_dir_all(support_dir).ok();
     }
 
@@ -805,21 +812,25 @@ mod tests {
             .expect("set codex model");
         assert_eq!(summary.runtime_tool_count, 9);
 
-        let summary = service
-            .set_codex_effort("xhigh")
-            .expect("set codex effort");
+        service
+            .set_runtime_tool_path("codexPath", " /opt/custom/codex \n")
+            .expect("set codex path");
+        service
+            .set_runtime_tool_path("ompPath", "")
+            .expect("clear omp path");
+
+        let summary = service.set_codex_effort("xhigh").expect("set codex effort");
         assert_eq!(summary.runtime_tool_count, 9);
 
-        let tool_permissions = crate::tool_permissions::ToolPermissionsService::new(support_dir.clone())
-            .summary();
+        let tool_permissions =
+            crate::tool_permissions::ToolPermissionsService::new(support_dir.clone()).summary();
         assert_eq!(tool_permissions.codex, "fullAccess");
         assert_eq!(tool_permissions.codex_model, "gpt-5.6");
+        assert_eq!(tool_permissions.codex_path, "/opt/custom/codex");
         assert_eq!(tool_permissions.codex_effort, "xhigh");
         assert_eq!(tool_permissions.omp, "fullAccess");
-        assert_eq!(
-            tool_permissions.omp_model,
-            "anthropic/claude-sonnet-4-5"
-        );
+        assert_eq!(tool_permissions.omp_model, "anthropic/claude-sonnet-4-5");
+        assert_eq!(tool_permissions.omp_path, "");
 
         crate::config::flush_all_config_writes();
         let saved = fs::read_to_string(support_dir.join("settings.json")).expect("saved settings");
@@ -829,9 +840,18 @@ mod tests {
             .and_then(|value| value.get("runtimeTools"))
             .and_then(|value| value.as_object())
             .expect("runtime tools object");
-        assert_eq!(tools.get("codex").and_then(|value| value.as_str()), Some("fullAccess"));
-        assert_eq!(tools.get("codexModel").and_then(|value| value.as_str()), Some("gpt-5.6"));
-        assert_eq!(tools.get("codexEffort").and_then(|value| value.as_str()), Some("xhigh"));
+        assert_eq!(
+            tools.get("codex").and_then(|value| value.as_str()),
+            Some("fullAccess")
+        );
+        assert_eq!(
+            tools.get("codexModel").and_then(|value| value.as_str()),
+            Some("gpt-5.6")
+        );
+        assert_eq!(
+            tools.get("codexEffort").and_then(|value| value.as_str()),
+            Some("xhigh")
+        );
         assert_eq!(
             tools.get("omp").and_then(|value| value.as_str()),
             Some("fullAccess")
@@ -839,6 +859,14 @@ mod tests {
         assert_eq!(
             tools.get("ompModel").and_then(|value| value.as_str()),
             Some("anthropic/claude-sonnet-4-5")
+        );
+        assert_eq!(
+            tools.get("codexPath").and_then(|value| value.as_str()),
+            Some("/opt/custom/codex")
+        );
+        assert_eq!(
+            tools.get("ompPath").and_then(|value| value.as_str()),
+            Some("")
         );
 
         fs::remove_dir_all(support_dir).ok();
@@ -856,8 +884,8 @@ mod tests {
             .set_runtime_tool_permission("kimi", "fullAccess")
             .expect("set kimi permission");
 
-        let tool_permissions = crate::tool_permissions::ToolPermissionsService::new(support_dir.clone())
-            .sync();
+        let tool_permissions =
+            crate::tool_permissions::ToolPermissionsService::new(support_dir.clone()).sync();
         assert_eq!(tool_permissions.kiro, "default");
         assert_eq!(tool_permissions.kimi, "default");
 
@@ -869,8 +897,14 @@ mod tests {
             .and_then(|value| value.get("runtimeTools"))
             .and_then(|value| value.as_object())
             .expect("runtime tools object");
-        assert_eq!(tools.get("kiro").and_then(|value| value.as_str()), Some("default"));
-        assert_eq!(tools.get("kimi").and_then(|value| value.as_str()), Some("default"));
+        assert_eq!(
+            tools.get("kiro").and_then(|value| value.as_str()),
+            Some("default")
+        );
+        assert_eq!(
+            tools.get("kimi").and_then(|value| value.as_str()),
+            Some("default")
+        );
 
         fs::remove_dir_all(support_dir).ok();
     }

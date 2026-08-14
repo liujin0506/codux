@@ -228,7 +228,9 @@ curl -fsSL https://raw.githubusercontent.com/duxweb/codux/main/apps/agent/script
 
 | 操作 | 快捷键 |
 | :--- | :----- |
-| 新建分屏 | `⌘T` |
+| 左右分屏 | `⌘D` |
+| 上下分屏 | `⌘⇧D` |
+| 关闭分屏 | `⌃D` |
 | 切换 Git 面板 | `⌘G` |
 | 切换 AI 面板 | `⌘Y` |
 | 切换项目 | `⌘1` – `⌘9` |

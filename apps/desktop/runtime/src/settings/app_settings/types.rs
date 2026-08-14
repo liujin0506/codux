@@ -171,6 +171,24 @@ pub struct AIRuntimeToolSettings {
     pub kimi_model: String,
     #[serde(default)]
     pub mimo_model: String,
+    #[serde(default)]
+    pub codex_path: String,
+    #[serde(default)]
+    pub claude_code_path: String,
+    #[serde(default)]
+    pub agy_path: String,
+    #[serde(default)]
+    pub omp_path: String,
+    #[serde(default)]
+    pub opencode_path: String,
+    #[serde(default)]
+    pub kiro_path: String,
+    #[serde(default)]
+    pub codewhale_path: String,
+    #[serde(default)]
+    pub kimi_path: String,
+    #[serde(default)]
+    pub mimo_path: String,
     #[serde(default = "default_codex_effort")]
     pub codex_effort: String,
 }

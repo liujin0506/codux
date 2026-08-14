@@ -158,11 +158,10 @@ pub(super) fn settings_memory_pane(
                             "settings.ai.memory.growth_threshold.help",
                             "Skip repeat extraction until a session grows by at least this many lines.",
                         )),
-                        settings_text_input(
+                        settings_compact_text_input(
                             "settings-memory-growth-threshold",
                             &settings.memory_extraction_growth_threshold_lines,
                             "8",
-                            false,
                             window,
                             cx,
                             |app, value, window, cx| {

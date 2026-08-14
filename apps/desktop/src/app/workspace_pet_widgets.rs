@@ -48,8 +48,10 @@ pub(in crate::app) fn workspace_pet_button(
         workspace_i18n(&language, "pet.claim.action", "Claim Pet")
     };
     let trigger = workspace_header_button("workspace-pet", cx)
-        .secondary()
-        .text_color(cx.theme().foreground)
+        .ghost()
+        .h(px(20.0))
+        .text_size(rems(0.75))
+        .text_color(color(theme::TEXT_MUTED))
         .child(workspace_header_badge_button_content(
             HeroIconName::Heart,
             color(theme::ACCENT),
@@ -76,13 +78,39 @@ pub(in crate::app) fn workspace_pet_button(
     );
 
     Popover::new("workspace-pet-popover")
-        .anchor(Anchor::TopRight)
+        .anchor(Anchor::BottomRight)
         .appearance(false)
         .w(px(324.0))
-        .trigger(trigger)
+        .trigger(trigger.h(px(20.0)))
         .child(content)
         .into_any_element()
 }
+
+pub(in crate::app) fn disabled_pet_button(
+    state: &RuntimeState,
+    cx: &mut Context<CoduxApp>,
+) -> impl IntoElement {
+    let label = if state.pet.claimed {
+        format!("Lv.{}", state.pet.level.max(1))
+    } else {
+        workspace_i18n(&state.settings.language, "pet.claim.action", "Claim Pet")
+    };
+
+    workspace_header_button("workspace-pet-disabled", cx)
+        .ghost()
+        .h(px(20.0))
+        .text_size(rems(0.75))
+        .disabled(true)
+        .opacity(0.45)
+        .text_color(color(theme::TEXT_MUTED))
+        .child(workspace_header_badge_button_content(
+            HeroIconName::Heart,
+            color(theme::ACCENT),
+            label,
+            cx,
+        ))
+}
+
 fn workspace_pet_dex_button(
     dex_tooltip: SharedString,
     app_entity: gpui::Entity<CoduxApp>,

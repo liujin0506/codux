@@ -35,7 +35,7 @@ pub struct SSHConnectionProfile {
     pub key_passphrase: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SSHProfileUpsertRequest {
     pub id: Option<String>,

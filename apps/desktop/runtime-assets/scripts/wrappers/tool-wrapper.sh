@@ -74,7 +74,44 @@ apply_process_limit_cap() {
   fi
 }
 
+expand_user_path() {
+  local raw="$1"
+  if [[ "$raw" == "~/"* ]]; then
+    print -r -- "${HOME}/${raw#~/}"
+  elif [[ "$raw" == "~" ]]; then
+    print -r -- "${HOME}"
+  else
+    print -r -- "$raw"
+  fi
+}
+
+resolve_configured_executable() {
+  local configured="$1"
+  [[ -n "$configured" ]] || return 1
+  local expanded
+  expanded="$(expand_user_path "$configured")"
+  if [[ "$expanded" == /* || "$expanded" == */* ]]; then
+    if [[ -x "$expanded" ]] && ! is_wrapper_bin_dir "${expanded:h}"; then
+      print -r -- "$expanded"
+      return 0
+    fi
+    return 1
+  fi
+  resolve_from_search_path "$expanded"
+}
+
 find_real_binary() {
+  local configured_path
+  configured_path="$(configured_tool_path || true)"
+  if [[ -n "${configured_path}" ]]; then
+    local configured_resolved
+    configured_resolved="$(resolve_configured_executable "${configured_path}" || true)"
+    if [[ -n "${configured_resolved}" ]]; then
+      print -r -- "${configured_resolved}"
+      return 0
+    fi
+  fi
+
   local active_resolved_path="${DMUX_ACTIVE_AI_RESOLVED_PATH:-}"
   local active_resolved_name="${active_resolved_path:t}"
   if [[ -n "${DMUX_ACTIVE_AI_RESOLVED_PATH:-}" \
@@ -126,23 +163,6 @@ find_real_binary() {
 
   return 1
 }
-
-real_bin="$(find_real_binary || true)"
-if [[ -z "$real_bin" ]]; then
-  print -u2 -- "wrapper: failed to locate real binary for $tool_name"
-  if [[ -x "${wrapper_dir}/dmux-ai-state.sh" && -n "${DMUX_SESSION_ID:-}" ]]; then
-    "${wrapper_dir}/dmux-ai-state.sh" stop "${DMUX_RUNTIME_OWNER:-}" "$tool_name" </dev/null >/dev/null 2>&1 || true
-  fi
-  exit 127
-fi
-
-# Seed the console's reported default colors (OSC 10/11 set) with the app
-# theme: on Windows ConPTY answers color queries itself from its own black
-# palette, so TUIs would detect a dark background under a light theme.
-if [[ -t 1 ]]; then
-  [[ -n "${DMUX_TERMINAL_OSC_FG:-}" ]] && printf '\033]10;%s\033\\' "${DMUX_TERMINAL_OSC_FG}"
-  [[ -n "${DMUX_TERMINAL_OSC_BG:-}" ]] && printf '\033]11;%s\033\\' "${DMUX_TERMINAL_OSC_BG}"
-fi
 
 json_escape() {
   local value="$1"
@@ -417,6 +437,65 @@ configured_tool_model() {
 
   configured_json_string_key "${config_path}" "${config_key}"
 }
+
+configured_tool_path() {
+  local config_path
+  config_path="$(tool_permission_settings_path)"
+  [[ -f "${config_path}" ]] || return 0
+
+  local config_key=""
+  case "${tool_name}" in
+    codex)
+      config_key="codexPath"
+      ;;
+    claude|claude-code|reclaude)
+      config_key="claudeCodePath"
+      ;;
+    agy)
+      config_key="agyPath"
+      ;;
+    omp)
+      config_key="ompPath"
+      ;;
+    kimi|kimi-code)
+      config_key="kimiPath"
+      ;;
+    opencode)
+      config_key="opencodePath"
+      ;;
+    mimo)
+      config_key="mimoPath"
+      ;;
+    kiro-cli)
+      config_key="kiroPath"
+      ;;
+    codewhale)
+      config_key="codewhalePath"
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+
+  configured_json_string_key "${config_path}" "${config_key}"
+}
+
+real_bin="$(find_real_binary || true)"
+if [[ -z "$real_bin" ]]; then
+  print -u2 -- "wrapper: failed to locate real binary for $tool_name"
+  if [[ -x "${wrapper_dir}/dmux-ai-state.sh" && -n "${DMUX_SESSION_ID:-}" ]]; then
+    "${wrapper_dir}/dmux-ai-state.sh" stop "${DMUX_RUNTIME_OWNER:-}" "$tool_name" </dev/null >/dev/null 2>&1 || true
+  fi
+  exit 127
+fi
+
+# Seed the console's reported default colors (OSC 10/11 set) with the app
+# theme: on Windows ConPTY answers color queries itself from its own black
+# palette, so TUIs would detect a dark background under a light theme.
+if [[ -t 1 ]]; then
+  [[ -n "${DMUX_TERMINAL_OSC_FG:-}" ]] && printf '\033]10;%s\033\\' "${DMUX_TERMINAL_OSC_FG}"
+  [[ -n "${DMUX_TERMINAL_OSC_BG:-}" ]] && printf '\033]11;%s\033\\' "${DMUX_TERMINAL_OSC_BG}"
+fi
 
 configured_codex_effort() {
   local config_path

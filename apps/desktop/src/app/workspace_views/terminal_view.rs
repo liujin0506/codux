@@ -103,6 +103,14 @@ impl TerminalWorkspaceView {
             self.open_split_menu_pane = None;
         }
         self.snapshot = snapshot;
+        let enter_restart = self.snapshot.main_panes.len() == 1;
+        for pane in &self.snapshot.main_panes {
+            if let Some(view) = &pane.view {
+                view.update(cx, |view, cx| {
+                    view.set_enter_restart_enabled(enter_restart, cx);
+                });
+            }
+        }
         cx.notify();
     }
 

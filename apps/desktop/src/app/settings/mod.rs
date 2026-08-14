@@ -17,16 +17,16 @@ use codux_runtime::{
     update::UpdateSummary,
 };
 use gpui::{
-    AnyElement, AppContext, Context, InteractiveElement, IntoElement, ObjectFit, ParentElement,
-    Pixels, Rems, SharedString, StatefulInteractiveElement, Styled, StyledImage, Window,
-    WindowControlArea, div, img, prelude::FluentBuilder as _, px, relative, rems,
+    AnyElement, AppContext, Context, Focusable, FontWeight, InteractiveElement, IntoElement,
+    ObjectFit, ParentElement, Pixels, Rems, SharedString, StatefulInteractiveElement, Styled,
+    StyledImage, Window, WindowControlArea, div, img, prelude::FluentBuilder as _, px, relative,
+    rems,
 };
 use gpui_component::{
     ActiveTheme, Disableable, Icon, Sizable,
     button::{Button, ButtonVariants},
     group_box::{GroupBox, GroupBoxVariants},
     input::{Input, InputEvent, InputState},
-    menu::{DropdownMenu, PopupMenuItem},
     progress::Progress,
     spinner::Spinner,
     switch::Switch,
@@ -141,6 +141,43 @@ impl SettingsPane {
     fn visible(self) -> bool {
         self != Self::Wsl || cfg!(target_os = "windows")
     }
+
+    fn matches_search(self, language: &str, query: &str) -> bool {
+        let query = query.trim().to_lowercase();
+        if query.is_empty() {
+            return true;
+        }
+        let label = self.label(language).to_lowercase();
+        if label.contains(&query) {
+            return true;
+        }
+        self.search_aliases()
+            .iter()
+            .any(|alias| alias.contains(query.as_str()) || query.contains(alias))
+    }
+
+    fn search_aliases(self) -> &'static [&'static str] {
+        match self {
+            Self::General => &["app", "language", "general", "通用", "一般"],
+            Self::Appearance => &["theme", "appearance", "外观", "外觀", "テーマ"],
+            Self::Pet => &["pet", "宠物", "寵物", "ペット"],
+            Self::AI => &["ai", "model", "codex", "claude", "工具"],
+            Self::Git => &["git", "commit"],
+            Self::Memory => &["memory", "记忆", "記憶", "メモリ"],
+            Self::Notifications => &["notification", "通知"],
+            Self::Remote => &["remote", "ssh", "远程", "遠端"],
+            Self::Shortcuts => &["shortcut", "hotkey", "快捷键", "快捷鍵"],
+            Self::Wsl => &["wsl", "windows"],
+            Self::Developer => &["developer", "debug", "开发", "開發"],
+        }
+    }
+}
+
+fn visible_settings_panes(language: &str, query: &str) -> Vec<SettingsPane> {
+    SETTINGS_PANES
+        .into_iter()
+        .filter(|pane| pane.visible() && pane.matches_search(language, query))
+        .collect()
 }
 
 const SETTINGS_PANES: [SettingsPane; 11] = [
@@ -194,6 +231,19 @@ impl CoduxApp {
         .detach();
     }
 
+    pub(super) fn set_settings_search(&mut self, query: String, cx: &mut Context<Self>) {
+        self.settings_search_query = query;
+        let language = self.state.settings.language.as_str();
+        let visible = visible_settings_panes(language, &self.settings_search_query);
+        if !visible.contains(&self.active_settings_pane)
+            && let Some(pane) = visible.first().copied()
+        {
+            self.set_settings_pane(pane, cx);
+            return;
+        }
+        self.invalidate_ui_region(cx, UiRegion::Root);
+    }
+
     pub(super) fn settings_workspace(
         &mut self,
         window: &mut Window,
@@ -202,6 +252,8 @@ impl CoduxApp {
         self.ensure_terminal_font_families_loaded(cx);
         let pane = self.active_settings_pane;
         let language = self.state.settings.language.as_str();
+        let search_query = self.settings_search_query.clone();
+        let visible_panes = visible_settings_panes(language, &search_query);
 
         div()
             .relative()
@@ -215,7 +267,7 @@ impl CoduxApp {
                 div()
                     .flex()
                     .flex_col()
-                    .w(px(200.0))
+                    .w(px(220.0))
                     .h_full()
                     .flex_shrink_0()
                     .border_r_1()
@@ -224,11 +276,33 @@ impl CoduxApp {
                     .child(
                         div()
                             .h(if cfg!(target_os = "macos") {
-                                px(48.0)
+                                px(52.0)
                             } else {
                                 px(16.0)
                             })
-                            .flex_shrink_0(),
+                            .flex_shrink_0()
+                            .window_control_area(WindowControlArea::Drag),
+                    )
+                    .child(
+                        div()
+                            .px(px(12.0))
+                            .pb(px(10.0))
+                            .flex()
+                            .items_center()
+                            .gap(px(8.0))
+                            .text_color(cx.theme().foreground)
+                            .child(
+                                Icon::new(HeroIconName::AdjustmentsHorizontal)
+                                    .size_4()
+                                    .text_color(cx.theme().muted_foreground),
+                            )
+                            .child(
+                                div()
+                                    .text_size(rems(0.9375))
+                                    .line_height(rems(1.25))
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .child(settings_text(language, "settings.title", "Settings")),
+                            ),
                     )
                     .child(
                         div()
@@ -236,18 +310,12 @@ impl CoduxApp {
                             .flex_col()
                             .flex_1()
                             .min_h_0()
-                            .px_3()
-                            .pb_3()
+                            .px(px(8.0))
+                            .pb(px(12.0))
                             .overflow_y_scrollbar()
-                            .children(
-                                SETTINGS_PANES
-                                    .into_iter()
-                                    .filter(|item| item.visible())
-                                    .map(|item| {
-                                        settings_nav_row(item, pane == item, language, cx)
-                                            .into_any_element()
-                                    }),
-                            ),
+                            .children(visible_panes.iter().copied().map(|item| {
+                                settings_nav_row(item, pane == item, language, cx).into_any_element()
+                            })),
                     ),
             )
             .child(
@@ -259,34 +327,31 @@ impl CoduxApp {
                     .w_full()
                     .min_w_0()
                     .h_full()
-                    .bg(color(theme::BG_COLUMN))
+                    .bg(cx.theme().background)
                     .child(
                         div()
-                            .h(px(68.0))
                             .flex_shrink_0()
-                            .pl(px(28.0))
-                            .pr(if cfg!(target_os = "macos") {
-                                px(28.0)
+                            .pt(if cfg!(target_os = "macos") {
+                                px(16.0)
                             } else {
                                 px(16.0)
                             })
-                            .pb(px(14.0))
+                            .px(px(20.0))
+                            .pb(px(6.0))
                             .flex()
-                            .items_end()
-                            .justify_between()
+                            .items_center()
                             .gap_3()
                             .child(
                                 div()
                                     .min_w_0()
                                     .flex_1()
-                                    .h_full()
-                                    .flex()
-                                    .items_end()
                                     .window_control_area(WindowControlArea::Drag)
-                                    .text_size(rems(1.25))
-                                    .line_height(rems(1.625))
-                                    .text_color(cx.theme().foreground)
-                                    .child(pane.label(language)),
+                                    .child(settings_search_bar(
+                                        &search_query,
+                                        language,
+                                        window,
+                                        cx,
+                                    )),
                             )
                             .when(!cfg!(target_os = "macos"), |this| {
                                 this.child(window_close_control(
@@ -304,9 +369,14 @@ impl CoduxApp {
                             .min_w_0()
                             .min_h_0()
                             .overflow_y_scrollbar()
-                            .px(px(28.0))
-                            .pb(px(28.0))
-                            .child(settings_pane_body(self, pane, window, cx)),
+                            .px(px(20.0))
+                            .pt(px(8.0))
+                            .pb(px(20.0))
+                            .child(if visible_panes.is_empty() {
+                                settings_search_empty(language)
+                            } else {
+                                settings_pane_body(self, pane, window, cx)
+                            }),
                     ),
             )
             .when(
@@ -350,31 +420,104 @@ fn settings_nav_row(
         .id(SharedString::from(format!("settings-nav-{:?}", pane)))
         .h(px(32.0))
         .px(px(10.0))
-        .mb(px(6.0))
-        .rounded(px(6.0))
+        .mb(px(2.0))
+        .rounded(px(8.0))
         .flex()
         .items_center()
-        .gap(px(10.0))
+        .gap(px(8.0))
         .cursor_pointer()
         .text_color(if active {
-            cx.theme().foreground
+            cx.theme().sidebar_accent_foreground
         } else {
             cx.theme().muted_foreground
         })
         .bg(if active {
-            cx.theme().accent
+            cx.theme().sidebar_accent
         } else {
             cx.theme().transparent
         })
-        .hover(|style| style.bg(cx.theme().list_hover))
+        .hover(|style| {
+            if active {
+                style
+            } else {
+                style.bg(cx.theme().list_hover)
+            }
+        })
         .on_click(cx.listener(move |app, _event, _window, cx| app.set_settings_pane(pane, cx)))
-        .child(Icon::new(pane.icon()).size_3p5())
+        .child(Icon::new(pane.icon()).size_4())
         .child(
             div()
                 .text_size(rems(0.875))
                 .line_height(rems(1.125))
+                .font_weight(if active {
+                    FontWeight::MEDIUM
+                } else {
+                    FontWeight::NORMAL
+                })
                 .child(label),
         )
+}
+
+fn settings_search_bar(
+    query: &str,
+    language: &str,
+    window: &mut Window,
+    cx: &mut Context<CoduxApp>,
+) -> AnyElement {
+    let placeholder = settings_text(language, "settings.search.placeholder", "Search settings");
+    let state = window.use_keyed_state(
+        SharedString::from("settings-search-input"),
+        cx,
+        |window, cx| {
+            InputState::new(window, cx)
+                .default_value(query.to_string())
+                .placeholder(placeholder.clone())
+        },
+    );
+    state.update(cx, |state, cx| {
+        if widgets::should_sync_settings_input(
+            state.value().as_ref(),
+            query,
+            state.focus_handle(cx).is_focused(window),
+        ) {
+            state.set_value(query.to_string(), window, cx);
+        }
+    });
+    cx.subscribe_in(&state, window, move |app, state, event, _window, cx| {
+        if matches!(event, InputEvent::Change) {
+            app.set_settings_search(state.read(cx).value().to_string(), cx);
+        }
+    })
+    .detach();
+
+    Input::new(&state)
+        .appearance(true)
+        .bordered(false)
+        .cleanable(true)
+        .prefix(
+            Icon::new(HeroIconName::MagnifyingGlass)
+                .size_4()
+                .text_color(cx.theme().muted_foreground),
+        )
+        .w_full()
+        .into_any_element()
+}
+
+fn settings_search_empty(language: &str) -> AnyElement {
+    div()
+        .w_full()
+        .pt(px(48.0))
+        .flex()
+        .justify_center()
+        .text_size(rems(0.875))
+        .line_height(rems(1.25))
+        .text_color(color(theme::TEXT_DIM))
+        .child(settings_text(
+            language,
+            "settings.search.empty",
+            "No matching settings",
+        ))
+        .into_any_element()
 }
 
 fn settings_pane_body(

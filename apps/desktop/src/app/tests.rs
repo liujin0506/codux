@@ -789,30 +789,30 @@ fn generated_git_commit_message_prefers_staged_count() {
 }
 
 #[test]
-fn project_badge_text_uses_up_to_four_project_name_chars() {
+fn project_badge_text_uses_first_character() {
     assert_eq!(
         project_badge_text_from_name(" Codux GPUI "),
-        Some("CG".to_string())
+        Some("C".to_string())
     );
     assert_eq!(
         project_badge_text_from_name("getUserInfo"),
-        Some("GUI".to_string())
+        Some("G".to_string())
     );
     assert_eq!(
         project_badge_text_from_name("wx-pay-api"),
-        Some("WPA".to_string())
+        Some("W".to_string())
     );
     assert_eq!(
         project_badge_text_from_name("codux"),
-        Some("CODU".to_string())
+        Some("C".to_string())
     );
     assert_eq!(
         project_badge_text_from_name("项目"),
-        Some("项目".to_string())
+        Some("项".to_string())
     );
     assert_eq!(
         project_badge_text_from_name("用户中心"),
-        Some("用户中心".to_string())
+        Some("用".to_string())
     );
     assert_eq!(project_badge_text_from_name("  "), None);
 }
@@ -897,14 +897,39 @@ fn shortcut_matching_uses_custom_value_or_default() {
     ));
     assert!(shortcut_matches(&shortcuts, "panel.git", default_git_panel));
     let default_terminal_split = if cfg!(target_os = "macos") {
-        "⌘T"
+        "⌘D"
     } else {
-        "Ctrl+T"
+        "Ctrl+D"
     };
     assert!(shortcut_matches(
         &shortcuts,
         "terminal.split",
         default_terminal_split
+    ));
+    assert!(shortcut_matches(
+        &shortcuts,
+        "terminal.split.create",
+        default_terminal_split
+    ));
+    let default_terminal_split_vertical = if cfg!(target_os = "macos") {
+        "⌘⇧D"
+    } else {
+        "Ctrl+Shift+D"
+    };
+    assert!(shortcut_matches(
+        &shortcuts,
+        "terminal.split.vertical",
+        default_terminal_split_vertical
+    ));
+    let default_terminal_split_close = if cfg!(target_os = "macos") {
+        "⌃D"
+    } else {
+        "Ctrl+Alt+D"
+    };
+    assert!(shortcut_matches(
+        &shortcuts,
+        "terminal.split.close",
+        default_terminal_split_close
     ));
     let default_projects_sidebar = if cfg!(target_os = "macos") {
         "⌘⌥P"

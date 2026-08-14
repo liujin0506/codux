@@ -479,8 +479,7 @@ impl CoduxApp {
     }
 
     /// Push the persisted appearance opacity into the render-time theme state.
-    /// A single opacity drives the whole UI; the terminal body derives a more
-    /// opaque value from it in `theme::terminal_alpha`.
+    /// A single opacity drives the chrome and the terminal body together.
     pub(super) fn apply_window_appearance_settings(&self) {
         theme::set_window_appearance(
             self.state.settings.window_style != "solid",
@@ -1783,6 +1782,32 @@ impl CoduxApp {
                 app.apply_async_settings_summary(settings);
                 app.state.tool_permissions = permissions;
                 app.status_message = format!("{model_key} saved");
+                app.invalidate_ui_region(cx, UiRegion::Root);
+            },
+            cx,
+        );
+        self.invalidate_ui_region(cx, UiRegion::Root);
+    }
+
+    pub(super) fn set_runtime_tool_path(
+        &mut self,
+        path_key: &'static str,
+        path: String,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.run_settings_task_async(
+            "set_runtime_tool_path",
+            "saving runtime tool path",
+            move |service| {
+                let settings = service.set_runtime_tool_path(path_key, &path)?;
+                let permissions = service.sync_tool_permissions();
+                Ok((settings, permissions))
+            },
+            move |app, (settings, permissions), cx| {
+                app.apply_async_settings_summary(settings);
+                app.state.tool_permissions = permissions;
+                app.status_message = format!("{path_key} saved");
                 app.invalidate_ui_region(cx, UiRegion::Root);
             },
             cx,

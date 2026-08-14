@@ -362,7 +362,7 @@ pub(super) fn file_editor_toolbar(
         })
         .border_b_1()
         .border_color(cx.theme().border)
-        .bg(cx.theme().title_bar)
+        .bg(theme::title_bar_fill())
         .when(window_header && !cfg!(target_os = "windows"), |this| {
             this.window_control_area(WindowControlArea::Drag)
         })

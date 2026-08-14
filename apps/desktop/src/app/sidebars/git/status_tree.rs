@@ -328,10 +328,8 @@ fn git_status_group_header(
         .flex()
         .items_center()
         .justify_between()
-        .border_color(cx.theme().border)
+        .border_color(color(theme::BORDER_SOFT).opacity(0.5))
         .when(!first, |this| this.border_t_1())
-        // Thin translucent darkening: deeper than the panel, still see-through.
-        .bg(theme::vibrancy_raised(cx.theme().list_head))
         .cursor_pointer()
         .on_click(
             cx.listener(move |app, _event, _window, cx| app.toggle_git_status_section(id, cx)),

@@ -156,6 +156,45 @@ function Tool-Model-Key([string]$Name) {
   }
 }
 
+function Tool-Path-Key([string]$Name) {
+  switch ($Name) {
+    "codex" { "codexPath" }
+    "claude" { "claudeCodePath" }
+    "claude-code" { "claudeCodePath" }
+    "reclaude" { "claudeCodePath" }
+    "agy" { "agyPath" }
+    "omp" { "ompPath" }
+    "kimi" { "kimiPath" }
+    "kimi-code" { "kimiPath" }
+    "opencode" { "opencodePath" }
+    "mimo" { "mimoPath" }
+    "kiro-cli" { "kiroPath" }
+    "codewhale" { "codewhalePath" }
+    default { "" }
+  }
+}
+
+function Expand-User-Path([string]$Value) {
+  if ([string]::IsNullOrWhiteSpace($Value)) { return $Value }
+  if ($Value -eq "~") { return $env:USERPROFILE }
+  if ($Value.StartsWith("~/") -or $Value.StartsWith("~\")) {
+    return (Join-Path $env:USERPROFILE $Value.Substring(2))
+  }
+  return $Value
+}
+
+function Resolve-Configured-Executable([string]$Configured, [string]$SearchPath) {
+  if ([string]::IsNullOrWhiteSpace($Configured)) { return $null }
+  $expanded = Expand-User-Path $Configured
+  if ([IO.Path]::IsPathRooted($expanded) -or $expanded.Contains("/") -or $expanded.Contains("\")) {
+    if ((Test-Path -LiteralPath $expanded) -and -not (Same-Directory (Split-Path -Parent $expanded) $wrapperBin)) {
+      return $expanded
+    }
+    return $null
+  }
+  return Find-Real-Binary $expanded $SearchPath
+}
+
 function Has-Arg([string[]]$Args, [string]$Name) {
   return $Args -contains $Name
 }
@@ -581,7 +620,21 @@ if ([string]::IsNullOrWhiteSpace($searchPath)) {
 }
 $runtimePath = Join-PathList @($wrapperBin, $searchPath)
 
-$realBin = Find-Real-Binary $Tool $searchPath
+$pathKey = Tool-Path-Key $Tool
+$configuredPath = $null
+if (-not [string]::IsNullOrWhiteSpace($pathKey)) {
+  $earlySettings = Read-Tool-Settings
+  if ($null -ne $earlySettings) {
+    $configuredPath = [string]$earlySettings.$pathKey
+  }
+}
+$realBin = $null
+if (-not [string]::IsNullOrWhiteSpace($configuredPath)) {
+  $realBin = Resolve-Configured-Executable $configuredPath $searchPath
+}
+if ([string]::IsNullOrWhiteSpace($realBin)) {
+  $realBin = Find-Real-Binary $Tool $searchPath
+}
 if ([string]::IsNullOrWhiteSpace($realBin)) {
   Write-Live-Log "launch failed tool=$Tool reason=missing-binary"
   [Console]::Error.WriteLine("$Tool is not installed or not available in PATH.")

@@ -345,3 +345,14 @@ fn key_input_uses_live_cursor_mode_before_snapshot_publish() {
 
     assert!(state.mode().application_cursor);
 }
+
+#[test]
+fn enter_restarts_an_exited_terminal() {
+    assert!(is_restart_exited_terminal_keystroke(&keystroke("enter")));
+    assert!(is_restart_exited_terminal_keystroke(&keystroke("Return")));
+    assert!(is_restart_exited_terminal_keystroke(&keystroke("kp_enter")));
+    assert!(!is_restart_exited_terminal_keystroke(&modified_key(
+        "enter", false, false, true, false
+    )));
+    assert!(!is_restart_exited_terminal_keystroke(&keystroke("d")));
+}

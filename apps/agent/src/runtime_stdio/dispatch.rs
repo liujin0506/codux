@@ -126,6 +126,9 @@ impl RuntimeStdioService {
                 required_str(params, "op")?,
                 params.get("args").unwrap_or(&Value::Null),
             ),
+            "ssh.list" => crate::ssh::list_payload(),
+            "ssh.upsert" => crate::ssh::upsert_payload(params.clone()),
+            "ssh.remove" => crate::ssh::remove_payload(params),
             "worktree.list" => Ok(crate::worktree::worktree_list_payload(
                 required_str(params, "projectId")?,
                 required_str(params, "projectPath")?,

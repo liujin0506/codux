@@ -8,6 +8,7 @@ pub struct GitStatusSummary {
     pub upstream: Option<String>,
     pub ahead: i64,
     pub behind: i64,
+    pub head_pushed: bool,
     pub staged: usize,
     pub unstaged: usize,
     pub untracked: usize,
@@ -47,6 +48,7 @@ pub fn git_status_payload(
         "upstream": summary.upstream,
         "ahead": summary.ahead,
         "behind": summary.behind,
+        "headPushed": summary.head_pushed,
         "staged": summary.staged,
         "unstaged": summary.unstaged,
         "untracked": summary.untracked,
@@ -76,6 +78,7 @@ mod tests {
             "/tmp/project-1",
             GitStatusSummary {
                 branch: "main".to_string(),
+                head_pushed: true,
                 staged: 1,
                 unstaged: 2,
                 untracked: 3,
@@ -88,6 +91,7 @@ mod tests {
         assert_eq!(payload["additions"], 0);
         assert_eq!(payload["deletions"], 0);
         assert_eq!(payload["branch"], "main");
+        assert_eq!(payload["headPushed"], true);
         assert_eq!(payload["isRepository"], true);
     }
 }

@@ -497,6 +497,23 @@ fn remote_git_status_payload_matches_domain_shape() {
     );
     assert_eq!(
         payload
+            .get("headPushed")
+            .and_then(serde_json::Value::as_bool),
+        Some(true)
+    );
+    let parsed: crate::git::GitSummary =
+        serde_json::from_value(payload.clone()).expect("remote Git payload parses");
+    assert!(parsed.head_pushed);
+    let mut legacy_payload = payload.clone();
+    legacy_payload
+        .as_object_mut()
+        .expect("Git payload object")
+        .remove("headPushed");
+    let legacy: crate::git::GitSummary =
+        serde_json::from_value(legacy_payload).expect("legacy Git payload parses");
+    assert!(!legacy.head_pushed);
+    assert_eq!(
+        payload
             .get("changedFiles")
             .and_then(serde_json::Value::as_array)
             .map(Vec::len),

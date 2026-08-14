@@ -77,6 +77,51 @@ impl AgentProjectStore {
         Ok(items)
     }
 
+    /// Resolve a controller's project identity to the agent-owned identity.
+    ///
+    /// Desktop controllers keep their own project id, while mobile clients
+    /// usually send the id returned by this store. The path is therefore the
+    /// stable bridge between the two controller roles and takes precedence
+    /// when both values are present.
+    pub fn resolve(
+        &self,
+        project_id: Option<&str>,
+        project_path: Option<&str>,
+    ) -> Option<ProjectListItem> {
+        let project_id = project_id.map(str::trim).filter(|value| !value.is_empty());
+        let project_path = project_path
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let items = self.list();
+        project_path
+            .and_then(|path| {
+                items
+                    .iter()
+                    .find(|item| codux_runtime_core::path::paths_equal(&item.path, path))
+            })
+            .or_else(|| project_id.and_then(|id| items.iter().find(|item| item.id == id)))
+            .cloned()
+    }
+
+    /// Resolve a project and register a path that was introduced by a
+    /// controller which has its own local project store (the desktop client).
+    /// This lets a PC open an existing remote workspace and make it visible to
+    /// a second controller without requiring a separate project-add action.
+    pub fn resolve_or_register(
+        &self,
+        project_id: Option<&str>,
+        project_path: Option<&str>,
+    ) -> Option<ProjectListItem> {
+        if let Some(project) = self.resolve(project_id, project_path) {
+            return Some(project);
+        }
+        let project_path = project_path
+            .map(str::trim)
+            .filter(|value| !value.is_empty())?;
+        self.add(project_path, None).ok()?;
+        self.resolve(None, Some(project_path))
+    }
+
     fn save(&self, items: &[ProjectListItem]) -> Result<(), String> {
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent).map_err(|error| error.to_string())?;

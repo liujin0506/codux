@@ -5,6 +5,7 @@ pub struct GitSummary {
     pub upstream: Option<String>,
     pub ahead: i64,
     pub behind: i64,
+    #[serde(default)]
     pub head_pushed: bool,
     pub staged: usize,
     pub unstaged: usize,

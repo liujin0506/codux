@@ -25,6 +25,18 @@ fn is_select_all_keystroke(keystroke: &Keystroke) -> bool {
         && !modifiers.shift
 }
 
+fn is_restart_exited_terminal_keystroke(keystroke: &Keystroke) -> bool {
+    let modifiers = &keystroke.modifiers;
+    !modifiers.platform
+        && !modifiers.control
+        && !modifiers.alt
+        && !modifiers.shift
+        && matches!(
+            keystroke.key.to_ascii_lowercase().as_str(),
+            "enter" | "return" | "kp_enter" | "numpadenter" | "numpad_enter"
+        )
+}
+
 /// cmd+up / cmd+down navigate OSC 133 prompt marks.
 fn prompt_jump_direction(keystroke: &Keystroke) -> Option<i32> {
     let modifiers = &keystroke.modifiers;
@@ -100,9 +112,7 @@ fn terminal_clipboard_text_preference(
     paste_images_as_paths: bool,
 ) -> TerminalClipboardTextPreference {
     match text {
-        Some(text)
-            if !paste_images_as_paths || !clipboard_text_looks_like_image_payload(&text) =>
-        {
+        Some(text) if !paste_images_as_paths || !clipboard_text_looks_like_image_payload(&text) => {
             TerminalClipboardTextPreference::Text(text)
         }
         Some(_) if paste_images_as_paths => TerminalClipboardTextPreference::RichClipboard,

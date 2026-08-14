@@ -107,11 +107,7 @@ impl Render for TerminalView {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .child(
-                                Icon::new(device_icon)
-                                    .size_8()
-                                    .text_color(fg.opacity(0.5)),
-                            ),
+                            .child(Icon::new(device_icon).size_8().text_color(fg.opacity(0.5))),
                     )
                     .child(div().h(px(18.0)))
                     .child(
@@ -176,8 +172,13 @@ impl Render for TerminalView {
                             .scrollbar_show(ScrollbarShow::Scrolling),
                     ),
             );
-            if self.search_open {
+            let terminal = if self.search_open {
                 terminal.child(self.render_search_bar(cx))
+            } else {
+                terminal
+            };
+            if self.can_restart_after_exit(cx) {
+                terminal.child(self.render_exited_banner(cx))
             } else {
                 terminal
             }

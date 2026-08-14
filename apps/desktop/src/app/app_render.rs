@@ -397,7 +397,7 @@ impl Render for CoduxApp {
                                                 .h_full()
                                                 .overflow_hidden()
                                                 .border_r_1()
-                                                .border_color(cx.theme().border)
+                                                .border_color(color(theme::BORDER_SOFT))
                                                 .child(
                                                     gpui::AnyView::from(task_column_view).cached(
                                                         gpui::StyleRefinement::default()

@@ -17,7 +17,8 @@ use codux_protocol::{
     REMOTE_FILE_WRITE, REMOTE_FILE_WRITE_BLOB, REMOTE_FILE_WRITTEN, REMOTE_GIT_INVOKE,
     REMOTE_GIT_READ, REMOTE_GIT_STATUS, REMOTE_HOST_INFO, REMOTE_HOST_METRICS,
     REMOTE_MEMORY_EXTRACT, REMOTE_MEMORY_READ, REMOTE_MEMORY_RESULT, REMOTE_PAIRING_CONFIRMED,
-    REMOTE_PAIRING_REJECTED, REMOTE_PAIRING_REQUEST, REMOTE_PROJECT_LIST, REMOTE_TERMINAL_BUFFER,
+    REMOTE_PAIRING_REJECTED, REMOTE_PAIRING_REQUEST, REMOTE_PROJECT_LIST, REMOTE_SSH_LIST,
+    REMOTE_SSH_LIST_RESULT, REMOTE_SSH_REMOVE, REMOTE_SSH_UPSERT, REMOTE_TERMINAL_BUFFER,
     REMOTE_TERMINAL_BUFFER_MAX_CHARS, REMOTE_TERMINAL_CLOSE, REMOTE_TERMINAL_CLOSED,
     REMOTE_TERMINAL_CREATE, REMOTE_TERMINAL_CREATED, REMOTE_TERMINAL_INPUT, REMOTE_TERMINAL_LIST,
     REMOTE_TERMINAL_OUTPUT, REMOTE_TERMINAL_STATUS, REMOTE_TERMINAL_VIEWPORT_RESIZE,
@@ -583,7 +584,7 @@ impl RemoteController {
         payloads
     }
 
-    /// Drain unsolicited hosted worktree/terminal-list resource updates while
+    /// Drain unsolicited hosted project/worktree/terminal-list resource updates while
     /// leaving every other controller event untouched.
     pub fn drain_hosted_workspace_updates(&self) -> Vec<(String, Value)> {
         let mut events = self.inner.events.lock().unwrap();
@@ -591,7 +592,7 @@ impl RemoteController {
         events.retain(|(kind, payload)| {
             if matches!(
                 kind.as_str(),
-                REMOTE_WORKTREE_UPDATED | REMOTE_TERMINAL_LIST
+                REMOTE_PROJECT_LIST | REMOTE_WORKTREE_UPDATED | REMOTE_TERMINAL_LIST
             ) {
                 updates.push((kind.clone(), payload.clone()));
                 false
@@ -980,6 +981,24 @@ impl RemoteController {
         )
     }
 
+    // ---- SSH ---------------------------------------------------------------
+
+    pub fn ssh_list(&self) -> Result<Value, String> {
+        self.request(REMOTE_SSH_LIST_RESULT, REMOTE_SSH_LIST, json!({}))
+    }
+
+    pub fn ssh_upsert(&self, profile: Value) -> Result<Value, String> {
+        self.request(REMOTE_SSH_LIST_RESULT, REMOTE_SSH_UPSERT, profile)
+    }
+
+    pub fn ssh_remove(&self, profile_id: &str) -> Result<Value, String> {
+        self.request(
+            REMOTE_SSH_LIST_RESULT,
+            REMOTE_SSH_REMOVE,
+            json!({ "id": profile_id }),
+        )
+    }
+
     // ---- Terminal -----------------------------------------------------------
 
     /// Register where `terminal.output` frames are delivered (a RemoteOutputRouter
@@ -1019,7 +1038,7 @@ impl RemoteController {
         // Pass our stable terminal id so the host keys the session by it and
         // RE-ATTACHES to the still-running shell on a later open (persistent
         // remote terminals) instead of spawning a fresh one each switch.
-        self.create_terminal(json!({
+        let mut payload = json!({
             "cwd": config.cwd,
             "command": config.command,
             "cols": config.cols,
@@ -1032,7 +1051,13 @@ impl RemoteController {
             "oscFg": osc_fg,
             "oscBg": osc_bg,
             "projectEnv": config.project_env,
-        }))
+        });
+        if let Some(runtime_tools) =
+            crate::tool_permissions::runtime_tools_payload(config.tool_permissions_file.as_deref())
+        {
+            payload["runtimeTools"] = runtime_tools;
+        }
+        self.create_terminal(payload)
     }
 
     /// Create a terminal on the host; returns its session id.
@@ -2077,6 +2102,56 @@ mod tests {
                 .and_then(Value::as_str),
             Some("https://example.test")
         );
+    }
+
+    #[test]
+    fn open_terminal_sends_runtime_tools_from_permissions_file() {
+        let dir = std::env::temp_dir().join(format!(
+            "codux-controller-runtime-tools-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let permissions_file = dir.join("tool-permissions.json");
+        std::fs::write(
+            &permissions_file,
+            json!({
+                "codexPath": "/opt/custom/codex",
+                "codexModel": "gpt-5.6"
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        let inner = Arc::new(ControllerInner::default());
+        let transport = Arc::new(CapturingReplyTransport::new(Arc::clone(&inner)));
+        let controller = RemoteController {
+            transport: transport.clone(),
+            device_id: "device-1".to_string(),
+            inner,
+            next_id: AtomicU64::new(1),
+        };
+
+        controller
+            .open_terminal(&crate::terminal_pty::TerminalPtyConfig {
+                cwd: Some("/repo".to_string()),
+                tool_permissions_file: Some(permissions_file),
+                ..Default::default()
+            })
+            .expect("terminal created");
+
+        let sent = transport.sent();
+        let payload = sent[0].get("payload").expect("payload");
+        assert_eq!(
+            payload
+                .get("runtimeTools")
+                .and_then(|value| value.get("codexPath"))
+                .and_then(Value::as_str),
+            Some("/opt/custom/codex")
+        );
+        std::fs::remove_dir_all(dir).ok();
     }
 
     #[test]

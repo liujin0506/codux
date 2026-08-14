@@ -74,7 +74,6 @@ impl Render for TerminalFloatWindow {
             div()
                 .flex_1()
                 .min_h_0()
-                .bg(color(theme::BG_TERMINAL))
                 .child(
                     match self
                         .restore

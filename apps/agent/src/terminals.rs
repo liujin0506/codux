@@ -9,8 +9,9 @@
 //! the `TerminalManager` lease + viewport-owner resolver) rather than a private
 //! copy of the desktop host's batching/baseline machinery.
 
+use crate::projects::AgentProjectStore;
 use codux_protocol::{
-    REMOTE_ERROR, REMOTE_RESOURCE_SUBSCRIBE, REMOTE_RESOURCE_TERMINALS,
+    REMOTE_ERROR, REMOTE_PROJECT_LIST, REMOTE_RESOURCE_SUBSCRIBE, REMOTE_RESOURCE_TERMINALS,
     REMOTE_RESOURCE_UNSUBSCRIBE, REMOTE_TERMINAL_BUFFER_MAX_CHARS, REMOTE_TERMINAL_CLOSED,
     REMOTE_TERMINAL_CREATED, REMOTE_TERMINAL_INPUT_ACK, REMOTE_TERMINAL_LIST,
     REMOTE_TERMINAL_OUTPUT, REMOTE_TERMINAL_VIEWPORT_STATE, RemoteTerminalBufferWindow,
@@ -49,6 +50,7 @@ struct BaselineViewport {
 pub struct TerminalFanout {
     subscriptions: Arc<RemoteTerminalSubscriptions>,
     project_id_by_session: Arc<Mutex<HashMap<String, String>>>,
+    project_path_by_session: Arc<Mutex<HashMap<String, String>>>,
     output_seq: Arc<Mutex<HashMap<String, i64>>>,
     output_ack: Arc<Mutex<HashMap<(String, String), i64>>>,
 }
@@ -89,13 +91,6 @@ impl TerminalFanout {
             .remove_project_subscriber(project_id, device_id);
     }
 
-    fn project_subscribers(&self, project_id: &str) -> Vec<String> {
-        self.subscriptions
-            .project_subscribers(project_id)
-            .into_iter()
-            .collect()
-    }
-
     fn set_session_project(&self, session_id: &str, project_id: &str) {
         let session_id = session_id.trim();
         let project_id = project_id.trim();
@@ -112,6 +107,29 @@ impl TerminalFanout {
             .lock()
             .ok()
             .and_then(|projects| projects.get(session_id).cloned())
+    }
+
+    fn set_session_project_path(&self, session_id: &str, project_path: Option<&str>) {
+        let session_id = session_id.trim();
+        let Some(project_path) = project_path
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            return;
+        };
+        if session_id.is_empty() {
+            return;
+        }
+        if let Ok(mut paths) = self.project_path_by_session.lock() {
+            paths.insert(session_id.to_string(), project_path.to_string());
+        }
+    }
+
+    fn project_path_for_session(&self, session_id: &str) -> Option<String> {
+        self.project_path_by_session
+            .lock()
+            .ok()
+            .and_then(|paths| paths.get(session_id).cloned())
     }
 
     fn remove_viewer(&self, session_id: &str, device_id: &str) {
@@ -184,6 +202,9 @@ impl TerminalFanout {
         self.subscriptions.remove_session(session_id);
         if let Ok(mut projects) = self.project_id_by_session.lock() {
             projects.remove(session_id);
+        }
+        if let Ok(mut paths) = self.project_path_by_session.lock() {
+            paths.remove(session_id);
         }
         if let Ok(mut output_seq) = self.output_seq.lock() {
             output_seq.remove(session_id);
@@ -319,6 +340,9 @@ fn terminal_payload(
     if let Some(project_id) = fanout_state.project_for_session(&session_id) {
         payload["projectId"] = json!(project_id);
     }
+    if let Some(project_path) = fanout_state.project_path_for_session(&session_id) {
+        payload["rootProjectPath"] = json!(project_path);
+    }
     if let Some(worktree_id) = worktree_id.filter(|value| !value.trim().is_empty()) {
         payload["worktreeId"] = json!(worktree_id);
     }
@@ -332,6 +356,37 @@ pub(crate) fn create_terminal(
     mut config: TerminalPtyConfig,
     project_id: Option<&str>,
 ) -> Result<codux_terminal_core::TerminalSessionSnapshot, String> {
+    // A desktop controller identifies its remote project with a local UUID,
+    // while the agent owns the shared project identity. Resolve by path first
+    // so terminals created by PC and mobile land in the same project/worktree
+    // namespace.
+    let requested_project_id = project_id
+        .or(config.root_project_id.as_deref())
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let resolved_project = AgentProjectStore::new()
+        .resolve_or_register(requested_project_id, config.root_project_path.as_deref());
+    let canonical_project_id = resolved_project
+        .as_ref()
+        .map(|project| project.id.clone())
+        .or_else(|| requested_project_id.map(str::to_string));
+    let canonical_project_path = resolved_project
+        .as_ref()
+        .map(|project| project.path.clone())
+        .or_else(|| config.root_project_path.clone());
+    if let Some(project_id) = canonical_project_id.as_deref() {
+        config.root_project_id = Some(project_id.to_string());
+    }
+    if let Some(project_path) = canonical_project_path.as_deref() {
+        config.root_project_path = Some(project_path.to_string());
+        if let (Some(project_id), Some(cwd)) =
+            (canonical_project_id.as_deref(), config.cwd.as_deref())
+        {
+            let worktree_id = crate::worktree::worktree_id_for_path(project_id, project_path, cwd);
+            config.worktree_id = Some(worktree_id.clone());
+            config.project_id = Some(worktree_id);
+        }
+    }
     let data_dir = crate::projects::agent_data_dir();
     let runtime_root = codux_runtime_live::runtime_paths::runtime_root_dir();
     config.support_dir = Some(data_dir.clone());
@@ -341,14 +396,18 @@ pub(crate) fn create_terminal(
     if config.terminal_id.is_none() {
         config.terminal_id = Some(uuid::Uuid::new_v4().to_string());
     }
-    if let (Some(session_id), Some(project_id)) = (config.terminal_id.as_deref(), project_id) {
+    if let (Some(session_id), Some(project_id)) = (
+        config.terminal_id.as_deref(),
+        canonical_project_id.as_deref(),
+    ) {
         fanout_state.set_session_project(session_id, project_id);
+        fanout_state.set_session_project_path(session_id, canonical_project_path.as_deref());
     }
 
     let driver_for_emit = Arc::clone(driver);
     let transport_for_emit = Arc::clone(transport);
     let fanout_for_emit = fanout_state.clone();
-    let project_id_for_emit = project_id.map(str::to_string);
+    let project_id_for_emit = canonical_project_id.clone();
     let event_order = Arc::new(Mutex::new(()));
     let event_order_for_emit = Arc::clone(&event_order);
     let emit = Arc::new(move |event: TerminalEvent| {
@@ -386,8 +445,9 @@ pub(crate) fn create_terminal(
             fanout_state.clear_session(&session_id);
             "Created terminal is unavailable.".to_string()
         })?;
-    if let Some(project_id) = project_id {
+    if let Some(project_id) = canonical_project_id.as_deref() {
         fanout_state.set_session_project(&session_id, project_id);
+        fanout_state.set_session_project_path(&session_id, canonical_project_path.as_deref());
     }
     Ok(terminal)
 }
@@ -403,6 +463,22 @@ pub(crate) fn broadcast_terminal_list(
         json!({
             "type": REMOTE_TERMINAL_LIST,
             "payload": list_payload(driver, fanout_state),
+        }),
+        false,
+    );
+}
+
+pub(crate) fn broadcast_project_list(transport: &TransportSlot) {
+    send(
+        transport,
+        None,
+        json!({
+            "type": REMOTE_PROJECT_LIST,
+            "payload": codux_runtime_core::project::project_list_payload(
+                AgentProjectStore::new().list(),
+                None,
+                None,
+            ),
         }),
         false,
     );
@@ -538,11 +614,6 @@ fn handle_agent_terminal_event(
             exit_code,
         } => {
             let viewers = fanout_state.viewers(&session_id);
-            let project_subscribers = fanout_state
-                .project_for_session(&session_id)
-                .as_deref()
-                .map(|project_id| fanout_state.project_subscribers(project_id))
-                .unwrap_or_default();
             send_to_viewers(
                 transport,
                 &viewers,
@@ -557,15 +628,7 @@ fn handle_agent_terminal_event(
                 false,
             );
             fanout_state.clear_session(&session_id);
-            send_to_viewers(
-                transport,
-                &project_subscribers,
-                json!({
-                    "type": REMOTE_TERMINAL_LIST,
-                    "payload": list_payload(driver, fanout_state),
-                }),
-                false,
-            );
+            broadcast_terminal_list(driver, transport, fanout_state);
         }
         TerminalEvent::Error {
             session_id,
@@ -834,6 +897,25 @@ impl RemoteTerminalDispatch for AgentTerminalCtx<'_> {
             .and_then(Value::as_str)
             .map(str::to_string)
             .or_else(|| project_id.clone());
+        let root_project_path = payload
+            .get("rootProjectPath")
+            .or_else(|| payload.get("projectRootPath"))
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .or_else(|| {
+                project_id.as_deref().and_then(|project_id| {
+                    AgentProjectStore::new()
+                        .resolve(Some(project_id), None)
+                        .map(|project| project.path)
+                })
+            })
+            .or_else(|| {
+                payload
+                    .get("projectPath")
+                    .or_else(|| payload.get("cwd"))
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            });
         let mut config = TerminalPtyConfig {
             cwd: payload
                 .get("cwd")
@@ -853,12 +935,7 @@ impl RemoteTerminalDispatch for AgentTerminalCtx<'_> {
                 .and_then(Value::as_u64)
                 .map(|v| v as u16),
             root_project_id: project_id.clone(),
-            root_project_path: payload
-                .get("rootProjectPath")
-                .or_else(|| payload.get("projectPath"))
-                .or_else(|| payload.get("cwd"))
-                .and_then(Value::as_str)
-                .map(str::to_string),
+            root_project_path,
             project_id: worktree_id.clone(),
             worktree_id,
             project_name: payload
@@ -889,6 +966,11 @@ impl RemoteTerminalDispatch for AgentTerminalCtx<'_> {
             ..Default::default()
         };
         apply_terminal_osc_color_env(&mut config, payload);
+        crate::tool_permissions::write_runtime_tools(
+            &crate::projects::agent_data_dir(),
+            payload.get("runtimeTools"),
+        )
+        .ok();
         if config.terminal_id.is_none() {
             config.terminal_id = Some(uuid::Uuid::new_v4().to_string());
         }
@@ -913,10 +995,6 @@ impl RemoteTerminalDispatch for AgentTerminalCtx<'_> {
                     device_id,
                     |session_id, device_id| self.add_viewer(session_id, device_id),
                 );
-                let mut subscribers = project_id
-                    .as_deref()
-                    .map(|project_id| self.fanout.project_subscribers(project_id))
-                    .unwrap_or_default();
                 let created_payload = terminal_payload(created_terminal, self.fanout);
                 reply(
                     self.transport,
@@ -926,18 +1004,8 @@ impl RemoteTerminalDispatch for AgentTerminalCtx<'_> {
                     REMOTE_TERMINAL_CREATED,
                     created_payload.clone(),
                 );
-                if let Some(device_id) = device_id {
-                    subscribers.retain(|subscriber| subscriber != device_id);
-                }
-                send_to_viewers(
-                    self.transport,
-                    &subscribers,
-                    json!({
-                        "type": REMOTE_TERMINAL_LIST,
-                        "payload": list_payload(self.driver, self.fanout),
-                    }),
-                    false,
-                );
+                broadcast_terminal_list(self.driver, self.transport, self.fanout);
+                broadcast_project_list(self.transport);
                 if lifecycle.reattaching
                     && let Some(device_id) =
                         device_id.map(str::trim).filter(|value| !value.is_empty())
@@ -1102,12 +1170,6 @@ impl RemoteTerminalDispatch for AgentTerminalCtx<'_> {
 
     fn handle_terminal_close_msg(&self, msg: &TerminalMessage) {
         if let Some(id) = msg.session_id {
-            let mut project_subscribers = self
-                .fanout
-                .project_for_session(id)
-                .as_deref()
-                .map(|project_id| self.fanout.project_subscribers(project_id))
-                .unwrap_or_default();
             let requesting_device = msg
                 .device_id
                 .filter(|device_id| !device_id.trim().is_empty());
@@ -1149,22 +1211,7 @@ impl RemoteTerminalDispatch for AgentTerminalCtx<'_> {
                 json!({ "sessionId": id }),
             );
             if !existed {
-                if let Some(device_id) = requesting_device
-                    && !project_subscribers
-                        .iter()
-                        .any(|subscriber| subscriber == device_id)
-                {
-                    project_subscribers.push(device_id.to_string());
-                }
-                send_to_viewers(
-                    self.transport,
-                    &project_subscribers,
-                    json!({
-                        "type": REMOTE_TERMINAL_LIST,
-                        "payload": list_payload(self.driver, self.fanout),
-                    }),
-                    false,
-                );
+                broadcast_terminal_list(self.driver, self.transport, self.fanout);
             }
         }
     }
@@ -1490,7 +1537,7 @@ mod tests {
         );
         assert_eq!(
             message_types(&received, "phone-b"),
-            vec![REMOTE_TERMINAL_CLOSED]
+            vec![REMOTE_TERMINAL_CLOSED, REMOTE_TERMINAL_LIST]
         );
         assert!(fanout.viewers("session-1").is_empty());
         assert_eq!(fanout.project_for_session("session-1"), None);

@@ -285,7 +285,7 @@ pub(super) fn appearance_style_card(
                 settings_text(
                     language,
                     "settings.window_style.ui_help",
-                    "Frosted-glass opacity for the sidebar, headers, panels and cards. The terminal stays a bit more opaque. Drag to 100% for solid.",
+                    "Frosted-glass opacity for the whole window, including the terminal. Drag to 100% for solid.",
                 ),
                 state,
                 cx,
@@ -320,11 +320,11 @@ pub(super) fn appearance_slider_row(
     let percent = (state.read(cx).value().start() * 100.0).round() as i64;
     div()
         .w_full()
-        .min_h(px(58.0))
-        .py(px(10.0))
+        .min_h(px(44.0))
+        .py(px(8.0))
         .flex()
         .items_center()
-        .gap(px(24.0))
+        .gap(px(20.0))
         .child(
             div()
                 .min_w(px(160.0))
@@ -340,7 +340,7 @@ pub(super) fn appearance_slider_row(
                 )
                 .child(
                     div()
-                        .mt(px(3.0))
+                        .mt(px(2.0))
                         .max_w(px(420.0))
                         .text_size(SETTINGS_FORM_DESCRIPTION_TEXT_SIZE)
                         .line_height(SETTINGS_FORM_DESCRIPTION_LINE_HEIGHT)

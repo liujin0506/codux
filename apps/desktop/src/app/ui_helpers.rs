@@ -309,10 +309,10 @@ fn codux_tooltip_position(
 
 pub(in crate::app) fn column_header(
     content: impl IntoElement,
-    cx: &mut Context<CoduxApp>,
+    _cx: &mut Context<CoduxApp>,
 ) -> impl IntoElement {
     div()
-        .h(px(52.0))
+        .h(px(44.0))
         .w_full()
         .px(px(10.0))
         .flex_shrink_0()
@@ -320,8 +320,8 @@ pub(in crate::app) fn column_header(
         // No `items_center`: the content row stretches to full header height so
         // its draggable middle area covers the whole title bar.
         .border_b_1()
-        .border_color(cx.theme().border)
-        .bg(theme::vibrancy(cx.theme().title_bar))
+        .border_color(color(theme::BORDER_SOFT))
+        .bg(theme::title_bar_fill())
         .child(content)
 }
 

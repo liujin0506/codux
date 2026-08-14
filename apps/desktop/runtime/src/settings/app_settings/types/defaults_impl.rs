@@ -64,6 +64,15 @@ impl Default for AIRuntimeToolSettings {
             codewhale_model: String::new(),
             kimi_model: String::new(),
             mimo_model: String::new(),
+            codex_path: String::new(),
+            claude_code_path: String::new(),
+            agy_path: String::new(),
+            omp_path: String::new(),
+            opencode_path: String::new(),
+            kiro_path: String::new(),
+            codewhale_path: String::new(),
+            kimi_path: String::new(),
+            mimo_path: String::new(),
             codex_effort: default_codex_effort(),
         }
     }

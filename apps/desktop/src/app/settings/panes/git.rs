@@ -63,33 +63,34 @@ pub(super) fn settings_git_pane(
                     ),
                 )
                 .into_any_element(),
-                settings_row(
-                    settings_text(
-                        language,
-                        "settings.ai.git_commit_message_style_rules",
-                        "Style Rules",
-                    ),
-                    Some(settings_text(
-                        language,
-                        "settings.ai.git_commit_message_style_rules_placeholder",
-                        "Example: use Conventional Commits, keep subject under 72 characters.",
-                    )),
-                    settings_textarea(
-                        "git-style-rules",
-                        &settings.git_commit_style_rules,
-                        3,
-                        settings_text(
-                            language,
-                            "settings.ai.git_commit_message_style_rules_placeholder",
-                            "Example: use Conventional Commits, keep subject under 72 characters.",
-                        ),
-                        window,
-                        cx,
-                        |app, value, window, cx| app.set_git_commit_style_rules(value, window, cx),
-                    ),
-                )
-                .into_any_element(),
             ],
+            cx,
+        )
+        .into_any_element(),
+        settings_card_flush(
+            Some(settings_text(
+                language,
+                "settings.ai.git_commit_message_style_rules",
+                "Style Rules",
+            )),
+            Some(settings_text(
+                language,
+                "settings.ai.git_commit_message_style_rules_placeholder",
+                "Example: use Conventional Commits, keep subject under 72 characters.",
+            )),
+            vec![settings_textarea(
+                "git-style-rules",
+                &settings.git_commit_style_rules,
+                4,
+                settings_text(
+                    language,
+                    "settings.ai.git_commit_message_style_rules",
+                    "Style Rules",
+                ),
+                window,
+                cx,
+                |app, value, window, cx| app.set_git_commit_style_rules(value, window, cx),
+            )],
             cx,
         )
         .into_any_element(),

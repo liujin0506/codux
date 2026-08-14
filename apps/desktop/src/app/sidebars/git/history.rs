@@ -26,8 +26,8 @@ pub(super) fn git_history_panel(
                 .px_3()
                 .flex()
                 .items_center()
-                // Thin translucent darkening: deeper than the panel, see-through.
-                .bg(theme::vibrancy_raised(cx.theme().list_head))
+                .border_t_1()
+                .border_color(color(theme::BORDER_SOFT).opacity(0.5))
                 .text_size(rems(0.875))
                 .line_height(rems(1.125))
                 .text_color(cx.theme().muted_foreground)

@@ -21,7 +21,9 @@ mod runstate;
 mod runtime_stdio;
 mod sessions;
 mod smoke;
+mod ssh;
 mod terminals;
+mod tool_permissions;
 mod web_test;
 mod worktree;
 

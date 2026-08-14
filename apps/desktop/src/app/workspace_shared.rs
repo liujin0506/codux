@@ -20,17 +20,18 @@ pub(in crate::app) fn workspace_header_badge_button_content(
     icon: HeroIconName,
     icon_bg: gpui::Hsla,
     label: impl Into<SharedString>,
-    cx: &mut Context<CoduxApp>,
+    _cx: &mut Context<CoduxApp>,
 ) -> impl IntoElement {
     div()
         .h(px(20.0))
         .flex()
         .items_center()
-        .gap_2()
-        .text_color(cx.theme().foreground)
+        .gap(px(5.0))
+        .text_size(rems(0.75))
+        .text_color(color(theme::TEXT_MUTED))
         .child(
             div()
-                .size(px(18.0))
+                .size(px(12.0))
                 .flex()
                 .items_center()
                 .justify_center()
@@ -41,8 +42,10 @@ pub(in crate::app) fn workspace_header_badge_button_content(
         )
         .child(
             div()
+                .mt(px(1.0))
                 .text_size(rems(0.75))
-                .text_color(cx.theme().foreground)
+                .line_height(rems(0.75))
+                .text_color(color(theme::TEXT_MUTED))
                 .child(label.into()),
         )
 }

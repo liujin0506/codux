@@ -6,9 +6,8 @@
 //! path convention the desktop uses — so the two hosts can't drift on them.
 
 use codux_runtime_core::worktree::{
-    RuntimeWorktreeItem, WorktreeSummaryPayload, default_worktree_base_branch,
-    selected_runtime_worktree_id, worktree_base_branches, worktree_display_name,
-    worktree_summary_payload, worktree_uuid,
+    WorktreeSummaryPayload, default_worktree_base_branch, worktree_base_branches,
+    worktree_display_name, worktree_summary_payload, worktree_uuid,
 };
 use serde_json::{Value, json};
 use std::path::Path;
@@ -30,32 +29,42 @@ pub fn worktree_list_payload(project_id: &str, project_path: &str) -> Value {
         .iter()
         .map(|entry| worktree_entry(project_id, entry))
         .collect();
-    let items: Vec<RuntimeWorktreeItem> = scanned
-        .iter()
-        .map(|entry| RuntimeWorktreeItem {
-            id: entry_id(project_id, entry),
-            project_id: project_id.to_string(),
-            path: entry.path.clone(),
-            is_default: entry.is_default,
-            exists: Path::new(&entry.path).exists(),
-        })
-        .collect();
-    let selected = selected_runtime_worktree_id(project_id, None, &items);
     // Base branches come from the project's git branches (same source the
     // desktop host uses), so the worktree create dialog offers real options.
     let status = codux_git::wire::status(project_path);
     let base_branches = worktree_base_branches(&status.branch, &status.branches);
     let default_base_branch = default_worktree_base_branch(&status.branch, &status.branches);
-    worktree_summary_payload(WorktreeSummaryPayload {
+    let mut payload = worktree_summary_payload(WorktreeSummaryPayload {
         project_id: project_id.to_string(),
-        selected_worktree_id: selected,
+        // Selection belongs to each controller. A resource snapshot must not
+        // overwrite another device's local worktree selection.
+        selected_worktree_id: None,
         worktrees: Value::Array(entries),
         tasks: json!([]),
         available: true,
         base_branches,
         default_base_branch,
         error: None,
-    })
+    });
+    payload["projectPath"] = json!(project_path);
+    payload
+}
+
+/// Resolve a controller-provided worktree path to the stable id derived from
+/// the agent-owned project id. The default worktree intentionally uses the
+/// project id itself, matching the shared runtime convention.
+pub fn worktree_id_for_path(project_id: &str, project_path: &str, worktree_path: &str) -> String {
+    if codux_runtime_core::path::paths_equal(project_path, worktree_path) {
+        return project_id.to_string();
+    }
+    if let Some(entry) = scan_worktrees(project_path)
+        .iter()
+        .find(|entry| codux_runtime_core::path::paths_equal(&entry.path, worktree_path))
+    {
+        return entry_id(project_id, entry);
+    }
+    let normalized = codux_git::normalize_repository_path(worktree_path);
+    worktree_uuid(project_id, &normalized)
 }
 
 /// Scan the project's real git worktrees via `git worktree list --porcelain`.
@@ -195,6 +204,13 @@ mod tests {
     fn create_payload_selects_the_created_worktree() {
         let repo = temp_dir("create-payload-selection");
         init_repo(&repo);
+
+        let initial = worktree_list_payload("project-1", repo.to_string_lossy().as_ref());
+        assert_eq!(initial["selectedWorktreeId"], Value::Null);
+        assert_eq!(
+            initial["projectPath"],
+            json!(repo.to_string_lossy().to_string())
+        );
 
         let payload = worktree_create_payload(
             "project-1",

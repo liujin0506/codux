@@ -216,6 +216,15 @@ fn sanitize_runtime_tool_settings(mut settings: AIRuntimeToolSettings) -> AIRunt
     settings.codewhale_model = settings.codewhale_model.trim().chars().take(160).collect();
     settings.kimi_model = settings.kimi_model.trim().chars().take(160).collect();
     settings.mimo_model = settings.mimo_model.trim().chars().take(160).collect();
+    settings.codex_path = sanitize_executable_path(&settings.codex_path);
+    settings.claude_code_path = sanitize_executable_path(&settings.claude_code_path);
+    settings.agy_path = sanitize_executable_path(&settings.agy_path);
+    settings.omp_path = sanitize_executable_path(&settings.omp_path);
+    settings.opencode_path = sanitize_executable_path(&settings.opencode_path);
+    settings.kiro_path = sanitize_executable_path(&settings.kiro_path);
+    settings.codewhale_path = sanitize_executable_path(&settings.codewhale_path);
+    settings.kimi_path = sanitize_executable_path(&settings.kimi_path);
+    settings.mimo_path = sanitize_executable_path(&settings.mimo_path);
     settings.codex_effort = match settings.codex_effort.trim() {
         "none" => "none".to_string(),
         "minimal" => "minimal".to_string(),
@@ -233,6 +242,15 @@ fn sanitize_tool_permission_mode(value: &str) -> String {
         "fullAccess" => "fullAccess".to_string(),
         _ => default_ai_tool_permission_mode(),
     }
+}
+
+fn sanitize_executable_path(value: &str) -> String {
+    value
+        .trim()
+        .chars()
+        .filter(|ch| !ch.is_control())
+        .take(4096)
+        .collect()
 }
 
 fn sanitize_ai_provider(mut provider: AIProviderSettings) -> Option<AIProviderSettings> {

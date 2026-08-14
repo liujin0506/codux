@@ -1,5 +1,5 @@
 use super::*;
-use gpui::Focusable;
+use gpui::{Focusable, FontWeight};
 
 pub(super) const SETTINGS_FORM_TEXT_SIZE: Rems = Rems(0.875);
 pub(super) const SETTINGS_FORM_LINE_HEIGHT: Rems = Rems(1.125);
@@ -12,7 +12,7 @@ pub(super) fn settings_form(children: Vec<AnyElement>) -> impl IntoElement {
         .flex()
         .flex_col()
         .w_full()
-        .gap(px(22.0))
+        .gap(px(16.0))
         .children(children)
 }
 
@@ -22,7 +22,16 @@ pub(super) fn settings_card(
     children: Vec<AnyElement>,
     cx: &mut Context<CoduxApp>,
 ) -> impl IntoElement {
-    settings_card_with_actions(title, description, None, children, cx)
+    settings_card_layout(title, description, None, children, true, cx)
+}
+
+pub(super) fn settings_card_flush(
+    title: Option<String>,
+    description: Option<String>,
+    children: Vec<AnyElement>,
+    cx: &mut Context<CoduxApp>,
+) -> impl IntoElement {
+    settings_card_layout(title, description, None, children, false, cx)
 }
 
 pub(super) fn settings_card_with_actions(
@@ -32,32 +41,46 @@ pub(super) fn settings_card_with_actions(
     children: Vec<AnyElement>,
     cx: &mut Context<CoduxApp>,
 ) -> impl IntoElement {
-    let title_element = if title.is_some() || description.is_some() || actions.is_some() {
+    settings_card_layout(title, description, actions, children, true, cx)
+}
+
+fn settings_card_layout(
+    title: Option<String>,
+    description: Option<String>,
+    actions: Option<AnyElement>,
+    children: Vec<AnyElement>,
+    padded: bool,
+    cx: &mut Context<CoduxApp>,
+) -> impl IntoElement {
+    let header = if title.is_some() || description.is_some() || actions.is_some() {
         Some(
             div()
-                .min_h(px(28.0))
+                .w_full()
+                .px(px(4.0))
                 .flex()
-                .items_center()
+                .items_end()
                 .justify_between()
                 .gap(px(12.0))
                 .child(
                     div()
-                        .min_w_0()
+                        .min_w(px(48.0))
                         .flex_1()
                         .flex()
                         .flex_col()
                         .child(
                             div()
-                                .text_size(SETTINGS_FORM_TEXT_SIZE)
-                                .line_height(SETTINGS_FORM_LINE_HEIGHT)
-                                .text_color(color(theme::TEXT))
+                                .whitespace_nowrap()
+                                .text_size(rems(0.6875))
+                                .line_height(rems(0.9375))
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(color(theme::TEXT_DIM))
                                 .child(title.clone().unwrap_or_default()),
                         )
                         .when_some(description, |this, description| {
                             this.child(
                                 div()
-                                    .mt(px(3.0))
-                                    .max_w(px(520.0))
+                                    .mt(px(4.0))
+                                    .max_w(px(560.0))
                                     .text_size(SETTINGS_FORM_DESCRIPTION_TEXT_SIZE)
                                     .line_height(SETTINGS_FORM_DESCRIPTION_LINE_HEIGHT)
                                     .text_color(color(theme::TEXT_DIM))
@@ -71,29 +94,35 @@ pub(super) fn settings_card_with_actions(
         None
     };
 
-    div().w_full().child(
-        GroupBox::new()
-            .w_full()
-            .fill()
-            .when_some(title_element, |this, title| this.title(title))
-            .content_style(
-                div()
-                    .w_full()
-                    .px(px(22.0))
-                    .py(px(10.0))
-                    .gap(px(0.0))
-                    .style()
-                    .clone(),
-            )
-            .children(children.into_iter().enumerate().flat_map(|(index, child)| {
-                let mut elements = Vec::with_capacity(if index == 0 { 1 } else { 2 });
-                if index > 0 {
-                    elements.push(settings_form_separator(cx));
-                }
-                elements.push(div().w_full().child(child).into_any_element());
-                elements
-            })),
-    )
+    div()
+        .w_full()
+        .flex()
+        .flex_col()
+        .gap(px(6.0))
+        .when_some(header, |this, header| this.child(header))
+        .child(
+            GroupBox::new()
+                .w_full()
+                .fill()
+                .content_style(
+                    div()
+                        .w_full()
+                        .when(padded, |this| this.px(px(14.0)).py(px(2.0)))
+                        .when(!padded, |this| this.p_0().overflow_hidden())
+                        .gap(px(0.0))
+                        .bg(settings_card_fill(cx))
+                        .style()
+                        .clone(),
+                )
+                .children(children.into_iter().enumerate().flat_map(|(index, child)| {
+                    let mut elements = Vec::with_capacity(if index == 0 { 1 } else { 2 });
+                    if index > 0 {
+                        elements.push(settings_form_separator(cx));
+                    }
+                    elements.push(div().w_full().child(child).into_any_element());
+                    elements
+                })),
+        )
 }
 
 pub(super) fn settings_form_separator(cx: &mut Context<CoduxApp>) -> AnyElement {
@@ -106,7 +135,17 @@ pub(super) fn settings_form_separator(cx: &mut Context<CoduxApp>) -> AnyElement 
 }
 
 pub(super) fn settings_form_divider(cx: &mut Context<CoduxApp>) -> gpui::Hsla {
-    theme::divider_for_surface(cx.theme().background)
+    let rgb = settings_card_fill(cx).to_rgb();
+    let luminance = 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b;
+    if luminance > 0.5 {
+        color(0x000000).opacity(0.05)
+    } else {
+        color(0xFFFFFF).opacity(0.055)
+    }
+}
+
+fn settings_card_fill(cx: &mut Context<CoduxApp>) -> gpui::Hsla {
+    theme::elevate(cx.theme().background, 0.045)
 }
 
 pub(super) fn settings_row(
@@ -116,12 +155,12 @@ pub(super) fn settings_row(
 ) -> impl IntoElement {
     let label = label.into();
     div()
-        .min_h(px(58.0))
-        .py(px(10.0))
+        .min_h(px(44.0))
+        .py(px(8.0))
         .flex()
         .items_center()
         .justify_between()
-        .gap(px(24.0))
+        .gap(px(20.0))
         .child(
             div()
                 .min_w(px(SETTINGS_ROW_LABEL_MIN_WIDTH))
@@ -130,16 +169,19 @@ pub(super) fn settings_row(
                 .flex_col()
                 .child(
                     div()
+                        .whitespace_nowrap()
                         .text_size(SETTINGS_FORM_TEXT_SIZE)
                         .line_height(SETTINGS_FORM_LINE_HEIGHT)
+                        .font_weight(FontWeight::MEDIUM)
                         .text_color(color(theme::TEXT))
                         .child(label),
                 )
                 .child(
                     div()
                         .when(description.is_none(), |this| this.hidden())
-                        .mt(px(3.0))
+                        .mt(px(2.0))
                         .max_w(px(420.0))
+                        .whitespace_nowrap()
                         .text_size(SETTINGS_FORM_DESCRIPTION_TEXT_SIZE)
                         .line_height(SETTINGS_FORM_DESCRIPTION_LINE_HEIGHT)
                         .text_color(color(theme::TEXT_DIM))
@@ -152,7 +194,7 @@ pub(super) fn settings_row(
                 .min_w(px(SETTINGS_ROW_CONTROL_MIN_WIDTH))
                 .max_w(relative(0.3))
                 .flex()
-                .flex_shrink_0()
+                .flex_none()
                 .items_center()
                 .justify_end()
                 .child(control),
@@ -220,14 +262,26 @@ pub(super) fn settings_text_input(
     cx: &mut Context<CoduxApp>,
     action: impl Fn(&mut CoduxApp, String, &mut Window, &mut Context<CoduxApp>) + 'static,
 ) -> AnyElement {
-    settings_text_input_sized(id, value, placeholder, masked, window, cx, action)
+    settings_text_input_width(id, value, placeholder, masked, None, window, cx, action)
 }
 
-pub(super) fn settings_text_input_sized(
+pub(super) fn settings_compact_text_input(
+    id: impl Into<SharedString>,
+    value: impl Into<String>,
+    placeholder: impl Into<String>,
+    window: &mut Window,
+    cx: &mut Context<CoduxApp>,
+    action: impl Fn(&mut CoduxApp, String, &mut Window, &mut Context<CoduxApp>) + 'static,
+) -> AnyElement {
+    settings_text_input_width(id, value, placeholder, false, Some(px(72.0)), window, cx, action)
+}
+
+fn settings_text_input_width(
     id: impl Into<SharedString>,
     value: impl Into<String>,
     placeholder: impl Into<String>,
     masked: bool,
+    width: Option<gpui::Pixels>,
     window: &mut Window,
     cx: &mut Context<CoduxApp>,
     action: impl Fn(&mut CoduxApp, String, &mut Window, &mut Context<CoduxApp>) + 'static,
@@ -258,7 +312,8 @@ pub(super) fn settings_text_input_sized(
     .detach();
 
     div()
-        .w_full()
+        .when_some(width, |this, width| this.w(width))
+        .when(width.is_none(), |this| this.w_full())
         .min_w_0()
         .child(
             Input::new(&state)
@@ -311,12 +366,13 @@ pub(super) fn settings_textarea(
         .child(
             Input::new(&state)
                 .with_size(gpui_component::Size::Medium)
+                .w_full()
                 .h(px((rows as f32 * 28.0).max(84.0))),
         )
         .into_any_element()
 }
 
-fn should_sync_settings_input(current: &str, external: &str, focused: bool) -> bool {
+pub(super) fn should_sync_settings_input(current: &str, external: &str, focused: bool) -> bool {
     !focused && current != external
 }
 

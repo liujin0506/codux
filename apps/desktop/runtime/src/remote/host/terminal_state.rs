@@ -967,10 +967,12 @@ pub(super) fn remote_terminal_pty_config(
     config.session_key = session_key;
     config.session_instance_id = session_instance_id;
     // Same env injection as local spawns (wrapper PATH, shell hooks,
-    // ssh/db profiles); without these a remote terminal launches the bare
-    // CLI and none of the wrapper features work.
-    config.support_dir = Some(support_dir);
+    // ssh/db profiles, tool permissions); without these a remote terminal
+    // launches the bare CLI and none of the wrapper features work.
+    config.support_dir = Some(support_dir.clone());
     config.runtime_root = Some(codux_runtime_live::runtime_paths::runtime_root_dir());
+    config.tool_permissions_file =
+        crate::tool_permissions::ToolPermissionsService::synced_file_path(support_dir);
     config
 }
 

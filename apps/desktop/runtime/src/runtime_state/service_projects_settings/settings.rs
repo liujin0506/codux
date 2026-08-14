@@ -427,6 +427,16 @@ impl RuntimeService {
         })
     }
 
+    pub fn set_runtime_tool_path(
+        &self,
+        path_key: &str,
+        path: &str,
+    ) -> Result<SettingsSummary, String> {
+        self.update_settings_with_side_effects(|settings| {
+            settings.set_runtime_tool_path(path_key, path)
+        })
+    }
+
     pub fn set_codex_effort(&self, effort: &str) -> Result<SettingsSummary, String> {
         self.update_settings_with_side_effects(|settings| settings.set_codex_effort(effort))
     }

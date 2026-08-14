@@ -2,6 +2,8 @@
   "strings": {
     "de": {
       "terminal.closed": "Closed terminal.",
+      "terminal.exited.title": "Prozess beendet",
+      "terminal.exited.restart_hint": "Eingabetaste zum Neustart",
       "terminal.keep_one_open": "At least one terminal must remain open.",
       "terminal.none_selected": "No terminal selected.",
       "terminal.title": "Terminal",
@@ -36,6 +38,8 @@
     },
     "en": {
       "terminal.closed": "Closed terminal.",
+      "terminal.exited.title": "Process completed",
+      "terminal.exited.restart_hint": "Press Enter to restart",
       "terminal.keep_one_open": "At least one terminal must remain open.",
       "terminal.none_selected": "No terminal selected.",
       "terminal.title": "Terminal",
@@ -74,6 +78,8 @@
     },
     "es": {
       "terminal.closed": "Closed terminal.",
+      "terminal.exited.title": "Proceso finalizado",
+      "terminal.exited.restart_hint": "Pulsa Intro para reiniciar",
       "terminal.keep_one_open": "At least one terminal must remain open.",
       "terminal.none_selected": "No terminal selected.",
       "terminal.title": "Terminal",
@@ -108,6 +114,8 @@
     },
     "fr": {
       "terminal.closed": "Closed terminal.",
+      "terminal.exited.title": "Processus terminé",
+      "terminal.exited.restart_hint": "Appuyez sur Entrée pour redémarrer",
       "terminal.keep_one_open": "At least one terminal must remain open.",
       "terminal.none_selected": "No terminal selected.",
       "terminal.title": "Terminal",
@@ -142,6 +150,8 @@
     },
     "ja": {
       "terminal.closed": "Closed terminal.",
+      "terminal.exited.title": "プロセスが終了しました",
+      "terminal.exited.restart_hint": "Enter で再起動",
       "terminal.keep_one_open": "At least one terminal must remain open.",
       "terminal.none_selected": "No terminal selected.",
       "terminal.title": "ターミナル",
@@ -176,6 +186,8 @@
     },
     "ko": {
       "terminal.closed": "Closed terminal.",
+      "terminal.exited.title": "프로세스가 종료되었습니다",
+      "terminal.exited.restart_hint": "Enter를 눌러 다시 시작",
       "terminal.keep_one_open": "At least one terminal must remain open.",
       "terminal.none_selected": "No terminal selected.",
       "terminal.title": "터미널",
@@ -210,6 +222,8 @@
     },
     "pt-BR": {
       "terminal.closed": "Closed terminal.",
+      "terminal.exited.title": "Processo encerrado",
+      "terminal.exited.restart_hint": "Pressione Enter para reiniciar",
       "terminal.keep_one_open": "At least one terminal must remain open.",
       "terminal.none_selected": "No terminal selected.",
       "terminal.title": "Terminal",
@@ -244,6 +258,8 @@
     },
     "ru": {
       "terminal.closed": "Closed terminal.",
+      "terminal.exited.title": "Процесс завершён",
+      "terminal.exited.restart_hint": "Нажмите Enter, чтобы перезапустить",
       "terminal.keep_one_open": "At least one terminal must remain open.",
       "terminal.none_selected": "No terminal selected.",
       "terminal.title": "Терминал",
@@ -278,6 +294,8 @@
     },
     "zh-Hans": {
       "terminal.closed": "已关闭终端。",
+      "terminal.exited.title": "进程已结束",
+      "terminal.exited.restart_hint": "按回车重新启动",
       "terminal.keep_one_open": "至少需要保留一个终端。",
       "terminal.none_selected": "未选中终端。",
       "terminal.title": "终端",
@@ -316,6 +334,8 @@
     },
     "zh-Hant": {
       "terminal.closed": "已關閉終端機。",
+      "terminal.exited.title": "進程已結束",
+      "terminal.exited.restart_hint": "按 Return 重新啟動",
       "terminal.keep_one_open": "至少要保留一個終端機。",
       "terminal.none_selected": "尚未選取終端機。",
       "terminal.title": "終端機",

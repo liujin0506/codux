@@ -11,7 +11,7 @@ const PROJECT_TOOL_TEXT_SIZE: Rems = Rems(0.875);
 const PROJECT_TOOL_LINE_HEIGHT: Rems = Rems(1.125);
 const PROJECT_TOOL_ICON_SLOT_WIDTH: f32 = 20.0;
 const PROJECT_TOOL_LABEL_WIDTH: f32 = 212.0;
-const PROJECT_TOOL_ICON_WIDTH: f32 = 40.0;
+const PROJECT_TOOL_ICON_WIDTH: f32 = 24.0;
 
 #[derive(Clone)]
 struct ProjectRowDrag {
@@ -24,8 +24,8 @@ struct ProjectRowDrag {
 impl Render for ProjectRowDrag {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         div()
-            .w(px(44.0))
-            .h(px(44.0))
+            .w(px(40.0))
+            .h(px(40.0))
             .rounded(px(8.0))
             .flex()
             .items_center()
@@ -136,13 +136,54 @@ impl Render for ProjectColumnView {
                 )
             });
         let app_entity = self.app_entity.clone();
-        let scroll_handle = self.scroll_handle.clone();
+        let add_app_entity = app_entity.clone();
         let language = self.language.clone();
         let row_menu_labels = project_row_menu_labels(language.as_str());
         let project_order = projects
             .iter()
             .map(|project| project.id.clone())
             .collect::<Vec<_>>();
+
+        let mut project_rows = Vec::with_capacity(projects.len() + 1);
+        for project in projects.iter() {
+            let project_id = project.id.clone();
+            let active = selected_project_id
+                .as_deref()
+                .map(|selected| selected == project.id)
+                .unwrap_or(false);
+            let lifecycle_state = lifecycle
+                .get(project.id.as_str())
+                .copied()
+                .filter(|state| *state != AgentLifecycleState::Idle);
+            let link_state = project
+                .remote_device_id()
+                .map(|device_id| links.get(device_id).copied());
+            project_rows.push(
+                div()
+                    .w_full()
+                    .pb(px(4.0))
+                    .child(project_row(
+                        ProjectRowInput {
+                            project: project.clone(),
+                            active,
+                            app_entity: app_entity.clone(),
+                            project_id,
+                            project_order: project_order.clone(),
+                            lifecycle_state,
+                            link_state,
+                            collapsed,
+                            labels: row_menu_labels.clone(),
+                        },
+                        window,
+                        cx,
+                    ))
+                    .into_any_element(),
+            );
+        }
+        project_rows.push(
+            add_project_list_row(collapsed, language.as_str(), add_app_entity, window, cx)
+                .into_any_element(),
+        );
 
         div()
             .flex()
@@ -154,81 +195,53 @@ impl Render for ProjectColumnView {
             }))
             .h_full()
             .bg(theme::vibrancy(cx.theme().sidebar))
-            .border_r_1()
-            .border_color(cx.theme().sidebar_border)
-            .child(project_column_header(collapsed))
+            .child(project_column_header(collapsed, cx))
             .child(
                 div()
-                    .id("project-list-scroll")
                     .flex()
                     .flex_col()
                     .flex_1()
                     .min_h_0()
-                    .px(if collapsed { px(7.0) } else { px(10.0) })
-                    .pt(px(10.0))
-                    .pb(px(10.0))
-                    .relative()
-                    .overflow_hidden()
-                    .child(codux_uniform_list(
-                        "project-list",
-                        projects.clone(),
-                        scroll_handle,
-                        None,
+                    .border_r_1()
+                    .border_color(cx.theme().sidebar_border)
+                    .child(
+                        div()
+                            .id("project-list-scroll")
+                            .flex()
+                            .flex_col()
+                            .flex_1()
+                            .min_h_0()
+                            .px(if collapsed { px(8.0) } else { px(10.0) })
+                            .pt(if collapsed { px(6.0) } else { px(8.0) })
+                            .pb(px(4.0))
+                            .overflow_y_scrollbar()
+                            .children(project_rows),
+                    )
+                    .child(project_tools_snapshot(
+                        collapsed,
+                        self.language.as_str(),
+                        self.app_entity.clone(),
+                        window,
                         cx,
-                        move |project, _index, window, cx| {
-                            let project_id = project.id.clone();
-                            let active = selected_project_id
-                                .as_deref()
-                                .map(|selected| selected == project.id)
-                                .unwrap_or(false);
-                            let lifecycle_state = lifecycle
-                                .get(project.id.as_str())
-                                .copied()
-                                .filter(|state| *state != AgentLifecycleState::Idle);
-                            let link_state = project
-                                .remote_device_id()
-                                .map(|device_id| links.get(device_id).copied());
-                            div()
-                                .w_full()
-                                .pb(px(4.0))
-                                .child(project_row(
-                                    ProjectRowInput {
-                                        project,
-                                        active,
-                                        app_entity: app_entity.clone(),
-                                        project_id,
-                                        project_order: project_order.clone(),
-                                        lifecycle_state,
-                                        link_state,
-                                        collapsed,
-                                        labels: row_menu_labels.clone(),
-                                    },
-                                    window,
-                                    cx,
-                                ))
-                                .into_any_element()
-                        },
                     )),
             )
-            .child(project_tools_snapshot(
-                collapsed,
-                self.language.as_str(),
-                self.app_entity.clone(),
-                window,
-                cx,
-            ))
     }
 }
 
-fn project_column_header(collapsed: bool) -> impl IntoElement {
+fn project_column_header(collapsed: bool, _cx: &mut Context<ProjectColumnView>) -> impl IntoElement {
+    let header_bg = theme::title_bar_fill();
     if collapsed {
         titlebar_drag_area(
             "project-column-titlebar-drag-collapsed",
             div()
-                .h(px(52.0))
+                .h(px(44.0))
+                .w_full()
                 .flex()
                 .items_center()
                 .justify_center()
+                .border_b_1()
+                .border_color(color(theme::BORDER_SOFT))
+                .bg(header_bg)
                 .when(!cfg!(target_os = "macos"), |this| {
                     this.child(
                         div()
@@ -245,13 +258,14 @@ fn project_column_header(collapsed: bool) -> impl IntoElement {
         .into_any_element()
     } else {
         div()
-            .h(px(52.0))
+            .h(px(44.0))
             .px(px(10.0))
             .flex()
             // No `items_center`: the drag area stretches to full header height
             // so the whole title bar is draggable.
             .border_b_1()
             .border_color(color(theme::BORDER_SOFT))
+            .bg(header_bg)
             .child(titlebar_drag_area(
                 "project-column-titlebar-drag",
                 div()
@@ -277,32 +291,19 @@ fn project_tools_snapshot(
     window: &mut Window,
     cx: &mut Context<ProjectColumnView>,
 ) -> AnyElement {
-    let base = div()
-        .flex()
-        .flex_shrink_0()
-        .gap(if collapsed { px(10.0) } else { px(4.0) })
-        .px(if collapsed { px(20.0) } else { px(10.0) })
-        .py_3();
+    let settings_label = project_column_text(language, "menu.settings", "Settings");
+    let more_label = project_column_text(language, "sidebar.footer.more", "More");
 
     if collapsed {
-        let add_project_label =
-            project_column_text(language, "sidebar.footer.add_project", "Add Project");
-        let settings_label = project_column_text(language, "menu.settings", "Settings");
-        let more_label = project_column_text(language, "sidebar.footer.more", "More");
-        base.flex_col()
+        return div()
+            .flex()
+            .flex_col()
+            .flex_shrink_0()
             .items_center()
-            .child(project_tool_button(
-                ProjectToolButtonProps {
-                    icon: HeroIconName::Plus,
-                    label: None,
-                    tooltip: add_project_label,
-                    id: "project-add-footer",
-                    app_entity: app_entity.clone(),
-                },
-                window,
-                cx,
-                |app, _event, window, cx| app.open_project_create_window(window, cx),
-            ))
+            .gap(px(8.0))
+            .px(px(8.0))
+            .pt(px(8.0))
+            .pb(px(10.0))
             .child(project_tool_button(
                 ProjectToolButtonProps {
                     icon: HeroIconName::Cog6Tooth,
@@ -316,58 +317,138 @@ fn project_tools_snapshot(
                 |app, _event, window, cx| app.open_settings_window(window, cx),
             ))
             .child(project_more_button(
-                None, more_label, language, app_entity, cx,
-            ))
-            .into_any_element()
-    } else {
-        let add_project_label =
-            project_column_text(language, "sidebar.footer.add_project", "Add Project");
-        let settings_label = project_column_text(language, "menu.settings", "Settings");
-        let more_label = project_column_text(language, "sidebar.footer.more", "More");
-        let toggle_label = project_column_text(language, "sidebar.collapse", "Collapse Sidebar");
-        base.flex_col()
-            .items_start()
-            .child(project_column_toggle_button(
-                collapsed,
+                None,
+                more_label.clone(),
                 language,
-                Some(toggle_label),
                 app_entity.clone(),
-                window,
                 cx,
             ))
-            .child(project_tool_button(
-                ProjectToolButtonProps {
-                    icon: HeroIconName::Plus,
-                    label: Some(add_project_label.clone()),
-                    tooltip: add_project_label,
-                    id: "project-add-footer",
-                    app_entity: app_entity.clone(),
-                },
-                window,
-                cx,
-                |app, _event, window, cx| app.open_project_create_window(window, cx),
+            .child(project_column_toggle_button(
+                collapsed, language, app_entity, window, cx,
             ))
-            .child(project_tool_button(
-                ProjectToolButtonProps {
-                    icon: HeroIconName::Cog6Tooth,
-                    label: Some(settings_label.clone()),
-                    tooltip: settings_label,
-                    id: "project-settings-footer",
-                    app_entity: app_entity.clone(),
-                },
-                window,
-                cx,
-                |app, _event, window, cx| app.open_settings_window(window, cx),
-            ))
-            .child(project_more_button(
-                Some(more_label.clone()),
-                more_label,
-                language,
-                app_entity,
-                cx,
-            ))
-            .into_any_element()
+            .into_any_element();
     }
+
+    div()
+        .h(px(28.0))
+        .w_full()
+        .flex_shrink_0()
+        .flex()
+        .items_center()
+        .justify_between()
+        .px(px(8.0))
+        .border_t_1()
+        .border_color(color(theme::BORDER_SOFT))
+        .bg(theme::status_bar_fill())
+        .child(project_column_toggle_button(
+            collapsed,
+            language,
+            app_entity.clone(),
+            window,
+            cx,
+        ))
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap(px(2.0))
+                .child(project_tool_button(
+                    ProjectToolButtonProps {
+                        icon: HeroIconName::Cog6Tooth,
+                        label: None,
+                        tooltip: settings_label,
+                        id: "project-settings-footer",
+                        app_entity: app_entity.clone(),
+                    },
+                    window,
+                    cx,
+                    |app, _event, window, cx| app.open_settings_window(window, cx),
+                ))
+                .child(project_more_button(
+                    None, more_label, language, app_entity, cx,
+                )),
+        )
+        .into_any_element()
+}
+
+fn add_project_list_row(
+    collapsed: bool,
+    language: &str,
+    app_entity: gpui::Entity<CoduxApp>,
+    window: &mut Window,
+    cx: &mut Context<ProjectColumnView>,
+) -> impl IntoElement {
+    let label = project_column_text(language, "sidebar.footer.add_project", "Add Project");
+    if collapsed {
+        return div()
+            .w_full()
+            .h(px(44.0))
+            .flex()
+            .items_center()
+            .justify_center()
+            .child(
+                codux_tooltip_container_with_placement(
+                    app_entity.clone(),
+                    "project-add-list-tooltip",
+                    label.clone(),
+                    CoduxTooltipPlacement::Right,
+                )
+                .child(
+                    div()
+                        .id("project-add-list")
+                        .w(px(40.0))
+                        .h(px(40.0))
+                        .rounded(px(8.0))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor_pointer()
+                        .bg(theme::elevate(cx.theme().sidebar, 0.08))
+                        .hover(|style| style.bg(project_list_highlight(cx)))
+                        .on_click(window.listener_for(&app_entity, |app, _event, window, cx| {
+                            app.open_project_create_window(window, cx)
+                        }))
+                        .child(
+                            Icon::new(HeroIconName::Plus)
+                                .text_color(cx.theme().secondary_foreground),
+                        ),
+                ),
+            )
+            .into_any_element();
+    }
+
+    div()
+        .id("project-add-list")
+        .w_full()
+        .h(px(40.0))
+        .px(px(8.0))
+        .flex()
+        .items_center()
+        .gap_2()
+        .rounded(px(8.0))
+        .cursor_pointer()
+        .hover(|style| style.bg(project_list_highlight(cx)))
+        .on_click(window.listener_for(&app_entity, |app, _event, window, cx| {
+            app.open_project_create_window(window, cx)
+        }))
+        .child(
+            div()
+                .w(px(32.0))
+                .h(px(32.0))
+                .rounded(px(8.0))
+                .flex()
+                .items_center()
+                .justify_center()
+                .bg(theme::elevate(cx.theme().sidebar, 0.07))
+                .child(Icon::new(HeroIconName::Plus).text_color(cx.theme().secondary_foreground)),
+        )
+        .child(
+            div()
+                .text_sm()
+                .text_color(cx.theme().secondary_foreground)
+                .child(label),
+        )
+        .into_any_element()
 }
 
 struct ProjectToolButtonProps {
@@ -394,7 +475,8 @@ fn project_tool_button(
     let has_label = label.is_some();
     let button = Button::new(SharedString::from(format!("project-tool-{id}")))
         .ghost()
-        .with_size(Size::Medium)
+        .compact()
+        .h(px(24.0))
         .text_color(cx.theme().secondary_foreground)
         .w(if has_label {
             px(PROJECT_TOOL_LABEL_WIDTH)
@@ -483,7 +565,8 @@ fn project_more_button(
     let language = language.to_string();
     let button = Button::new("project-tool-project-more-footer")
         .ghost()
-        .with_size(Size::Medium)
+        .compact()
+        .h(px(24.0))
         .text_color(cx.theme().secondary_foreground)
         .w(if has_label {
             px(PROJECT_TOOL_LABEL_WIDTH)
@@ -632,16 +715,10 @@ fn project_column_text(language: &str, key: &str, fallback: &str) -> String {
 fn project_column_toggle_button(
     collapsed: bool,
     language: &str,
-    label: Option<String>,
     app_entity: gpui::Entity<CoduxApp>,
     window: &mut Window,
     cx: &mut Context<ProjectColumnView>,
 ) -> impl IntoElement {
-    let icon = if collapsed {
-        HeroIconName::ChevronDoubleRight
-    } else {
-        HeroIconName::ChevronDoubleLeft
-    };
     let tooltip = project_column_text(
         language,
         if collapsed {
@@ -655,25 +732,17 @@ fn project_column_toggle_button(
             "Collapse Sidebar"
         },
     );
-    let has_label = label.is_some();
+    let icon_color = cx.theme().secondary_foreground;
     let button = Button::new("project-column-toggle")
         .ghost()
-        .with_size(Size::Medium)
-        .text_color(cx.theme().secondary_foreground)
-        .w(if has_label {
-            px(PROJECT_TOOL_LABEL_WIDTH)
-        } else {
-            px(PROJECT_TOOL_ICON_WIDTH)
-        })
-        .when(has_label, |this| this.justify_start())
+        .compact()
+        .h(px(24.0))
+        .w(px(PROJECT_TOOL_ICON_WIDTH))
+        .text_color(icon_color)
         .on_click(window.listener_for(&app_entity, |app, _event, window, cx| {
             app.toggle_project_column(window, cx)
         }))
-        .child(project_tool_content(icon, label, cx));
-
-    if has_label {
-        return button.into_any_element();
-    }
+        .child(sidebar_pane_icon(icon_color));
 
     codux_tooltip_container_with_placement(
         app_entity.clone(),
@@ -683,6 +752,18 @@ fn project_column_toggle_button(
     )
     .child(button)
     .into_any_element()
+}
+
+fn sidebar_pane_icon(color: gpui::Hsla) -> impl IntoElement {
+    div()
+        .w(px(16.0))
+        .h(px(13.0))
+        .rounded(px(2.0))
+        .border_1()
+        .border_color(color)
+        .overflow_hidden()
+        .flex()
+        .child(div().w(px(5.0)).h_full().border_r_1().border_color(color))
 }
 
 struct ProjectRowInput {
@@ -767,18 +848,6 @@ fn project_row(
             .flex()
             .items_center()
             .justify_center()
-            .when(active, |this| {
-                this.child(
-                    div()
-                        .absolute()
-                        .left(px(0.0))
-                        .top(px(13.0))
-                        .w(px(3.0))
-                        .h(px(18.0))
-                        .rounded(px(3.0))
-                        .bg(cx.theme().primary),
-                )
-            })
             .child(
                 codux_tooltip_container_with_placement(
                     app_entity.clone(),
@@ -789,14 +858,17 @@ fn project_row(
                 .child(
                     div()
                         .id(SharedString::from(format!("project-icon-{}", project.id)))
-                        .w(px(44.0))
-                        .h(px(44.0))
+                        .w(px(40.0))
+                        .h(px(40.0))
                         .rounded(px(8.0))
                         .flex()
                         .items_center()
                         .justify_center()
                         .cursor_pointer()
-                        .hover(|style| style.bg(theme::elevate(cx.theme().sidebar, 0.07)))
+                        .when(active, |this| {
+                            this.border_2().border_color(cx.theme().primary)
+                        })
+                        .hover(|style| style.bg(project_list_highlight(cx)))
                         .on_click(window.listener_for(
                             &app_entity,
                             move |app, _event, window, cx| {
@@ -876,7 +948,7 @@ fn project_row(
         }))
         .w_full()
         .min_w_0()
-        .h(px(52.0))
+        .h(px(40.0))
         .flex()
         .flex_col()
         .justify_start()
@@ -889,14 +961,14 @@ fn project_row(
                 .flex()
                 .items_center()
                 .gap_2()
-                .h(px(52.0))
+                .h(px(40.0))
                 .w_full()
                 .min_w_0()
                 .px(px(8.0))
                 .rounded(px(8.0))
-                .when(active, |this| this.bg(cx.theme().list_hover))
+                .when(active, |this| this.bg(project_list_highlight(cx)))
                 .cursor_pointer()
-                .hover(|style| style.bg(cx.theme().list_hover))
+                .hover(|style| style.bg(project_list_highlight(cx)))
                 .on_click(
                     window.listener_for(&app_entity, move |app, _event, window, cx| {
                         app.select_project(project_id.clone(), window, cx)
@@ -928,31 +1000,19 @@ fn project_row(
                 )
                 .child(
                     div()
-                        .flex()
-                        .flex_col()
                         .min_w_0()
                         .flex_1()
                         .overflow_hidden()
-                        .child(
-                            div()
-                                .text_sm()
-                                .text_color(color(if !project.exists {
-                                    theme::TEXT_DIM
-                                } else if active {
-                                    theme::TEXT
-                                } else {
-                                    theme::TEXT_MUTED
-                                }))
-                                .truncate()
-                                .child(project.name.clone()),
-                        )
-                        .child(
-                            div()
-                                .text_size(rems(0.75))
-                                .text_color(color(theme::TEXT_DIM))
-                                .truncate()
-                                .child(project.path.clone()),
-                        ),
+                        .text_sm()
+                        .text_color(color(if !project.exists {
+                            theme::TEXT_DIM
+                        } else if active {
+                            theme::TEXT
+                        } else {
+                            theme::TEXT_MUTED
+                        }))
+                        .truncate()
+                        .child(project.name.clone()),
                 ),
         )
         .into_any_element()
@@ -1060,6 +1120,12 @@ fn project_lifecycle_badge(state: AgentLifecycleState) -> AnyElement {
     }
 }
 
+/// Soft row fill for hover / selected project names. `list_hover` is a 15%
+/// white overlay and reads too loud on the frosted sidebar.
+fn project_list_highlight(cx: &mut Context<ProjectColumnView>) -> gpui::Hsla {
+    theme::elevate(cx.theme().sidebar, 0.06)
+}
+
 /// Disconnected-link badge color (no theme constant — danger red is local here).
 const REMOTE_LINK_RED: u32 = theme::RED;
 
@@ -1096,7 +1162,7 @@ fn project_remote_badge(link: Option<ControllerLinkState>) -> AnyElement {
         .into_any_element()
 }
 
-fn project_icon(project: &ProjectInfo, active: bool, collapsed: bool) -> impl IntoElement {
+fn project_icon(project: &ProjectInfo, active: bool, _collapsed: bool) -> impl IntoElement {
     let (background, _accent, text) = match project
         .badge_color_hex
         .as_deref()
@@ -1110,7 +1176,7 @@ fn project_icon(project: &ProjectInfo, active: bool, collapsed: bool) -> impl In
         .as_deref()
         .and_then(project_badge_symbol_icon);
     let badge = project_badge_label(project);
-    let size = if collapsed { 36.0 } else { 38.0 };
+    let size = 32.0;
 
     div()
         .w(px(size))
@@ -1262,18 +1328,15 @@ fn project_badge_symbol_icon(symbol: &str) -> Option<HeroIconName> {
 }
 
 fn project_badge_label(project: &ProjectInfo) -> String {
-    let badge = project.badge.trim();
-    if badge.is_empty() {
-        return project_initial(&project.name);
-    }
-    badge.chars().take(4).collect::<String>().to_uppercase()
+    project_initial(&project.name)
 }
 
 fn project_initial(name: &str) -> String {
-    name.chars()
-        .find(|ch| ch.is_alphanumeric())
+    name.trim()
+        .chars()
+        .next()
         .map(|ch| ch.to_uppercase().collect::<String>())
-        .unwrap_or_else(|| "C".to_string())
+        .unwrap_or_else(|| "?".to_string())
 }
 
 #[cfg(test)]
@@ -1281,9 +1344,17 @@ mod tests {
     use super::*;
 
     fn project_with_badge(badge: &str) -> ProjectInfo {
+        project_with_name_and_badge("Project A", badge)
+    }
+
+    fn project_with_name(name: &str) -> ProjectInfo {
+        project_with_name_and_badge(name, "")
+    }
+
+    fn project_with_name_and_badge(name: &str, badge: &str) -> ProjectInfo {
         ProjectInfo {
             id: "project-a".to_string(),
-            name: "Project A".to_string(),
+            name: name.to_string(),
             path: "/workspace/project-a".to_string(),
             exists: true,
             badge: badge.to_string(),
@@ -1296,16 +1367,12 @@ mod tests {
     }
 
     #[test]
-    fn project_badge_label_prefers_runtime_badge() {
-        assert_eq!(project_badge_label(&project_with_badge("cd")), "CD");
-        assert_eq!(project_badge_label(&project_with_badge("abcd")), "ABCD");
-        assert_eq!(project_badge_label(&project_with_badge("abcde")), "ABCD");
-        assert_eq!(project_badge_label(&project_with_badge("项目")), "项目");
-        assert_eq!(
-            project_badge_label(&project_with_badge("用户中心")),
-            "用户中心"
-        );
-        assert_eq!(project_badge_label(&project_with_badge(" ")), "P");
+    fn project_badge_label_uses_first_character_of_name() {
+        assert_eq!(project_badge_label(&project_with_badge("cd")), "P");
+        assert_eq!(project_badge_label(&project_with_name("codux")), "C");
+        assert_eq!(project_badge_label(&project_with_name("wx-pay-api")), "W");
+        assert_eq!(project_badge_label(&project_with_name("项目")), "项");
+        assert_eq!(project_badge_label(&project_with_name("  ")), "?");
     }
 
     #[test]

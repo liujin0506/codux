@@ -1,4 +1,8 @@
 use super::*;
+use crate::app::{
+    workspace_daily_level::{disabled_level_button, workspace_level_button},
+    workspace_pet_widgets::{WorkspacePetButtonInput, disabled_pet_button, workspace_pet_button},
+};
 
 pub(in crate::app) struct StatusBarView {
     app_entity: gpui::Entity<CoduxApp>,
@@ -35,6 +39,17 @@ pub(in crate::app) struct StatusBarSnapshot {
     remote_online_devices: usize,
     git: StatusGitSummary,
     git_running_label: Option<String>,
+    show_server_info: bool,
+    server_panel_active: bool,
+    has_project: bool,
+    pet_enabled: bool,
+    pet_claimed: bool,
+    pet_level: i64,
+    pet_updated_at: Option<i64>,
+    pet_name_editing: bool,
+    daily_tier_id: String,
+    daily_tokens: i64,
+    ai_panel_active: bool,
 }
 
 impl StatusBarView {
@@ -53,8 +68,18 @@ impl StatusBarView {
 }
 
 impl Render for StatusBarView {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        status_bar_content(self.app_entity.clone(), self.snapshot.clone(), cx).into_any_element()
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let (pet_button, level_button) = self
+            .app_entity
+            .update(cx, |app, cx| app.status_bar_accessory_buttons(window, cx));
+        status_bar_content(
+            self.app_entity.clone(),
+            self.snapshot.clone(),
+            pet_button,
+            level_button,
+            cx,
+        )
+        .into_any_element()
     }
 }
 
@@ -111,7 +136,65 @@ impl CoduxApp {
                 .git_running_operation
                 .as_ref()
                 .map(|operation| operation.label.clone()),
+            show_server_info: self.state.selected_project.is_some()
+                && self
+                    .state
+                    .selected_project
+                    .as_ref()
+                    .and_then(|project| project.remote_device_id())
+                    .map(|device_id| {
+                        self.remote_link_states.get(device_id)
+                            == Some(&codux_runtime::remote::ControllerLinkState::Connected)
+                    })
+                    .unwrap_or(true),
+            server_panel_active: self.assistant_panel == Some(AssistantPanel::ServerInfo),
+            has_project: self.state.selected_project.is_some(),
+            pet_enabled: self.state.settings.pet_enabled,
+            pet_claimed: self.state.pet.claimed,
+            pet_level: self.state.pet.level,
+            pet_updated_at: self.state.pet.updated_at,
+            pet_name_editing: self.pet_name_editing,
+            daily_tier_id: self.state.daily_level.current_tier.id.clone(),
+            daily_tokens: self.state.daily_level.tokens,
+            ai_panel_active: self.assistant_panel == Some(AssistantPanel::AIStats),
         }
+    }
+
+    fn status_bar_accessory_buttons(
+        &self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> (AnyElement, AnyElement) {
+        let has_project_context = self.state.selected_project.is_some();
+        let pet_button = if self.state.settings.pet_enabled {
+            if has_project_context {
+                workspace_pet_button(
+                    WorkspacePetButtonInput {
+                        pet: &self.state.pet,
+                        pet_snapshot: Some(&self.pet_snapshot),
+                        custom_pets: &self.pet_custom_pets,
+                        runtime_asset_root: &self.runtime.source_root,
+                        support_dir: &self.state.support_dir,
+                        language: &self.state.settings.language,
+                        pet_name_editing: self.pet_name_editing,
+                    },
+                    window,
+                    cx,
+                )
+                .into_any_element()
+            } else {
+                disabled_pet_button(&self.state, cx).into_any_element()
+            }
+        } else {
+            gpui::Empty.into_any_element()
+        };
+        let level_button = if has_project_context {
+            workspace_level_button(&self.state.daily_level, &self.state.settings.language, cx)
+                .into_any_element()
+        } else {
+            disabled_level_button(&self.state.settings.language, cx).into_any_element()
+        };
+        (pet_button, level_button)
     }
 
     /// Connected outbound hosts (the peers this machine controls). The remote
@@ -209,6 +292,8 @@ fn non_empty(value: String) -> Option<String> {
 fn status_bar_content(
     app_entity: gpui::Entity<CoduxApp>,
     snapshot: StatusBarSnapshot,
+    pet_button: AnyElement,
+    level_button: AnyElement,
     cx: &mut Context<StatusBarView>,
 ) -> impl IntoElement {
     div()
@@ -222,7 +307,7 @@ fn status_bar_content(
         .justify_between()
         .border_t_1()
         .border_color(color(theme::BORDER_SOFT))
-        .bg(theme::vibrancy_panel(color(theme::STATUS_BAR)))
+        .bg(theme::status_bar_fill())
         .text_color(color(theme::TEXT_MUTED))
         .text_size(rems(0.75))
         .child(
@@ -230,26 +315,23 @@ fn status_bar_content(
                 .flex()
                 .min_w_0()
                 .items_center()
-                .gap_1()
+                .gap_3()
                 .child(status_runtime_ready_segment(
                     snapshot.runtime_ready,
                     snapshot.runtime_queue_busy,
                     &snapshot.language,
                 ))
-                .child(status_separator())
                 .when(snapshot.developer_hud, |this| {
                     this.child(status_metric(
                         "status-performance-cpu",
                         "CPU",
                         snapshot.cpu_label.clone(),
                     ))
-                    .child(status_separator())
                     .child(status_metric(
                         "status-performance-memory",
                         "MEM",
                         snapshot.memory_label.clone(),
                     ))
-                    .child(status_separator())
                 }),
         )
         .child(
@@ -257,15 +339,18 @@ fn status_bar_content(
                 .flex()
                 .flex_shrink_0()
                 .items_center()
-                .gap_1()
+                .gap_3()
+                .child(pet_button)
+                .child(level_button)
                 .child(status_ai_segment(
                     app_entity.clone(),
                     snapshot.ai_index_count,
                     snapshot.ai_error.as_deref(),
+                    snapshot.ai_panel_active,
+                    snapshot.has_project,
                     &snapshot.language,
                     cx,
                 ))
-                .child(status_separator())
                 .child(status_memory_segment(
                     app_entity.clone(),
                     snapshot.memory_queued,
@@ -275,7 +360,6 @@ fn status_bar_content(
                     &snapshot.language,
                     cx,
                 ))
-                .child(status_separator())
                 .child(status_remote_segment(
                     app_entity.clone(),
                     &snapshot.remote_status,
@@ -284,7 +368,6 @@ fn status_bar_content(
                     &snapshot.language,
                     cx,
                 ))
-                .child(status_separator())
                 .when(snapshot.git.is_repository, |this| {
                     let git_running_label = snapshot.git_running_label.as_deref();
                     let git_operation_running = git_running_label.is_some();
@@ -319,7 +402,7 @@ fn status_bar_content(
                     ))
                     .child(status_sync_action_button(
                         StatusSyncAction {
-                            app_entity,
+                            app_entity: app_entity.clone(),
                             label: status_text(&snapshot.language, "git.remote.push", "Push"),
                             count: snapshot.git.outgoing,
                             theme_is_light: snapshot.theme_is_light,
@@ -331,7 +414,48 @@ fn status_bar_content(
                         cx,
                         |app, _event, window, cx| app.push_project_git(window, cx),
                     ))
+                })
+                .when(snapshot.show_server_info, |this| {
+                    this.child(status_server_button(
+                        app_entity.clone(),
+                        snapshot.server_panel_active,
+                        cx,
+                    ))
                 }),
+        )
+}
+
+fn status_server_button(
+    app_entity: gpui::Entity<CoduxApp>,
+    active: bool,
+    cx: &mut Context<StatusBarView>,
+) -> impl IntoElement {
+    let icon_color = if active {
+        cx.theme().primary
+    } else {
+        color(theme::TEXT_MUTED)
+    };
+    let click_entity = app_entity;
+    div()
+        .id("status-server-panel")
+        .h(px(20.0))
+        .px(px(6.0))
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded_sm()
+        .cursor_pointer()
+        .when(active, |this| this.bg(cx.theme().accent))
+        .hover(|style| style.bg(cx.theme().list_hover))
+        .on_click(move |_, window, cx| {
+            cx.update_entity(&click_entity, |app, cx| {
+                app.toggle_assistant_panel(AssistantPanel::ServerInfo, window, cx);
+            });
+        })
+        .child(
+            Icon::new(HeroIconName::ServerStack)
+                .size_3()
+                .text_color(icon_color),
         )
 }
 
@@ -366,7 +490,7 @@ fn status_runtime_ready_segment(
         .child(
             div()
                 .mt(px(1.0))
-                .text_color(color(theme::TEXT))
+                .text_color(color(theme::TEXT_MUTED))
                 .child(label),
         )
 }
@@ -445,7 +569,7 @@ fn status_sync_action_button(
                     .child(count.min(99).to_string()),
             )
         })
-        .child(div().text_color(color(theme::TEXT)).child(label))
+        .child(div().text_color(color(theme::TEXT_MUTED)).child(label))
 }
 
 fn status_metric(id: &'static str, label: &'static str, value: String) -> impl IntoElement {
@@ -467,7 +591,7 @@ fn status_metric(id: &'static str, label: &'static str, value: String) -> impl I
         .child(
             div()
                 .mt(px(1.0))
-                .text_color(color(theme::TEXT))
+                .text_color(color(theme::TEXT_MUTED))
                 .child(value),
         )
 }
@@ -476,6 +600,8 @@ fn status_ai_segment(
     app_entity: gpui::Entity<CoduxApp>,
     index_count: usize,
     error: Option<&str>,
+    active: bool,
+    enabled: bool,
     language: &str,
     cx: &mut Context<StatusBarView>,
 ) -> impl IntoElement {
@@ -486,6 +612,11 @@ fn status_ai_segment(
         theme::ORANGE
     } else {
         theme::TEXT_DIM
+    };
+    let icon_color = if active {
+        cx.theme().primary
+    } else {
+        color(theme::TEXT_MUTED)
     };
 
     div()
@@ -498,14 +629,26 @@ fn status_ai_segment(
         .text_size(rems(0.75))
         .text_color(color(theme::TEXT_MUTED))
         .rounded_sm()
-        .cursor_pointer()
-        .hover(|style| style.bg(cx.theme().list_hover))
+        .when(active, |this| this.bg(cx.theme().accent))
+        .when(enabled, |this| {
+            this.cursor_pointer()
+                .hover(|style| style.bg(cx.theme().list_hover))
+        })
+        .when(!enabled, |this| this.opacity(0.45))
         .on_click(move |_, window, cx| {
+            if !enabled {
+                cx.stop_propagation();
+                return;
+            }
             cx.update_entity(&app_entity, |app, cx| {
                 app.toggle_assistant_panel(AssistantPanel::AIStats, window, cx);
             });
         })
-        .child(div().mt(px(1.0)).text_color(color(theme::TEXT)).child("AI"))
+        .child(
+            Icon::new(HeroIconName::CpuChip)
+                .size_3()
+                .text_color(icon_color),
+        )
         .child(
             div()
                 .mt(px(1.0))
@@ -559,7 +702,7 @@ fn status_memory_segment(
         .child(
             div()
                 .mt(px(1.0))
-                .text_color(color(theme::TEXT))
+                .text_color(color(theme::TEXT_MUTED))
                 .child(status_text(
                     language,
                     "memory.status.short_memory",
@@ -632,7 +775,7 @@ fn status_remote_segment(
         .child(
             div()
                 .mt(px(1.0))
-                .text_color(color(theme::TEXT))
+                .text_color(color(theme::TEXT_MUTED))
                 .child(remote_label),
         )
         .child(
@@ -681,7 +824,7 @@ fn status_git_segment(
                 .mt(px(1.0))
                 .max_w(px(180.0))
                 .truncate()
-                .text_color(color(theme::TEXT))
+                .text_color(color(theme::TEXT_MUTED))
                 .child(branch.to_string()),
         )
         .child(
@@ -696,12 +839,4 @@ fn status_git_segment(
                 .text_color(color(theme::RED))
                 .child(format!("-{}", deletions.max(0))),
         )
-}
-
-fn status_separator() -> impl IntoElement {
-    div()
-        .h(px(16.0))
-        .w(px(1.0))
-        .mx_1()
-        .bg(color(theme::BORDER_SOFT))
 }

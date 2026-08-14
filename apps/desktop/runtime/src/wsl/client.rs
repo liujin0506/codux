@@ -292,7 +292,12 @@ impl crate::runtime_terminal::RuntimeTerminalController for WslRuntimeClient {
         &self,
         config: &crate::terminal_pty::TerminalPtyConfig,
     ) -> Result<String, String> {
-        let params = serde_json::to_value(config).map_err(|error| error.to_string())?;
+        let mut params = serde_json::to_value(config).map_err(|error| error.to_string())?;
+        if let Some(runtime_tools) =
+            crate::tool_permissions::runtime_tools_payload(config.tool_permissions_file.as_deref())
+        {
+            params["runtimeTools"] = runtime_tools;
+        }
         let value = self.request("terminal.create", params)?;
         value
             .get("id")

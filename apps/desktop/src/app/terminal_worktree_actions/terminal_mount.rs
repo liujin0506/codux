@@ -348,7 +348,11 @@ impl CoduxApp {
         let observer_terminal_id = terminal_id.clone();
         let title_terminal_id = terminal_id.clone();
         let search_terminal_id = terminal_id.clone();
-        pane.view.update(cx, |terminal, _| {
+        let restart_terminal_id = terminal_id.clone();
+        let app_for_restart = app.clone();
+        let app_for_close = app.clone();
+        let enter_restart = self.main_terminal().is_some_and(|tab| tab.panes.len() <= 1);
+        pane.view.update(cx, |terminal, cx| {
             terminal.set_focus_observer(move |_window, cx| {
                 let terminal_id = observer_terminal_id.clone();
                 let _ = app.update(cx, |app, cx| {
@@ -379,6 +383,40 @@ impl CoduxApp {
                     app.open_terminal_web_link(url, cx);
                 });
             });
+            terminal.set_restart_observer(move |window, cx| {
+                let app = app_for_restart.clone();
+                let terminal_id = restart_terminal_id.clone();
+                window.defer(cx, move |window, cx| {
+                    let _ = app.update(cx, |app, cx| {
+                        app.restart_terminal_session(&terminal_id, window, cx);
+                    });
+                });
+            });
+            terminal.set_close_split_handler(move |keystroke, window, cx| {
+                let app = app_for_close.clone();
+                app.update(cx, |app, cx| {
+                    if !app.can_close_terminal_split() {
+                        return false;
+                    }
+                    let actual = shortcut_display_from_keystroke(keystroke);
+                    if !shortcut_matches(
+                        &app.state.settings.shortcuts,
+                        "terminal.split.close",
+                        &actual,
+                    ) {
+                        return false;
+                    }
+                    let app_entity = cx.entity();
+                    window.defer(cx, move |window, cx| {
+                        cx.update_entity(&app_entity, |app, cx| {
+                            app.close_focused_terminal_split(window, cx);
+                        });
+                    });
+                    true
+                })
+                .unwrap_or(false)
+            });
+            terminal.set_enter_restart_enabled(enter_restart, cx);
         });
         // Seed from the view's cached title: registration may follow output
         // that already carried an OSC title.

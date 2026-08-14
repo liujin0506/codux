@@ -191,6 +191,12 @@ impl CoduxApp {
             FilePickerTarget::ProjectEditorPath => {
                 // The picker chose both the device and the directory.
                 self.project_editor_runtime_target = destination_target;
+                if self.project_editor_name.trim().is_empty() {
+                    let suggested = file_picker_path_name(&path);
+                    if !suggested.trim().is_empty() {
+                        self.project_editor_name = suggested;
+                    }
+                }
                 self.project_editor_path = path;
                 self.invalidate_project_management(cx);
             }

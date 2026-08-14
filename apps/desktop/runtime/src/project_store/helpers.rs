@@ -67,69 +67,11 @@ pub(super) fn normalized_string(value: &str) -> Option<String> {
 }
 
 pub(crate) fn badge_from_name(name: &str) -> String {
-    let Some(segments) = badge_segments(name) else {
-        return "PR".to_string();
-    };
-
-    let badge = badge_text_from_segments(&segments);
-    if badge.is_empty() {
-        "PR".to_string()
-    } else {
-        badge
-    }
-}
-
-fn badge_text_from_segments(segments: &[String]) -> String {
-    let chars = if segments.len() > 1
-        && segments
-            .iter()
-            .all(|segment| segment.chars().all(|ch| ch.is_ascii_alphanumeric()))
-    {
-        segments
-            .iter()
-            .filter_map(|segment| segment.chars().next())
-            .take(4)
-            .collect::<Vec<_>>()
-    } else {
-        segments
-            .iter()
-            .flat_map(|segment| segment.chars())
-            .take(4)
-            .collect::<Vec<_>>()
-    };
-
-    chars.into_iter().collect::<String>().to_uppercase()
-}
-
-fn badge_segments(name: &str) -> Option<Vec<String>> {
-    let mut segments = Vec::new();
-    let mut current = String::new();
-    let mut prev: Option<char> = None;
-
-    for ch in name.chars() {
-        if !ch.is_alphanumeric() {
-            if !current.is_empty() {
-                segments.push(std::mem::take(&mut current));
-            }
-            prev = None;
-            continue;
-        }
-
-        if matches!(prev, Some(prev) if prev.is_lowercase() && ch.is_uppercase())
-            && !current.is_empty()
-        {
-            segments.push(std::mem::take(&mut current));
-        }
-
-        current.push(ch);
-        prev = Some(ch);
-    }
-
-    if !current.is_empty() {
-        segments.push(current);
-    }
-
-    (!segments.is_empty()).then_some(segments)
+    name.trim()
+        .chars()
+        .next()
+        .map(|ch| ch.to_uppercase().collect::<String>())
+        .unwrap_or_else(|| "?".to_string())
 }
 
 pub(super) fn normalized_existing_path(path: &str) -> Result<String, String> {
@@ -201,15 +143,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn badge_from_name_uses_word_initials_or_first_four_chars() {
-        assert_eq!(badge_from_name("codux"), "CODU");
-        assert_eq!(badge_from_name("codux-gpui"), "CG");
-        assert_eq!(badge_from_name("Codux GPUI"), "CG");
-        assert_eq!(badge_from_name("getUserInfo"), "GUI");
-        assert_eq!(badge_from_name("wx-pay-api"), "WPA");
-        assert_eq!(badge_from_name("a-b-c-d-e"), "ABCD");
-        assert_eq!(badge_from_name("项目"), "项目");
-        assert_eq!(badge_from_name("用户中心"), "用户中心");
-        assert_eq!(badge_from_name("  "), "PR");
+    fn badge_from_name_uses_first_character() {
+        assert_eq!(badge_from_name("codux"), "C");
+        assert_eq!(badge_from_name("codux-gpui"), "C");
+        assert_eq!(badge_from_name("Codux GPUI"), "C");
+        assert_eq!(badge_from_name("getUserInfo"), "G");
+        assert_eq!(badge_from_name("wx-pay-api"), "W");
+        assert_eq!(badge_from_name("a-b-c-d-e"), "A");
+        assert_eq!(badge_from_name("项目"), "项");
+        assert_eq!(badge_from_name("用户中心"), "用");
+        assert_eq!(badge_from_name("  "), "?");
     }
 }

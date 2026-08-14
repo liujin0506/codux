@@ -1,8 +1,7 @@
 use super::*;
 
 impl RemoteHostRuntime {
-    /// Serve the host's saved SSH profiles (lean, no secrets). The host owns the
-    /// profiles, so it just sends its own list as the shared DTO.
+    /// Serve the runtime host's saved SSH profiles (lean, no secrets).
     pub(super) fn handle_ssh_list(&self, envelope: &RemoteEnvelope) {
         self.reply_ssh_list(envelope);
     }

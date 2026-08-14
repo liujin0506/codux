@@ -189,6 +189,19 @@ impl CoduxApp {
                 app.split_terminal(window, cx)
             }
         );
+        register!(native_menu::CreateVerticalSplit, |app: &mut CoduxApp,
+                                                     window: &mut Window,
+                                                     cx: &mut Context<
+            CoduxApp,
+        >| {
+            app.split_terminal_vertical(window, cx)
+        });
+        register!(
+            native_menu::CloseSplit,
+            |app: &mut CoduxApp, window: &mut Window, cx: &mut Context<CoduxApp>| {
+                app.close_focused_terminal_split(window, cx)
+            }
+        );
         register!(
             native_menu::CreateTask,
             |app: &mut CoduxApp, window: &mut Window, cx: &mut Context<CoduxApp>| {

@@ -76,11 +76,11 @@ impl TerminalModel {
         // thread to the UI thread, where clipboard and bell live.
         let (engine_event_tx, engine_event_rx) =
             flume::unbounded::<codux_terminal_core::TerminalScreenEvent>();
-        screen
-            .lock()
-            .set_event_sink(Arc::new(move |event: codux_terminal_core::TerminalScreenEvent| {
+        screen.lock().set_event_sink(Arc::new(
+            move |event: codux_terminal_core::TerminalScreenEvent| {
                 let _ = engine_event_tx.send(event);
-            }));
+            },
+        ));
         cx.spawn(async move |this: WeakEntity<Self>, cx| {
             while let Ok(event) = engine_event_rx.recv_async().await {
                 if this
@@ -98,7 +98,9 @@ impl TerminalModel {
         if let Some(restored_output) = restored_output.as_ref()
             && !restored_output.tail.is_empty()
         {
-            screen.lock().process_replay(restored_output.tail.as_bytes());
+            screen
+                .lock()
+                .process_replay(restored_output.tail.as_bytes());
             codux_runtime::runtime_trace::runtime_trace(
                 "terminal-restore",
                 &format!(
@@ -369,7 +371,8 @@ impl TerminalModel {
                 rows,
             } => {
                 let scheme_changed = self.remote_viewer != remote_owner
-                    && self.effective_scheme_is_dark() != scheme_is_dark(remote_owner, &self.colors);
+                    && self.effective_scheme_is_dark()
+                        != scheme_is_dark(remote_owner, &self.colors);
                 self.remote_viewer = remote_owner;
                 self.viewport_generation = generation;
                 // While a remote client owns the viewport, the PTY is sized to
@@ -812,6 +815,10 @@ impl TerminalModel {
         self.handle.snapshot.lock().title.clone()
     }
 
+    fn has_exited(&self) -> bool {
+        self.exited
+    }
+
     fn current_ime_cursor_bounds(&self, layout: &TerminalLayoutMetrics) -> Option<Bounds<Pixels>> {
         let content = self.handle.snapshot();
         ime_cursor_bounds_from_content(&content, layout)
@@ -1171,7 +1178,10 @@ impl TerminalStateHandle {
     // Returns (cols, rows, cell count, content changed). Skipping the
     // repaint when the content is unchanged keeps idle-but-noisy terminals
     // from re-shaping the whole viewport every output batch.
-    fn publish_screen_snapshot(&self, snapshot: TerminalScreenSnapshot) -> (usize, usize, usize, bool) {
+    fn publish_screen_snapshot(
+        &self,
+        snapshot: TerminalScreenSnapshot,
+    ) -> (usize, usize, usize, bool) {
         let content = TerminalContent::from_screen_snapshot(snapshot);
         let stats = (content.columns, content.screen_lines, content.cells.len());
         let mut published = self.snapshot.lock();
@@ -1297,11 +1307,7 @@ fn selected_text_from_screen_range(
     let mut content = fallback_content.clone();
     while line <= range.end.line {
         if !content.line_in_snapshot(line) {
-            let offset = display_offset_for_line(
-                line,
-                content.total_lines,
-                content.screen_lines,
-            );
+            let offset = display_offset_for_line(line, content.total_lines, content.screen_lines);
             let request = { screen.lock().snapshot_at_offset_request(offset) };
             content = TerminalContent::from_screen_snapshot(request.snapshot());
         }
@@ -1427,9 +1433,7 @@ fn chars_eq_fold(a: char, b: char) -> bool {
 
 fn display_offset_for_line(line: i32, total_lines: usize, rows: usize) -> usize {
     let line = usize::try_from(line).unwrap_or(0);
-    total_lines
-        .saturating_sub(rows)
-        .saturating_sub(line)
+    total_lines.saturating_sub(rows).saturating_sub(line)
 }
 
 fn selection_point_from_cell(
@@ -1461,7 +1465,10 @@ fn selected_line_text(
         .collect()
 }
 
-fn find_selection_text_range(content: &TerminalContent, selected_text: &str) -> Option<SelectionRange> {
+fn find_selection_text_range(
+    content: &TerminalContent,
+    selected_text: &str,
+) -> Option<SelectionRange> {
     let mut lines = selected_text.split('\n');
     let first_line = lines.next()?;
     if lines.next().is_some() || first_line.is_empty() {

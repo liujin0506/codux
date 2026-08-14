@@ -575,7 +575,6 @@ fn terminal_pane(
         .min_w_0()
         .min_h_0()
         .overflow_hidden()
-        .bg(theme::terminal_fill(color(theme::BG_TERMINAL)))
         .child(
             div()
                 .flex_1()

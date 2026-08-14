@@ -126,7 +126,6 @@ impl CoduxApp {
 #[derive(Clone, PartialEq)]
 struct TaskColumnLabels {
     language: String,
-    no_project: String,
     no_worktrees_title: String,
     no_sessions_title: String,
     no_branch: String,
@@ -135,6 +134,7 @@ struct TaskColumnLabels {
     changed_format: String,
     create: String,
     refresh: String,
+    collapse: String,
     open: String,
     new_session: String,
     open_folder: String,
@@ -147,7 +147,6 @@ fn task_column_labels(language: &str) -> TaskColumnLabels {
     let tr = |key: &str, fallback: &str| translate(&locale, key, fallback);
     TaskColumnLabels {
         language: language.to_string(),
-        no_project: tr("files.panel.no_project", "No project selected"),
         no_worktrees_title: tr("worktree.sidebar.empty_title", "No worktrees yet"),
         no_sessions_title: tr("ai.sessions.empty", "No Sessions"),
         no_branch: tr("git.branch.none", "No Branch"),
@@ -156,6 +155,7 @@ fn task_column_labels(language: &str) -> TaskColumnLabels {
         changed_format: tr("worktree.sidebar.changed_format", "%@ changed"),
         create: tr("worktree.create.title", "New Worktree"),
         refresh: tr("common.refresh", "Refresh"),
+        collapse: tr("sidebar.collapse", "Collapse Sidebar"),
         open: tr("common.open", "Open"),
         new_session: tr("ai.sessions.new_session", "New Session"),
         open_folder: tr("worktree.menu.open_folder", "Open Folder"),
@@ -177,10 +177,10 @@ fn task_session_row(session: &AISessionSummary) -> TaskSessionRow {
 
 #[derive(Clone, PartialEq)]
 pub(in crate::app) struct TaskColumnHeaderSnapshot {
-    project_name: String,
     refreshing: bool,
     create_label: String,
     refresh_label: String,
+    collapse_label: String,
 }
 
 pub(in crate::app) struct TaskColumnHeaderView {
@@ -201,10 +201,10 @@ impl TaskColumnHeaderView {
 impl Render for TaskColumnHeaderView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         task_column_header(
-            self.snapshot.project_name.clone(),
             self.snapshot.refreshing,
             self.snapshot.create_label.clone(),
             self.snapshot.refresh_label.clone(),
+            self.snapshot.collapse_label.clone(),
             self.app_entity.clone(),
             cx,
         )
@@ -420,15 +420,10 @@ impl CoduxApp {
     fn task_column_header_snapshot(&self) -> TaskColumnHeaderSnapshot {
         let labels = task_column_labels(&self.state.settings.language);
         TaskColumnHeaderSnapshot {
-            project_name: self
-                .state
-                .selected_project
-                .as_ref()
-                .map(|project| project.name.clone())
-                .unwrap_or(labels.no_project),
             refreshing: self.task_column_refreshing,
             create_label: labels.create,
             refresh_label: labels.refresh,
+            collapse_label: labels.collapse,
         }
     }
 
@@ -606,17 +601,18 @@ fn task_column_content(
 }
 
 fn task_column_header(
-    project_name: String,
     refreshing: bool,
     create_label: String,
     refresh_label: String,
+    collapse_label: String,
     app_entity: gpui::Entity<CoduxApp>,
     cx: &mut Context<TaskColumnHeaderView>,
 ) -> impl IntoElement {
     let create_entity = app_entity.clone();
     let refresh_entity = app_entity.clone();
+    let collapse_entity = app_entity.clone();
     div()
-        .h(px(52.0))
+        .h(px(44.0))
         .w_full()
         .px(px(10.0))
         .flex_shrink_0()
@@ -624,8 +620,8 @@ fn task_column_header(
         // No `items_center` on the outer div: the content row below stretches to
         // full header height so its drag area covers the whole title bar.
         .border_b_1()
-        .border_color(cx.theme().border)
-        .bg(task_column_surface(cx.theme().title_bar))
+        .border_color(color(theme::BORDER_SOFT))
+        .bg(theme::title_bar_fill())
         .child(
             // No `items_center`: children stretch to full header height so the
             // drag area fills it; the title text and buttons center themselves.
@@ -636,15 +632,7 @@ fn task_column_header(
                 .h_full()
                 .child(titlebar_drag_area(
                     "task-column-titlebar-drag",
-                    div()
-                        .flex_1()
-                        .h_full()
-                        .flex()
-                        .items_center()
-                        .text_sm()
-                        .text_color(color(theme::TEXT))
-                        .truncate()
-                        .child(project_name),
+                    div().flex_1().h_full(),
                 ))
                 .child(
                     div()
@@ -679,7 +667,7 @@ fn task_column_header(
                         )
                         .child(
                             codux_tooltip_container(
-                                app_entity,
+                                refresh_entity.clone(),
                                 "task-refresh-tooltip",
                                 refresh_label,
                             )
@@ -704,13 +692,43 @@ fn task_column_header(
                                         );
                                     }),
                             ),
+                        )
+                        .child(
+                            codux_tooltip_container(
+                                collapse_entity.clone(),
+                                "task-collapse-tooltip",
+                                collapse_label,
+                            )
+                            .child(
+                                Button::new("task-collapse")
+                                    .ghost()
+                                    .compact()
+                                    .text_color(cx.theme().secondary_foreground)
+                                    .icon(
+                                        Icon::new(HeroIconName::ChevronDoubleLeft)
+                                            .size_3p5()
+                                            .text_color(cx.theme().secondary_foreground),
+                                    )
+                                    .on_click(move |_, window, cx| {
+                                        cx.update_entity(
+                                            &collapse_entity,
+                                            |app: &mut CoduxApp, cx| {
+                                                app.toggle_task_column(window, cx);
+                                            },
+                                        );
+                                    }),
+                            ),
                         ),
                 ),
         )
 }
 
 fn task_column_surface(base: gpui::Hsla) -> gpui::Hsla {
-    theme::vibrancy_panel(base)
+    theme::vibrancy(base)
+}
+
+fn task_column_highlight(amount: f32) -> gpui::Hsla {
+    theme::vibrancy(theme::elevate(color(theme::BG_COLUMN), amount))
 }
 
 fn task_list_area(
@@ -1024,10 +1042,10 @@ fn terminal_compact_row(
         .items_center()
         .gap_2()
         .when(terminal.active, |this| {
-            this.bg(theme::elevate(color(theme::BG_COLUMN), 0.07))
+            this.bg(task_column_highlight(0.07))
         })
         .cursor_pointer()
-        .hover(|style| style.bg(theme::elevate(color(theme::BG_COLUMN), 0.07)))
+        .hover(|style| style.bg(task_column_highlight(0.07)))
         .on_click(move |_, window, cx| {
             cx.update_entity(&app_entity, |app, cx| {
                 if lifecycle == Some(AgentLifecycleState::Completed)
@@ -1125,7 +1143,7 @@ fn session_section_heading(
         .items_center()
         .justify_between()
         .cursor_pointer()
-        .hover(|style| style.bg(theme::elevate(color(theme::BG_COLUMN), 0.05)))
+        .hover(|style| style.bg(task_column_highlight(0.05)))
         .on_click(move |_, _window, cx| {
             cx.update_entity(&app_entity, |app, cx| {
                 match section {
@@ -1195,10 +1213,10 @@ fn worktree_compact_row(
         .items_center()
         .gap_3()
         .when(worktree.active, |this| {
-            this.bg(theme::elevate(color(theme::BG_COLUMN), 0.07))
+            this.bg(task_column_highlight(0.07))
         })
         .cursor_pointer()
-        .hover(|style| style.bg(theme::elevate(color(theme::BG_COLUMN), 0.07)))
+        .hover(|style| style.bg(task_column_highlight(0.07)))
         .on_click(move |_, window, cx| {
             cx.update_entity(&select_entity, |app, cx| {
                 if lifecycle == Some(AgentLifecycleState::Completed)
@@ -1383,7 +1401,7 @@ fn ai_session_compact_row(
         .px_3()
         .py(px(8.0))
         .cursor_pointer()
-        .hover(|style| style.bg(theme::elevate(color(theme::BG_COLUMN), 0.07)))
+        .hover(|style| style.bg(task_column_highlight(0.07)))
         .on_drag(drag_payload, move |drag, _, _, cx| {
             cx.stop_propagation();
             cx.new(|_| drag.clone())
@@ -1532,7 +1550,7 @@ mod tests {
 
     #[test]
     fn task_column_header_and_body_share_surface_opacity() {
-        let header = task_column_surface(color(theme::BG_HEADER));
+        let header = theme::title_bar_fill();
         let body = task_column_surface(color(theme::BG_COLUMN));
 
         assert_eq!(header.a, body.a);

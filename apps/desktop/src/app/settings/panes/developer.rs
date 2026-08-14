@@ -58,9 +58,12 @@ pub(super) struct RuntimeToolBlockInput<'a> {
     pub(super) label: String,
     pub(super) tool_key: &'static str,
     pub(super) model_key: &'static str,
+    pub(super) path_key: &'static str,
     pub(super) permission: &'a str,
     pub(super) model: &'a str,
+    pub(super) path: &'a str,
     pub(super) placeholder: &'static str,
+    pub(super) path_placeholder: &'static str,
     pub(super) include_permission: bool,
     pub(super) include_codex_effort: bool,
     pub(super) codex_effort: &'a str,
@@ -76,22 +79,18 @@ pub(super) fn settings_runtime_tool_block(
         label,
         tool_key,
         model_key,
+        path_key,
         permission,
         model,
+        path,
         placeholder,
+        path_placeholder,
         include_permission,
         include_codex_effort,
         codex_effort,
         language,
     } = input;
-    let mut children = vec![
-        div()
-            .text_size(rems(0.875))
-            .line_height(rems(1.125))
-            .text_color(color(theme::TEXT))
-            .child(label)
-            .into_any_element(),
-    ];
+    let mut children = Vec::new();
     if include_permission {
         children.push(
             settings_row(
@@ -116,6 +115,28 @@ pub(super) fn settings_runtime_tool_block(
             .into_any_element(),
         );
     }
+    children.push(
+        settings_row(
+            settings_text(language, "settings.ai.tool.executable", "Launch Command"),
+            Some(settings_text(
+                language,
+                "settings.ai.tool.executable_help",
+                "Leave empty to use the default command.",
+            )),
+            settings_text_input(
+                SharedString::from(format!("settings-{path_key}")),
+                path,
+                path_placeholder,
+                false,
+                window,
+                cx,
+                move |app, value, window, cx| {
+                    app.set_runtime_tool_path(path_key, value, window, cx)
+                },
+            ),
+        )
+        .into_any_element(),
+    );
     children.push(
         settings_row(
             settings_text(language, "settings.ai.tool.default_model", "Default Model"),
@@ -157,11 +178,5 @@ pub(super) fn settings_runtime_tool_block(
         );
     }
 
-    div()
-        .py(px(12.0))
-        .flex()
-        .flex_col()
-        .gap(px(2.0))
-        .children(children)
-        .into_any_element()
+    settings_card(Some(label), None, children, cx).into_any_element()
 }

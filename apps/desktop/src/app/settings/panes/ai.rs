@@ -17,7 +17,7 @@ pub(super) fn settings_ai_pane(
     let provider_rows = if settings.ai_providers.is_empty() {
         vec![
             div()
-                .py(px(12.0))
+                .py(px(8.0))
                 .text_size(rems(0.875))
                 .line_height(rems(1.125))
                 .text_color(color(theme::TEXT_DIM))
@@ -47,21 +47,18 @@ pub(super) fn settings_ai_pane(
             })
             .collect::<Vec<_>>()
     };
-    let mut runtime_tool_rows = Vec::new();
-    runtime_tool_rows.extend(vec![
+    let mut cards = vec![
         settings_runtime_tool_block(
             RuntimeToolBlockInput {
-                label: settings_text(
-                    language,
-                    "settings.ai.tool.configuration_format",
-                    "%@ Configuration",
-                )
-                .replace("%@", "Codex"),
+                label: "Codex".to_string(),
                 tool_key: "codex",
                 model_key: "codexModel",
+                path_key: "codexPath",
                 permission: &permissions.codex,
                 model: &permissions.codex_model,
+                path: &permissions.codex_path,
                 placeholder: "gpt-5.5",
+                path_placeholder: "codex",
                 include_permission: true,
                 include_codex_effort: true,
                 codex_effort: &permissions.codex_effort,
@@ -72,17 +69,15 @@ pub(super) fn settings_ai_pane(
         ),
         settings_runtime_tool_block(
             RuntimeToolBlockInput {
-                label: settings_text(
-                    language,
-                    "settings.ai.tool.configuration_format",
-                    "%@ Configuration",
-                )
-                .replace("%@", "Oh My Pi"),
+                label: "Oh My Pi".to_string(),
                 tool_key: "omp",
                 model_key: "ompModel",
+                path_key: "ompPath",
                 permission: &permissions.omp,
                 model: &permissions.omp_model,
+                path: &permissions.omp_path,
                 placeholder: "anthropic/claude-sonnet-4-5",
+                path_placeholder: "omp",
                 include_permission: true,
                 include_codex_effort: false,
                 codex_effort: &permissions.codex_effort,
@@ -93,17 +88,15 @@ pub(super) fn settings_ai_pane(
         ),
         settings_runtime_tool_block(
             RuntimeToolBlockInput {
-                label: settings_text(
-                    language,
-                    "settings.ai.tool.configuration_format",
-                    "%@ Configuration",
-                )
-                .replace("%@", "Claude Code"),
+                label: "Claude Code".to_string(),
                 tool_key: "claudeCode",
                 model_key: "claudeCodeModel",
+                path_key: "claudeCodePath",
                 permission: &permissions.claude_code,
                 model: &permissions.claude_code_model,
+                path: &permissions.claude_code_path,
                 placeholder: "claude-sonnet-4.5",
+                path_placeholder: "claude",
                 include_permission: true,
                 include_codex_effort: false,
                 codex_effort: &permissions.codex_effort,
@@ -114,17 +107,15 @@ pub(super) fn settings_ai_pane(
         ),
         settings_runtime_tool_block(
             RuntimeToolBlockInput {
-                label: settings_text(
-                    language,
-                    "settings.ai.tool.configuration_format",
-                    "%@ Configuration",
-                )
-                .replace("%@", "Agy"),
+                label: "Agy".to_string(),
                 tool_key: "agy",
                 model_key: "agyModel",
+                path_key: "agyPath",
                 permission: &permissions.agy,
                 model: &permissions.agy_model,
+                path: &permissions.agy_path,
                 placeholder: "gemini-2.5-pro",
+                path_placeholder: "agy",
                 include_permission: true,
                 include_codex_effort: false,
                 codex_effort: &permissions.codex_effort,
@@ -135,17 +126,15 @@ pub(super) fn settings_ai_pane(
         ),
         settings_runtime_tool_block(
             RuntimeToolBlockInput {
-                label: settings_text(
-                    language,
-                    "settings.ai.tool.configuration_format",
-                    "%@ Configuration",
-                )
-                .replace("%@", "OpenCode"),
+                label: "OpenCode".to_string(),
                 tool_key: "opencode",
                 model_key: "opencodeModel",
+                path_key: "opencodePath",
                 permission: &permissions.opencode,
                 model: &permissions.opencode_model,
+                path: &permissions.opencode_path,
                 placeholder: "gpt-5.5",
+                path_placeholder: "opencode",
                 include_permission: true,
                 include_codex_effort: false,
                 codex_effort: &permissions.codex_effort,
@@ -156,17 +145,15 @@ pub(super) fn settings_ai_pane(
         ),
         settings_runtime_tool_block(
             RuntimeToolBlockInput {
-                label: settings_text(
-                    language,
-                    "settings.ai.tool.configuration_format",
-                    "%@ Configuration",
-                )
-                .replace("%@", "Kiro"),
+                label: "Kiro".to_string(),
                 tool_key: "kiro",
                 model_key: "kiroModel",
+                path_key: "kiroPath",
                 permission: &permissions.kiro,
                 model: &permissions.kiro_model,
+                path: &permissions.kiro_path,
                 placeholder: "auto",
+                path_placeholder: "kiro-cli",
                 include_permission: false,
                 include_codex_effort: false,
                 codex_effort: &permissions.codex_effort,
@@ -177,17 +164,15 @@ pub(super) fn settings_ai_pane(
         ),
         settings_runtime_tool_block(
             RuntimeToolBlockInput {
-                label: settings_text(
-                    language,
-                    "settings.ai.tool.configuration_format",
-                    "%@ Configuration",
-                )
-                .replace("%@", "CodeWhale"),
+                label: "CodeWhale".to_string(),
                 tool_key: "codewhale",
                 model_key: "codewhaleModel",
+                path_key: "codewhalePath",
                 permission: &permissions.codewhale,
                 model: &permissions.codewhale_model,
+                path: &permissions.codewhale_path,
                 placeholder: "deepseek-chat",
+                path_placeholder: "codewhale",
                 include_permission: true,
                 include_codex_effort: false,
                 codex_effort: &permissions.codex_effort,
@@ -198,17 +183,15 @@ pub(super) fn settings_ai_pane(
         ),
         settings_runtime_tool_block(
             RuntimeToolBlockInput {
-                label: settings_text(
-                    language,
-                    "settings.ai.tool.configuration_format",
-                    "%@ Configuration",
-                )
-                .replace("%@", "Kimi Code"),
+                label: "Kimi Code".to_string(),
                 tool_key: "kimi",
                 model_key: "kimiModel",
+                path_key: "kimiPath",
                 permission: &permissions.kimi,
                 model: &permissions.kimi_model,
+                path: &permissions.kimi_path,
                 placeholder: "kimi-k2",
+                path_placeholder: "kimi",
                 include_permission: false,
                 include_codex_effort: false,
                 codex_effort: &permissions.codex_effort,
@@ -219,17 +202,15 @@ pub(super) fn settings_ai_pane(
         ),
         settings_runtime_tool_block(
             RuntimeToolBlockInput {
-                label: settings_text(
-                    language,
-                    "settings.ai.tool.configuration_format",
-                    "%@ Configuration",
-                )
-                .replace("%@", "MiMo-Code"),
+                label: "MiMo-Code".to_string(),
                 tool_key: "mimo",
                 model_key: "mimoModel",
+                path_key: "mimoPath",
                 permission: &permissions.mimo,
                 model: &permissions.mimo_model,
+                path: &permissions.mimo_path,
                 placeholder: "kimi-k2",
+                path_placeholder: "mimo",
                 include_permission: true,
                 include_codex_effort: false,
                 codex_effort: &permissions.codex_effort,
@@ -238,25 +219,10 @@ pub(super) fn settings_ai_pane(
             window,
             cx,
         ),
-    ]);
+    ];
 
-    settings_form(vec![
-        settings_card(
-            Some(settings_text(
-                language,
-                "settings.ai.section.runtime_tools",
-                "Runtime Tools",
-            )),
-            Some(settings_text(
-                language,
-                "settings.tools.hint",
-                "These defaults are written to the runtime wrapper permission file.",
-            )),
-            runtime_tool_rows,
-            cx,
-        )
-        .into_any_element(),
-        settings_card(
+    cards.push(
+        settings_card_flush(
             Some(settings_text(
                 language,
                 "settings.ai.global_prompt",
@@ -283,6 +249,8 @@ pub(super) fn settings_ai_pane(
             cx,
         )
         .into_any_element(),
+    );
+    cards.push(
         settings_card_with_actions(
             Some(settings_text(
                 language,
@@ -308,8 +276,8 @@ pub(super) fn settings_ai_pane(
             cx,
         )
         .into_any_element(),
-    ])
-    .into_any_element()
+    );
+    settings_form(cards).into_any_element()
 }
 pub(super) fn settings_ai_provider_card(
     provider: codux_runtime::settings::AIProviderSummary,
@@ -343,10 +311,10 @@ pub(super) fn settings_ai_provider_card(
             "settings-provider-{}",
             provider.id
         )))
-        .py(px(12.0))
+        .py(px(8.0))
         .flex()
         .flex_col()
-        .gap(px(10.0))
+        .gap(px(8.0))
         .on_click(cx.listener(move |app, _event, window, cx| {
             app.select_ai_provider(select_id.clone(), window, cx)
         }))

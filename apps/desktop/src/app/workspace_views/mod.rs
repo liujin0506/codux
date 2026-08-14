@@ -65,10 +65,16 @@ impl Render for WorkspaceColumnView {
             .w_full()
             .h_full()
             .child(
-                div().flex().flex_none().w_full().h(px(52.0)).child(
-                    gpui::AnyView::from(self.toolbar_view.clone())
-                        .cached(gpui::StyleRefinement::default().flex().w_full().h(px(52.0))),
-                ),
+                div()
+                    .flex()
+                    .flex_none()
+                    .w_full()
+                    .h(px(44.0))
+                    .bg(theme::title_bar_fill())
+                    .child(
+                        gpui::AnyView::from(self.toolbar_view.clone())
+                            .cached(gpui::StyleRefinement::default().flex().w_full().h(px(44.0))),
+                    ),
             )
             .child(
                 div()

@@ -154,6 +154,23 @@ impl CoduxApp {
         }
     }
 
+    fn ssh_runtime_target(&self) -> ProjectRuntimeTarget {
+        self.active_terminal_slot()
+            .and_then(|(_, slot)| slot.pane.as_ref())
+            .and_then(|pane| pane.hosted_runtime_target())
+            .or_else(|| {
+                self.current_terminal_launch_context()
+                    .map(|context| context.runtime_target)
+            })
+            .or_else(|| {
+                self.state
+                    .selected_project
+                    .as_ref()
+                    .map(|project| project.runtime_target.clone())
+            })
+            .unwrap_or(ProjectRuntimeTarget::Local)
+    }
+
     pub(super) fn select_ssh_profile(
         &mut self,
         profile_id: String,
@@ -182,23 +199,88 @@ impl CoduxApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.state.ssh.wrapper_available {
-            self.status_message = "codux-ssh wrapper is not available".to_string();
-            self.invalidate_remote_panel(cx);
-            return;
-        }
         let Some(profile) = self.selected_ssh_profile().cloned() else {
             self.status_message = "no SSH profile selected".to_string();
             self.invalidate_remote_panel(cx);
             return;
         };
+        let target = self.ssh_runtime_target();
         match self.runtime_service.ssh_launch_command(profile.id.clone()) {
             Ok(command) => {
-                self.send_to_active_terminal(&terminal_command_text(&command.command), cx);
-                if let Some(view) = self.active_terminal_view() {
-                    view.read(cx).focus_handle().focus(window, cx);
+                if target.is_hosted() {
+                    let Some(full_profile) = self
+                        .runtime_service
+                        .ssh_profiles()
+                        .profiles
+                        .into_iter()
+                        .find(|item| item.id == profile.id)
+                    else {
+                        self.status_message = "SSH profile is no longer available".to_string();
+                        self.invalidate_remote_panel(cx);
+                        return;
+                    };
+                    let request = SSHProfileUpsertRequest {
+                        id: Some(full_profile.id),
+                        name: full_profile.name,
+                        host: full_profile.host,
+                        port: full_profile.port,
+                        username: full_profile.username,
+                        credential_kind: full_profile.credential_kind,
+                        private_key_path: Some(full_profile.private_key_path),
+                        password: full_profile.password,
+                        key_passphrase: full_profile.key_passphrase,
+                    };
+                    let service = self.runtime_service.clone();
+                    let command_text = terminal_command_text(&command.command);
+                    let profile_name = profile.name.clone();
+                    let expected_target = target.clone();
+                    let sync_target = expected_target.clone();
+                    self.status_message = "syncing SSH profile to workspace runtime...".to_string();
+                    cx.spawn(async move |this: gpui::WeakEntity<Self>, cx| {
+                        let result = codux_runtime::async_runtime::spawn_blocking(move || {
+                            service.upsert_ssh_profile_for_target(&sync_target, &request)
+                        })
+                        .await
+                        .map_err(|error| error.to_string())
+                        .and_then(|result| result);
+                        let _ = this.update(cx, |app, cx| {
+                            match result {
+                                Ok(_) => {
+                                    if app.ssh_runtime_target() != expected_target {
+                                        app.status_message =
+                                            "workspace runtime changed before SSH connect"
+                                                .to_string();
+                                    } else {
+                                        app.send_to_active_terminal(&command_text, cx);
+                                        app.status_message = format!(
+                                            "SSH connect sent to workspace runtime: {profile_name}"
+                                        );
+                                    }
+                                }
+                                Err(error) => {
+                                    app.status_message = format!(
+                                        "failed to sync SSH profile to workspace runtime: {error}"
+                                    );
+                                }
+                            }
+                            app.sync_project_lifecycle_state(cx);
+                            app.invalidate_task_column(cx);
+                            app.invalidate_remote_panel(cx);
+                        });
+                    })
+                    .detach();
+                } else {
+                    if !self.state.ssh.wrapper_available {
+                        self.status_message = "codux-ssh wrapper is not available".to_string();
+                        self.invalidate_remote_panel(cx);
+                        return;
+                    }
+                    self.send_to_active_terminal(&terminal_command_text(&command.command), cx);
+                    if let Some(view) = self.active_terminal_view() {
+                        view.read(cx).focus_handle().focus(window, cx);
+                    }
+                    self.status_message = format!("SSH connect sent: {}", profile.name);
                 }
-                self.status_message = format!("SSH connect sent: {}", profile.name);
             }
             Err(error) => {
                 self.status_message = format!("failed to build SSH launch command: {error}");
@@ -1993,6 +2075,23 @@ impl CoduxApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ssh_launch_routes_hosted_workspaces_to_their_runtime() {
+        assert!(
+            ProjectRuntimeTarget::Remote {
+                device_id: "agent-1".to_string(),
+            }
+            .is_hosted()
+        );
+        assert!(
+            ProjectRuntimeTarget::Wsl {
+                distribution: "Ubuntu".to_string(),
+            }
+            .is_hosted()
+        );
+        assert!(!ProjectRuntimeTarget::Local.is_hosted());
+    }
 
     #[test]
     fn agent_git_refresh_waits_one_interval_after_work_starts() {

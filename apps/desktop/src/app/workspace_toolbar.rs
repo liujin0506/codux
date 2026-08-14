@@ -1,11 +1,7 @@
 use super::*;
 use crate::app::{
     ui_helpers::{titlebar_drag_area, with_codux_tooltip},
-    workspace_daily_level::workspace_level_button,
-    workspace_pet_widgets::{WorkspacePetButtonInput, workspace_pet_button},
-    workspace_shared::{
-        workspace_header_badge_button_content, workspace_header_button, workspace_i18n,
-    },
+    workspace_shared::{workspace_header_button, workspace_i18n},
 };
 use codux_runtime::{i18n::translate, settings::locale_from_language_setting};
 use gpui::Rems;
@@ -23,7 +19,7 @@ const WORKSPACE_WINDOW_CONTROLS_WIDTH: f32 = WORKSPACE_WINDOW_CONTROL_LEADING_MA
 impl CoduxApp {
     pub(in crate::app) fn workspace_toolbar(
         &self,
-        window: &mut Window,
+        _window: &mut Window,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let active_index = match self.workspace_view {
@@ -32,7 +28,6 @@ impl CoduxApp {
             WorkspaceView::Review => 2,
             WorkspaceView::Stats => 3,
         };
-        let pet_snapshot = self.pet_snapshot.clone();
         let has_project_context = self.state.selected_project.is_some();
         let remote_project_device_id = self
             .state
@@ -45,35 +40,10 @@ impl CoduxApp {
                     == Some(&codux_runtime::remote::ControllerLinkState::Connected))
                 .then(|| device_id.clone())
             });
-        let show_server_info_button = has_project_context
-            && (remote_project_device_id.is_none() || connected_remote_project_device_id.is_some());
-        let pet_button = if self.state.settings.pet_enabled {
-            if has_project_context {
-                workspace_pet_button(
-                    WorkspacePetButtonInput {
-                        pet: &self.state.pet,
-                        pet_snapshot: Some(&pet_snapshot),
-                        custom_pets: &self.pet_custom_pets,
-                        runtime_asset_root: &self.runtime.source_root,
-                        support_dir: &self.state.support_dir,
-                        language: &self.state.settings.language,
-                        pet_name_editing: self.pet_name_editing,
-                    },
-                    window,
-                    cx,
-                )
-                .into_any_element()
-            } else {
-                disabled_pet_button(&self.state, cx).into_any_element()
-            }
+        let task_column_reveal_button = if has_project_context && self.task_column_collapsed {
+            task_column_expand_button(&self.state.settings.language, cx).into_any_element()
         } else {
             gpui::Empty.into_any_element()
-        };
-        let level_button = if has_project_context {
-            workspace_level_button(&self.state.daily_level, &self.state.settings.language, cx)
-                .into_any_element()
-        } else {
-            disabled_level_button(&self.state.settings.language, cx).into_any_element()
         };
         column_header(
             // No `items_center` here: children stretch to full header height so the
@@ -88,6 +58,8 @@ impl CoduxApp {
                         .flex()
                         .items_center()
                         .gap_2()
+                        .when(self.project_column_collapsed, |this| this.pl(px(12.0)))
+                        .child(task_column_reveal_button)
                         .child(workspace_segmented_tabs(
                             active_index,
                             &self.state.settings.language,
@@ -97,16 +69,13 @@ impl CoduxApp {
                 )
                 .child(titlebar_drag_area(
                     "workspace-titlebar-drag",
-                    div().flex_1().h_full(),
+                    div().flex_1().h_full().bg(theme::title_bar_fill()),
                 ))
                 .child(
                     div()
                         .flex()
                         .items_center()
                         .gap_2()
-                        .child(pet_button)
-                        .child(level_button)
-                        .child(workspace_toolbar_separator(cx))
                         .child(workspace_open_button(
                             &self.project_open_applications,
                             has_project_context,
@@ -114,33 +83,13 @@ impl CoduxApp {
                             cx,
                         ))
                         .when_some(connected_remote_project_device_id, |this, device_id| {
-                            this.child(workspace_toolbar_separator(cx)).child(
-                                workspace_remote_browser_button(
-                                    device_id,
-                                    &self.state.settings.language,
-                                    cx,
-                                ),
-                            )
-                        })
-                        .when(show_server_info_button, |this| {
-                            this.child(workspace_toolbar_separator(cx)).child(
-                                workspace_assistant_button(
-                                    "Server",
-                                    AssistantPanel::ServerInfo,
-                                    self.assistant_panel,
-                                    true,
-                                    cx,
-                                ),
-                            )
+                            this.child(workspace_remote_browser_button(
+                                device_id,
+                                &self.state.settings.language,
+                                cx,
+                            ))
                         })
                         .child(workspace_toolbar_separator(cx))
-                        .child(workspace_assistant_button(
-                            "AI",
-                            AssistantPanel::AIStats,
-                            self.assistant_panel,
-                            has_project_context,
-                            cx,
-                        ))
                         .child(workspace_assistant_button(
                             "SSH",
                             AssistantPanel::Ssh,
@@ -181,6 +130,20 @@ impl CoduxApp {
             cx,
         )
     }
+}
+
+fn task_column_expand_button(language: &str, cx: &mut Context<CoduxApp>) -> impl IntoElement {
+    let label = workspace_i18n(language, "sidebar.expand", "Expand Sidebar");
+    let button = workspace_header_button("task-column-expand", cx)
+        .ghost()
+        .w(px(28.0))
+        .text_color(cx.theme().secondary_foreground)
+        .on_click(cx.listener(|app, _event, window, cx| {
+            app.toggle_task_column(window, cx);
+        }))
+        .child(Icon::new(HeroIconName::ChevronDoubleRight).size_3p5());
+
+    with_codux_tooltip(cx.entity(), "task-column-expand-tooltip", button, label)
 }
 
 fn workspace_remote_browser_button(
@@ -243,7 +206,7 @@ fn workspace_open_button(
             div()
                 .id("workspace-open-folder")
                 .h(px(28.0))
-                .w(px(38.0))
+                .w(px(26.0))
                 .flex()
                 .items_center()
                 .justify_center()
@@ -268,7 +231,7 @@ fn workspace_open_button(
             Button::new("workspace-open-apps")
                 .text()
                 .h(px(28.0))
-                .w(px(30.0))
+                .w(px(20.0))
                 .cursor_pointer()
                 .text_color(cx.theme().foreground)
                 .child(
@@ -464,9 +427,6 @@ fn workspace_segmented_tabs(
         (HeroIconName::ChartBar, stats_label),
     ];
     div()
-        .rounded(px(8.0))
-        .bg(cx.theme().tab_bar_segmented)
-        .p(px(2.0))
         .flex()
         .items_center()
         .gap(px(2.0))
@@ -520,40 +480,4 @@ fn workspace_toolbar_separator(cx: &mut Context<CoduxApp>) -> impl IntoElement {
         .h(px(16.0))
         .flex_none()
         .bg(theme::divider_for_surface(cx.theme().title_bar))
-}
-
-fn disabled_pet_button(state: &RuntimeState, cx: &mut Context<CoduxApp>) -> impl IntoElement {
-    let label = if state.pet.claimed {
-        format!("Lv.{}", state.pet.level.max(1))
-    } else {
-        workspace_i18n(&state.settings.language, "pet.claim.action", "Claim Pet")
-    };
-
-    workspace_header_button("workspace-pet-disabled", cx)
-        .secondary()
-        .disabled(true)
-        .opacity(0.45)
-        .text_color(cx.theme().foreground)
-        .child(workspace_header_badge_button_content(
-            HeroIconName::Heart,
-            color(theme::ACCENT),
-            label,
-            cx,
-        ))
-}
-
-fn disabled_level_button(language: &str, cx: &mut Context<CoduxApp>) -> impl IntoElement {
-    let label = workspace_i18n(language, "rank.iron", "Iron");
-
-    workspace_header_button("workspace-level-disabled", cx)
-        .secondary()
-        .disabled(true)
-        .opacity(0.45)
-        .text_color(cx.theme().foreground)
-        .child(workspace_header_badge_button_content(
-            HeroIconName::Minus,
-            color(theme::TEXT_MUTED),
-            label,
-            cx,
-        ))
 }

@@ -1,6 +1,9 @@
 type TerminalFocusObserver = Arc<dyn Fn(&mut Window, &mut Context<TerminalView>)>;
 type TerminalTitleObserver = Arc<dyn Fn(Option<String>, &mut Context<TerminalView>)>;
 type TerminalSearchObserver = Arc<dyn Fn(bool, &mut Context<TerminalView>)>;
+type TerminalRestartObserver = Arc<dyn Fn(&mut Window, &mut Context<TerminalView>)>;
+type TerminalCloseSplitHandler =
+    Arc<dyn Fn(&Keystroke, &mut Window, &mut Context<TerminalView>) -> bool>;
 type TerminalLinkOpener = Arc<dyn Fn(String, &mut Window, &mut Context<TerminalView>)>;
 
 pub struct TerminalView {
@@ -26,6 +29,9 @@ pub struct TerminalView {
     focus_observer: Option<TerminalFocusObserver>,
     title_observer: Option<TerminalTitleObserver>,
     search_observer: Option<TerminalSearchObserver>,
+    restart_observer: Option<TerminalRestartObserver>,
+    close_split_handler: Option<TerminalCloseSplitHandler>,
+    enter_restart_enabled: bool,
     osc_title: Option<String>,
     search_open: bool,
     search_input: Option<Entity<InputState>>,
@@ -166,10 +172,7 @@ impl TerminalScrollInputState {
 }
 
 impl TerminalView {
-    fn new<W>(
-        input: TerminalViewInput<W>,
-        cx: &mut Context<Self>,
-    ) -> Self
+    fn new<W>(input: TerminalViewInput<W>, cx: &mut Context<Self>) -> Self
     where
         W: Write + Send + 'static,
     {
@@ -239,6 +242,9 @@ impl TerminalView {
             focus_observer: None,
             title_observer: None,
             search_observer: None,
+            restart_observer: None,
+            close_split_handler: None,
+            enter_restart_enabled: false,
             osc_title: None,
             search_open: false,
             search_input: None,
@@ -352,6 +358,45 @@ impl TerminalView {
         self.search_observer = Some(Arc::new(observer));
     }
 
+    pub fn set_restart_observer<F>(&mut self, observer: F)
+    where
+        F: Fn(&mut Window, &mut Context<TerminalView>) + 'static,
+    {
+        self.restart_observer = Some(Arc::new(observer));
+    }
+
+    pub fn set_close_split_handler<F>(&mut self, handler: F)
+    where
+        F: Fn(&Keystroke, &mut Window, &mut Context<TerminalView>) -> bool + 'static,
+    {
+        self.close_split_handler = Some(Arc::new(handler));
+    }
+
+    pub fn set_enter_restart_enabled(&mut self, enabled: bool, cx: &mut Context<Self>) {
+        if self.enter_restart_enabled == enabled {
+            return;
+        }
+        self.enter_restart_enabled = enabled;
+        cx.notify();
+    }
+
+    pub fn has_exited(&self, cx: &App) -> bool {
+        self.model.read(cx).has_exited()
+    }
+
+    fn can_restart_after_exit(&self, cx: &App) -> bool {
+        self.enter_restart_enabled && self.has_exited(cx)
+    }
+
+    fn request_restart(&self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.can_restart_after_exit(cx) {
+            return;
+        }
+        if let Some(observer) = self.restart_observer.clone() {
+            observer(window, cx);
+        }
+    }
+
     pub fn search_is_open(&self) -> bool {
         self.search_open
     }
@@ -454,13 +499,63 @@ impl TerminalView {
             .into_any_element()
     }
 
+    fn render_exited_banner(&self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let language = self.config.language.clone();
+        let title =
+            codux_runtime::i18n::translate(&language, "terminal.exited.title", "Process completed");
+        let hint = codux_runtime::i18n::translate(
+            &language,
+            "terminal.exited.restart_hint",
+            "Press Enter to restart",
+        );
+        div()
+            .id("terminal-exited-banner")
+            .absolute()
+            .left_0()
+            .right_0()
+            .bottom_0()
+            .occlude()
+            .flex()
+            .items_center()
+            .justify_between()
+            .gap_3()
+            .px(px(14.0))
+            .py(px(8.0))
+            .border_t_1()
+            .border_color(cx.theme().border)
+            .bg(cx.theme().popover)
+            .cursor_pointer()
+            .on_click(cx.listener(|view, _event, window, cx| {
+                view.request_restart(window, cx);
+            }))
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(2.0))
+                    .child(
+                        div()
+                            .text_size(px(12.0))
+                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .text_color(cx.theme().foreground)
+                            .child(title),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(11.0))
+                            .text_color(cx.theme().muted_foreground)
+                            .child(hint),
+                    ),
+            )
+            .into_any_element()
+    }
+
     fn on_key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
-        if is_copy_keystroke(&event.keystroke)
-            && self.copy_selected_text(cx) {
-                cx.stop_propagation();
-                cx.notify();
-                return;
-            }
+        if is_copy_keystroke(&event.keystroke) && self.copy_selected_text(cx) {
+            cx.stop_propagation();
+            cx.notify();
+            return;
+        }
 
         if is_paste_keystroke(&event.keystroke) {
             if let Some(text) = self.terminal_clipboard_paste_text(cx) {
@@ -487,11 +582,22 @@ impl TerminalView {
     pub fn handle_app_terminal_keystroke(
         &mut self,
         keystroke: &Keystroke,
-        _window: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
         if is_select_all_keystroke(keystroke) {
             self.select_all(cx);
+            return true;
+        }
+        if let Some(handler) = self.close_split_handler.clone()
+            && handler(keystroke, window, cx)
+        {
+            return true;
+        }
+        if self.has_exited(cx) {
+            if is_restart_exited_terminal_keystroke(keystroke) {
+                self.request_restart(window, cx);
+            }
             return true;
         }
         // cmd+up/down: jump between OSC 133 prompt marks (Ghostty parity);
@@ -522,10 +628,9 @@ impl TerminalView {
     pub fn open_search(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let was_open = self.search_open;
         self.search_open = true;
-        if !was_open
-            && let Some(observer) = self.search_observer.clone() {
-                observer(true, cx);
-            }
+        if !was_open && let Some(observer) = self.search_observer.clone() {
+            observer(true, cx);
+        }
         let input = match self.search_input.clone() {
             Some(input) => input,
             None => {
@@ -773,8 +878,9 @@ impl TerminalView {
                                 Some(range) => self.selection.lock().set_range(range),
                                 None => {
                                     self.selection.lock().start(selection_point);
-                                    self.model
-                                        .update(cx, |model, _| model.start_selection(selection_point));
+                                    self.model.update(cx, |model, _| {
+                                        model.start_selection(selection_point)
+                                    });
                                 }
                             }
                         }
@@ -1050,10 +1156,12 @@ impl TerminalView {
             let model = self.model.read(cx);
             (model.remote_viewer(), model.viewport_generation())
         };
-        if !is_remote && generation != previous_generation
-            && let Err(error) = self.session.refresh_local_viewport_if_current_owner() {
-                eprintln!("failed to restore desktop terminal viewport: {error}");
-            }
+        if !is_remote
+            && generation != previous_generation
+            && let Err(error) = self.session.refresh_local_viewport_if_current_owner()
+        {
+            eprintln!("failed to restore desktop terminal viewport: {error}");
+        }
     }
 
     fn write_bytes(&mut self, bytes: &[u8], cx: &mut Context<Self>) {

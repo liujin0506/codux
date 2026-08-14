@@ -1,7 +1,10 @@
 use crate::config::ConfigStore;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -26,6 +29,15 @@ pub struct ToolPermissionsSummary {
     pub codewhale_model: String,
     pub kimi_model: String,
     pub mimo_model: String,
+    pub codex_path: String,
+    pub claude_code_path: String,
+    pub agy_path: String,
+    pub omp_path: String,
+    pub opencode_path: String,
+    pub kiro_path: String,
+    pub codewhale_path: String,
+    pub kimi_path: String,
+    pub mimo_path: String,
     pub codex_effort: String,
     pub full_access_count: usize,
     pub error: Option<String>,
@@ -70,6 +82,24 @@ struct AIRuntimeToolSettings {
     kimi_model: String,
     #[serde(default)]
     mimo_model: String,
+    #[serde(default)]
+    codex_path: String,
+    #[serde(default)]
+    claude_code_path: String,
+    #[serde(default)]
+    agy_path: String,
+    #[serde(default)]
+    omp_path: String,
+    #[serde(default)]
+    opencode_path: String,
+    #[serde(default)]
+    kiro_path: String,
+    #[serde(default)]
+    codewhale_path: String,
+    #[serde(default)]
+    kimi_path: String,
+    #[serde(default)]
+    mimo_path: String,
     #[serde(default = "default_codex_effort")]
     codex_effort: String,
 }
@@ -95,6 +125,15 @@ impl Default for AIRuntimeToolSettings {
             codewhale_model: String::new(),
             kimi_model: String::new(),
             mimo_model: String::new(),
+            codex_path: String::new(),
+            claude_code_path: String::new(),
+            agy_path: String::new(),
+            omp_path: String::new(),
+            opencode_path: String::new(),
+            kiro_path: String::new(),
+            codewhale_path: String::new(),
+            kimi_path: String::new(),
+            mimo_path: String::new(),
             codex_effort: default_codex_effort(),
         }
     }
@@ -122,6 +161,14 @@ impl ToolPermissionsService {
                 ..Default::default()
             },
         }
+    }
+
+    pub fn synced_file_path(support_dir: PathBuf) -> Option<PathBuf> {
+        let summary = Self::new(support_dir).sync();
+        summary
+            .error
+            .is_none()
+            .then(|| PathBuf::from(summary.path))
     }
 
     pub fn sync(&self) -> ToolPermissionsSummary {
@@ -196,6 +243,15 @@ fn summary_from_settings(
         codewhale_model: settings.codewhale_model,
         kimi_model: settings.kimi_model,
         mimo_model: settings.mimo_model,
+        codex_path: settings.codex_path,
+        claude_code_path: settings.claude_code_path,
+        agy_path: settings.agy_path,
+        omp_path: settings.omp_path,
+        opencode_path: settings.opencode_path,
+        kiro_path: settings.kiro_path,
+        codewhale_path: settings.codewhale_path,
+        kimi_path: settings.kimi_path,
+        mimo_path: settings.mimo_path,
         codex_effort: settings.codex_effort,
         full_access_count,
         error,
@@ -221,6 +277,15 @@ fn sanitize_runtime_tool_settings(mut settings: AIRuntimeToolSettings) -> AIRunt
     settings.codewhale_model = sanitize_model(&settings.codewhale_model);
     settings.kimi_model = sanitize_model(&settings.kimi_model);
     settings.mimo_model = sanitize_model(&settings.mimo_model);
+    settings.codex_path = sanitize_executable_path(&settings.codex_path);
+    settings.claude_code_path = sanitize_executable_path(&settings.claude_code_path);
+    settings.agy_path = sanitize_executable_path(&settings.agy_path);
+    settings.omp_path = sanitize_executable_path(&settings.omp_path);
+    settings.opencode_path = sanitize_executable_path(&settings.opencode_path);
+    settings.kiro_path = sanitize_executable_path(&settings.kiro_path);
+    settings.codewhale_path = sanitize_executable_path(&settings.codewhale_path);
+    settings.kimi_path = sanitize_executable_path(&settings.kimi_path);
+    settings.mimo_path = sanitize_executable_path(&settings.mimo_path);
     settings.codex_effort = match settings.codex_effort.trim() {
         "none" => "none".to_string(),
         "minimal" => "minimal".to_string(),
@@ -244,6 +309,15 @@ fn sanitize_model(value: &str) -> String {
     value.trim().chars().take(160).collect()
 }
 
+fn sanitize_executable_path(value: &str) -> String {
+    value
+        .trim()
+        .chars()
+        .filter(|ch| !ch.is_control())
+        .take(4096)
+        .collect()
+}
+
 fn default_permission_mode() -> String {
     "default".to_string()
 }
@@ -254,6 +328,12 @@ fn default_codex_effort() -> String {
 
 fn runtime_temp_dir() -> PathBuf {
     crate::runtime_paths::runtime_temp_dir()
+}
+
+pub fn runtime_tools_payload(path: Option<&Path>) -> Option<Value> {
+    let raw = fs::read_to_string(path?).ok()?;
+    let value = serde_json::from_str::<Value>(&raw).ok()?;
+    value.is_object().then_some(value)
 }
 
 #[cfg(test)]
@@ -306,7 +386,9 @@ mod tests {
                         "kimi": "fullAccess",
                         "mimo": "fullAccess",
                         "codexModel": " gpt-5.5 ",
+                        "codexPath": " /opt/custom/codex ",
                         "ompModel": " anthropic/claude-sonnet-4-5 ",
+                        "ompPath": "   ",
                         "codewhaleModel": " deepseek-chat ",
                         "kimiModel": " kimi-k2 ",
                         "mimoModel": " kimi-k2 ",
@@ -333,8 +415,10 @@ mod tests {
         assert_eq!(summary.kiro, "default");
         assert_eq!(summary.kimi, "default");
         assert_eq!(summary.codex_model, "gpt-5.5");
+        assert_eq!(summary.codex_path, "/opt/custom/codex");
         assert_eq!(summary.omp, "fullAccess");
         assert_eq!(summary.omp_model, "anthropic/claude-sonnet-4-5");
+        assert_eq!(summary.omp_path, "");
         assert_eq!(summary.codewhale_model, "deepseek-chat");
         assert_eq!(summary.kimi_model, "kimi-k2");
         assert_eq!(summary.mimo_model, "kimi-k2");
@@ -352,5 +436,21 @@ mod tests {
         assert_eq!(written["codexEffort"], "xhigh");
 
         fs::remove_dir_all(support_dir).unwrap();
+    }
+
+    #[test]
+    fn runtime_tools_payload_reads_object_files_only() {
+        let dir = temp_support_dir();
+        let path = dir.join("tool-permissions.json");
+        fs::write(&path, json!({"codexPath": "/opt/custom/codex"}).to_string()).unwrap();
+        assert_eq!(
+            runtime_tools_payload(Some(&path))
+                .and_then(|value| value.get("codexPath").and_then(Value::as_str).map(str::to_string)),
+            Some("/opt/custom/codex".to_string())
+        );
+        fs::write(&path, "\"not-an-object\"").unwrap();
+        assert_eq!(runtime_tools_payload(Some(&path)), None);
+        assert_eq!(runtime_tools_payload(None), None);
+        fs::remove_dir_all(dir).unwrap();
     }
 }

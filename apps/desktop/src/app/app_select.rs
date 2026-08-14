@@ -1,9 +1,10 @@
 use super::*;
+use crate::app::scroll_compat::ScrollableElement;
 use gpui::{Anchor, Rems};
 use gpui_component::{
     Disableable, Sizable,
     button::Button,
-    menu::{DropdownMenu, PopupMenuItem},
+    popover::Popover,
 };
 
 const CODUX_SELECT_TEXT_SIZE: Rems = Rems(0.875);
@@ -59,12 +60,12 @@ pub(in crate::app) fn codux_select(
     let selected_value = value;
     let app_entity = cx.entity();
 
-    Button::new(SharedString::from(format!("codux-select-trigger-{id}")))
+    let trigger = Button::new(SharedString::from(format!("codux-select-trigger-{id}")))
         .outline()
-        .with_size(gpui_component::Size::Medium)
+        .small()
         .disabled(disabled)
         .w(width)
-        .min_w(px(180.0))
+        .min_w(px(0.0))
         .child(
             div()
                 .flex()
@@ -97,27 +98,96 @@ pub(in crate::app) fn codux_select(
                             cx.theme().foreground.opacity(0.5)
                         }),
                 ),
-        )
-        .dropdown_menu_with_anchor(Anchor::TopRight, move |menu, _window, _cx| {
-            options.iter().fold(
-                menu.min_w(menu_width).max_w(menu_width).scrollable(true),
-                |menu, item| {
+        );
+
+    if disabled {
+        return trigger.into_any_element();
+    }
+
+    Popover::new(SharedString::from(format!("codux-select-menu-{id}")))
+        .w(width)
+        .anchor(Anchor::TopRight)
+        .appearance(false)
+        .trigger(trigger)
+        .content(move |_, _, cx| {
+            let popover = cx.entity();
+            let accent = cx.theme().accent;
+            let accent_fg = cx.theme().accent_foreground;
+            let hover = cx.theme().list_hover;
+            let fg = color(theme::TEXT);
+            div()
+                .w(menu_width)
+                .max_h(px(280.0))
+                .overflow_y_scrollbar()
+                .rounded(px(8.0))
+                .border_1()
+                .border_color(cx.theme().border)
+                .bg(cx.theme().popover)
+                .shadow_md()
+                .p(px(4.0))
+                .flex()
+                .flex_col()
+                .children(options.iter().map(|item| {
                     let value = item.value.clone();
                     let selected = value == selected_value;
                     let action = action.clone();
                     let app_entity = app_entity.clone();
-                    menu.item(
-                        PopupMenuItem::new(item.label.clone())
-                            .checked(selected)
-                            .on_click(move |_, window, cx| {
-                                cx.update_entity(&app_entity, |app, cx| {
-                                    action(app, value.clone(), window, cx);
-                                    cx.notify();
-                                });
-                            }),
-                    )
-                },
-            )
+                    let popover = popover.clone();
+                    let label = item.label.clone();
+                    div()
+                        .id(SharedString::from(format!("codux-select-option-{value}")))
+                        .w_full()
+                        .h(px(22.0))
+                        .px(px(8.0))
+                        .rounded(px(5.0))
+                        .flex()
+                        .items_center()
+                        .gap(px(6.0))
+                        .cursor_pointer()
+                        .text_size(CODUX_SELECT_TEXT_SIZE)
+                        .line_height(CODUX_SELECT_LINE_HEIGHT)
+                        .text_color(if selected { accent_fg } else { fg })
+                        .bg(if selected {
+                            accent
+                        } else {
+                            cx.theme().transparent
+                        })
+                        .hover(move |style| {
+                            if selected {
+                                style
+                            } else {
+                                style.bg(hover)
+                            }
+                        })
+                        .on_click(move |_, window, cx| {
+                            cx.update_entity(&app_entity, |app, cx| {
+                                action(app, value.clone(), window, cx);
+                                cx.notify();
+                            });
+                            popover.update(cx, |state, cx| state.dismiss(window, cx));
+                        })
+                        .child(
+                            div()
+                                .w(px(12.0))
+                                .flex_shrink_0()
+                                .child(if selected {
+                                    Icon::new(HeroIconName::Check)
+                                        .size_3()
+                                        .text_color(accent_fg)
+                                        .into_any_element()
+                                } else {
+                                    div().into_any_element()
+                                }),
+                        )
+                        .child(
+                            div()
+                                .min_w_0()
+                                .flex_1()
+                                .truncate()
+                                .child(label),
+                        )
+                        .into_any_element()
+                }))
         })
         .into_any_element()
 }

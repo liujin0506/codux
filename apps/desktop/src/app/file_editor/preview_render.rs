@@ -119,7 +119,7 @@ fn file_preview_window_header(
         .when(!cfg!(target_os = "macos"), |this| this.pl(px(18.0)))
         .border_b_1()
         .border_color(cx.theme().border)
-        .bg(cx.theme().title_bar)
+        .bg(theme::title_bar_fill())
         .child(
             // Drag lives on the title only: overlapping a Drag ancestor over the
             // buttons makes Windows NC hit-testing return HTCAPTION for them.

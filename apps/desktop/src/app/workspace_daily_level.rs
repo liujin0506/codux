@@ -1,5 +1,7 @@
 use super::*;
-use crate::app::workspace_shared::{workspace_header_button, workspace_i18n};
+use crate::app::workspace_shared::{
+    workspace_header_badge_button_content, workspace_header_button, workspace_i18n,
+};
 use gpui::Anchor;
 use gpui_component::popover::Popover;
 
@@ -14,12 +16,14 @@ pub(in crate::app) fn workspace_level_button(
     let daily_level = daily_level.clone();
 
     Popover::new("workspace-level-popover")
-        .anchor(Anchor::TopRight)
+        .anchor(Anchor::BottomRight)
         .w(px(304.0))
         .trigger(
             workspace_header_button("workspace-level", cx)
-                .secondary()
-                .text_color(cx.theme().foreground)
+                .ghost()
+                .h(px(20.0))
+                .text_size(rems(0.75))
+                .text_color(color(theme::TEXT_MUTED))
                 .child(workspace_daily_level_button_content(
                     current_tier.clone(),
                     button_label,
@@ -37,6 +41,27 @@ pub(in crate::app) fn workspace_level_button(
         })
 }
 
+pub(in crate::app) fn disabled_level_button(
+    language: &str,
+    cx: &mut Context<CoduxApp>,
+) -> impl IntoElement {
+    let label = workspace_i18n(language, "rank.iron", "Iron");
+
+    workspace_header_button("workspace-level-disabled", cx)
+        .ghost()
+        .h(px(20.0))
+        .text_size(rems(0.75))
+        .disabled(true)
+        .opacity(0.45)
+        .text_color(color(theme::TEXT_MUTED))
+        .child(workspace_header_badge_button_content(
+            HeroIconName::Minus,
+            color(theme::TEXT_MUTED),
+            label,
+            cx,
+        ))
+}
+
 fn daily_level_title(
     tier: &codux_runtime::ai_history::AIHistoryDailyLevelTierView,
     language: &str,
@@ -47,17 +72,19 @@ fn daily_level_title(
 fn workspace_daily_level_button_content(
     tier: codux_runtime::ai_history::AIHistoryDailyLevelTierView,
     label: String,
-    cx: &mut Context<CoduxApp>,
+    _cx: &mut Context<CoduxApp>,
 ) -> impl IntoElement {
     div()
         .h(px(20.0))
         .flex()
         .items_center()
-        .gap_1()
-        .text_color(cx.theme().foreground)
-        .child(daily_level_badge(&tier, 18.0, 8.0))
+        .gap(px(5.0))
+        .text_size(rems(0.75))
+        .text_color(color(theme::TEXT_MUTED))
+        .child(daily_level_badge(&tier, 12.0, 6.0))
         .child(
             div()
+                .mt(px(1.0))
                 .text_size(rems(0.75))
                 .line_height(rems(0.75))
                 .child(label),

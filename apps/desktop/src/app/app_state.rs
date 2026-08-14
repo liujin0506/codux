@@ -320,6 +320,7 @@ pub struct CoduxApp {
     pub(in crate::app) pending_performance_refresh: Option<PerformanceSummary>,
     pub(in crate::app) today_level_day_start: f64,
     pub(in crate::app) active_settings_pane: SettingsPane,
+    pub(in crate::app) settings_search_query: String,
     pub(in crate::app) memory_manager_tab: MemoryManagerTab,
     pub(in crate::app) memory_manager_scope: String,
     pub(in crate::app) memory_manager_project_id: Option<String>,

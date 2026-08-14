@@ -33,10 +33,13 @@ impl RuntimeService {
         match kind {
             codux_protocol::REMOTE_WORKTREE_UPDATED => {
                 let snapshot = worktree_snapshot_from_payload(payload)?;
-                let project = self.remote_project_owned_by_device(device_id, &snapshot.project_id)?;
-                let default_base_branch = payload
-                    .get("defaultBaseBranch")
-                    .and_then(Value::as_str);
+                let project_path = payload.get("projectPath").and_then(Value::as_str);
+                let project = self.remote_project_owned_by_device_or_path(
+                    device_id,
+                    &snapshot.project_id,
+                    project_path,
+                )?;
+                let default_base_branch = payload.get("defaultBaseBranch").and_then(Value::as_str);
                 self.sync_hosted_project_worktree_snapshot(
                     &project.id,
                     &snapshot,
@@ -53,8 +56,12 @@ impl RuntimeService {
                     .get("terminals")
                     .and_then(Value::as_array)
                     .ok_or_else(|| "Remote terminal list is missing terminals.".to_string())?;
-                let projects = ProjectStore::new(self.support_dir.clone()).projects_snapshot();
+                let project_store = ProjectStore::new(self.support_dir.clone());
+                let project_snapshot = project_store.snapshot();
+                let projects = &project_snapshot.projects;
                 let mut updates = Vec::new();
+                let mut live_terminal_ids = std::collections::HashSet::new();
+                let mut complete_snapshot = true;
                 for terminal in terminals {
                     if !terminal
                         .get("isRunning")
@@ -71,21 +78,33 @@ impl RuntimeService {
                         .ok_or_else(|| {
                             "Remote terminal list entry is missing projectId.".to_string()
                         })?;
-                    let Some(project) = projects.iter().find(|project| project.id == project_id)
-                    else {
-                        continue;
+                    let project = if let Some(project) =
+                        projects.iter().find(|project| project.id == project_id)
+                    {
+                        if project.runtime_target.remote_device_id() != Some(device_id) {
+                            return Err(format!(
+                                "Project {project_id} does not belong to remote device {device_id}."
+                            ));
+                        }
+                        project
+                    } else {
+                        let root_project_path = terminal
+                            .get("rootProjectPath")
+                            .or_else(|| terminal.get("projectRootPath"))
+                            .and_then(Value::as_str)
+                            .map(str::trim)
+                            .filter(|value| !value.is_empty());
+                        let Some(project) = projects.iter().find(|project| {
+                            project.runtime_target.remote_device_id() == Some(device_id)
+                                && root_project_path.is_some_and(|path| {
+                                    project.runtime_target.paths_equal(&project.path, path)
+                                })
+                        }) else {
+                            complete_snapshot = false;
+                            continue;
+                        };
+                        project
                     };
-                    if project.runtime_target.remote_device_id() != Some(device_id) {
-                        return Err(format!(
-                            "Project {project_id} does not belong to remote device {device_id}."
-                        ));
-                    }
-                    let worktree_id = terminal
-                        .get("worktreeId")
-                        .and_then(Value::as_str)
-                        .map(str::trim)
-                        .filter(|value| !value.is_empty())
-                        .unwrap_or(project_id);
                     let terminal_id = terminal
                         .get("id")
                         .or_else(|| terminal.get("sessionId"))
@@ -93,12 +112,19 @@ impl RuntimeService {
                         .map(str::trim)
                         .filter(|value| !value.is_empty())
                         .ok_or_else(|| "Remote terminal list entry is missing id.".to_string())?;
+                    let worktree_id = terminal
+                        .get("worktreeId")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                        .unwrap_or(project_id);
+                    live_terminal_ids.insert(terminal_id.to_string());
                     let title = terminal
                         .get("title")
                         .and_then(Value::as_str)
                         .unwrap_or("Terminal");
                     updates.push((
-                        project_id.to_string(),
+                        project.id.clone(),
                         worktree_id.to_string(),
                         terminal_id.to_string(),
                         title.to_string(),
@@ -116,15 +142,60 @@ impl RuntimeService {
                         .top_panes
                         .iter()
                         .any(|pane| pane.terminal_id == terminal_id)
-                        || layout
-                            .tabs
-                            .iter()
-                            .any(|tab| tab.terminal_id == terminal_id)
+                        || layout.tabs.iter().any(|tab| tab.terminal_id == terminal_id)
                     {
                         continue;
                     }
                     layout_service.ensure_terminal(&layout_key, &terminal_id, &title)?;
                     changed = true;
+                }
+                if complete_snapshot {
+                    for project in projects.iter().filter(|project| {
+                        project.runtime_target.remote_device_id() == Some(device_id)
+                    }) {
+                        let mut worktree_ids = vec![project.id.clone()];
+                        worktree_ids.extend(
+                            project_snapshot
+                                .worktrees
+                                .iter()
+                                .filter(|worktree| worktree.project_id == project.id)
+                                .map(|worktree| worktree.id.clone()),
+                        );
+                        for worktree_id in worktree_ids {
+                            let layout_key = crate::terminal_layout::terminal_layout_storage_key(
+                                &project.id,
+                                &worktree_id,
+                            );
+                            let mut layout = layout_service.load(Some(&layout_key));
+                            let before = layout.top_panes.len()
+                                + layout.tabs.len()
+                                + layout.collapsed_panes.len();
+                            if before == 0 {
+                                continue;
+                            }
+                            layout
+                                .top_panes
+                                .retain(|pane| live_terminal_ids.contains(&pane.terminal_id));
+                            layout
+                                .tabs
+                                .retain(|tab| live_terminal_ids.contains(&tab.terminal_id));
+                            layout.collapsed_panes.retain(|pane| {
+                                live_terminal_ids.contains(&pane.terminal_id)
+                            });
+                            let after = layout.top_panes.len()
+                                + layout.tabs.len()
+                                + layout.collapsed_panes.len();
+                            if before == after {
+                                continue;
+                            }
+                            if after == 0 {
+                                layout_service.delete(&layout_key)?;
+                            } else {
+                                layout_service.save_summary(&layout_key, layout)?;
+                            }
+                            changed = true;
+                        }
+                    }
                 }
                 if !changed {
                     return Ok(Vec::new());
@@ -141,22 +212,33 @@ impl RuntimeService {
         }
     }
 
-    fn remote_project_owned_by_device(
+    fn remote_project_owned_by_device_or_path(
         &self,
         device_id: &str,
         project_id: &str,
+        project_path: Option<&str>,
     ) -> Result<crate::project_store::ProjectRecord, String> {
-        ProjectStore::new(self.support_dir.clone())
-            .projects_snapshot()
-            .into_iter()
-            .find(|project| {
-                project.id == project_id
-                    && project.runtime_target.remote_device_id() == Some(device_id)
+        let projects = ProjectStore::new(self.support_dir.clone()).projects_snapshot();
+        if let Some(project) = projects.iter().find(|project| project.id == project_id) {
+            if project.runtime_target.remote_device_id() == Some(device_id) {
+                return Ok(project.clone());
+            }
+            return Err(format!(
+                "Project {project_id} does not belong to remote device {device_id}."
+            ));
+        }
+        project_path
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .and_then(|path| {
+                projects.iter().find(|project| {
+                    project.runtime_target.remote_device_id() == Some(device_id)
+                        && project.runtime_target.paths_equal(&project.path, path)
+                })
             })
+            .cloned()
             .ok_or_else(|| {
-                format!(
-                    "Project {project_id} does not belong to remote device {device_id}."
-                )
+                format!("Project {project_id} does not belong to remote device {device_id}.")
             })
     }
 
@@ -215,59 +297,61 @@ impl RuntimeService {
         project_path: &str,
     ) -> crate::worktree::WorktreeSummary {
         let active_git = self.reload_project_git(project_path);
-        let result = runtime.worktree_list(project_id, project_path).and_then(|value| {
-            let snapshot = worktree_snapshot_from_payload(&value)?;
-            let worktrees = hosted_payload_field(&value, "worktrees")?;
-            let base_branches = hosted_payload_field(&value, "baseBranches")?;
-            let available = value
-                .get("available")
-                .and_then(Value::as_bool)
-                .ok_or_else(|| "Hosted worktree payload is missing available".to_string())?;
-            let default_base_branch = value
-                .get("defaultBaseBranch")
-                .and_then(Value::as_str)
-                .ok_or_else(|| {
-                    "Hosted worktree payload is missing defaultBaseBranch".to_string()
-                })?
-                .to_string();
-            let payload_error = snapshot.error.clone();
-            let (tasks, sync_error) = if payload_error.is_none() {
-                match self.sync_hosted_project_worktree_snapshot(
-                    project_id,
-                    &snapshot,
-                    Some(&default_base_branch),
-                    false,
-                ) {
-                    Ok(tasks) => (tasks, None),
-                    Err(error) => (snapshot.tasks.clone(), Some(error)),
-                }
-            } else {
-                (snapshot.tasks.clone(), None)
-            };
-            let selected_worktree_id = ProjectStore::new(self.support_dir.clone())
-                .list_snapshot()
-                .selected_worktree_id_by_project
-                .get(project_id)
-                .cloned();
-            Ok(crate::worktree::WorktreeSummary {
-                available,
-                selected_worktree_id,
-                worktrees,
-                tasks: tasks
-                    .into_iter()
-                    .map(|task| crate::worktree::WorktreeTaskInfo {
-                        worktree_id: task.worktree_id,
-                        title: task.title,
-                        base_branch: task.base_branch,
-                        status: task.status,
-                    })
-                    .collect(),
-                active_git: active_git.clone(),
-                base_branches,
-                default_base_branch,
-                error: payload_error.or(sync_error),
-            })
-        });
+        let result = runtime
+            .worktree_list(project_id, project_path)
+            .and_then(|value| {
+                let snapshot = worktree_snapshot_from_payload(&value)?;
+                let worktrees = hosted_payload_field(&value, "worktrees")?;
+                let base_branches = hosted_payload_field(&value, "baseBranches")?;
+                let available = value
+                    .get("available")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| "Hosted worktree payload is missing available".to_string())?;
+                let default_base_branch = value
+                    .get("defaultBaseBranch")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        "Hosted worktree payload is missing defaultBaseBranch".to_string()
+                    })?
+                    .to_string();
+                let payload_error = snapshot.error.clone();
+                let (tasks, sync_error) = if payload_error.is_none() {
+                    match self.sync_hosted_project_worktree_snapshot(
+                        project_id,
+                        &snapshot,
+                        Some(&default_base_branch),
+                        false,
+                    ) {
+                        Ok(tasks) => (tasks, None),
+                        Err(error) => (snapshot.tasks.clone(), Some(error)),
+                    }
+                } else {
+                    (snapshot.tasks.clone(), None)
+                };
+                let selected_worktree_id = ProjectStore::new(self.support_dir.clone())
+                    .list_snapshot()
+                    .selected_worktree_id_by_project
+                    .get(project_id)
+                    .cloned();
+                Ok(crate::worktree::WorktreeSummary {
+                    available,
+                    selected_worktree_id,
+                    worktrees,
+                    tasks: tasks
+                        .into_iter()
+                        .map(|task| crate::worktree::WorktreeTaskInfo {
+                            worktree_id: task.worktree_id,
+                            title: task.title,
+                            base_branch: task.base_branch,
+                            status: task.status,
+                        })
+                        .collect(),
+                    active_git: active_git.clone(),
+                    base_branches,
+                    default_base_branch,
+                    error: payload_error.or(sync_error),
+                })
+            });
         result.unwrap_or_else(|error| crate::worktree::WorktreeSummary {
             active_git,
             error: Some(error),
@@ -285,9 +369,27 @@ impl RuntimeService {
         let store = ProjectStore::new(self.support_dir.clone());
         let existing = store.snapshot();
         let now = chrono::Utc::now().timestamp_millis();
+        let existing_worktree_id = existing
+            .selected_worktree_id_by_project
+            .get(project_id)
+            .map(String::as_str)
+            .filter(|worktree_id| {
+                snapshot
+                    .worktrees
+                    .iter()
+                    .any(|worktree| worktree.id == *worktree_id)
+            });
         let preferred_worktree_id = prefer_payload_selection
             .then_some(snapshot.selected_worktree_id.trim())
-            .filter(|worktree_id| !worktree_id.is_empty());
+            .filter(|worktree_id| !worktree_id.is_empty())
+            .or(existing_worktree_id)
+            .or_else(|| {
+                snapshot
+                    .worktrees
+                    .iter()
+                    .find(|worktree| worktree.is_default)
+                    .map(|worktree| worktree.id.as_str())
+            });
         let tasks = hosted_worktree_tasks(snapshot, &existing, default_base_branch, now);
         store.replace_project_worktree_state(
             project_id,
@@ -351,11 +453,8 @@ impl RuntimeService {
         self.require_wsl_enabled()?;
         let version = UpdateService::new(self.support_dir.clone(), PathBuf::new())
             .latest_release_version()?;
-        self.wsl_runtimes.install_distribution_with_progress(
-            distribution,
-            &version,
-            progress,
-        )
+        self.wsl_runtimes
+            .install_distribution_with_progress(distribution, &version, progress)
     }
 
     pub fn install_wsl_runtime_with_progress(
@@ -477,19 +576,13 @@ impl RuntimeService {
             ProjectRuntimeTarget::Wsl { distribution } => {
                 self.require_wsl_enabled()?;
                 self.wsl_runtimes.client_for(distribution).map(|client| {
-                    Some(
-                        client
-                            as Arc<dyn crate::runtime_terminal::RuntimeTerminalController>,
-                    )
+                    Some(client as Arc<dyn crate::runtime_terminal::RuntimeTerminalController>)
                 })
             }
             ProjectRuntimeTarget::Remote { device_id } => self
                 .remote_controller_for_device_blocking(device_id)
                 .map(|controller| {
-                    Some(
-                        controller
-                            as Arc<dyn crate::runtime_terminal::RuntimeTerminalController>,
-                    )
+                    Some(controller as Arc<dyn crate::runtime_terminal::RuntimeTerminalController>)
                 }),
         }
     }
@@ -502,19 +595,36 @@ impl RuntimeService {
             ProjectRuntimeTarget::Local => Ok(None),
             ProjectRuntimeTarget::Wsl { distribution } => {
                 self.require_wsl_enabled()?;
-                Ok(self.wsl_runtimes.current_client(distribution).map(|client| {
-                    client as Arc<dyn crate::runtime_terminal::RuntimeTerminalController>
-                }))
+                Ok(self
+                    .wsl_runtimes
+                    .current_client(distribution)
+                    .map(|client| {
+                        client as Arc<dyn crate::runtime_terminal::RuntimeTerminalController>
+                    }))
             }
             ProjectRuntimeTarget::Remote { device_id } => self
                 .remote_controllers
                 .controller_for(device_id)
                 .map(|controller| {
-                    Some(
-                        controller
-                            as Arc<dyn crate::runtime_terminal::RuntimeTerminalController>,
-                    )
+                    Some(controller as Arc<dyn crate::runtime_terminal::RuntimeTerminalController>)
                 }),
+        }
+    }
+
+    /// Persist an SSH profile in the runtime that owns the selected workspace.
+    /// The returned value is the target runtime's public profile list; secrets
+    /// are only used for the upsert request and are never returned by the
+    /// remote protocol.
+    pub fn upsert_ssh_profile_for_target(
+        &self,
+        target: &ProjectRuntimeTarget,
+        profile: &crate::ssh::SSHProfileUpsertRequest,
+    ) -> Result<serde_json::Value, String> {
+        let payload = serde_json::to_value(profile).map_err(|error| error.to_string())?;
+        match self.hosted_runtime_for_target_blocking(target)? {
+            Some(HostedProjectRuntime::Wsl(client)) => client.request("ssh.upsert", payload),
+            Some(HostedProjectRuntime::Remote(controller)) => controller.ssh_upsert(payload),
+            None => Err("Local runtime does not need remote SSH profile sync.".to_string()),
         }
     }
 
@@ -530,11 +640,13 @@ impl RuntimeService {
         };
         match target {
             ProjectRuntimeTarget::Local => None,
-            ProjectRuntimeTarget::Wsl { distribution } => Some(self.require_wsl_enabled().and_then(
-                |_| self.wsl_runtimes
-                    .client_for(&distribution)
-                    .map(HostedProjectRuntime::Wsl),
-            )),
+            ProjectRuntimeTarget::Wsl { distribution } => {
+                Some(self.require_wsl_enabled().and_then(|_| {
+                    self.wsl_runtimes
+                        .client_for(&distribution)
+                        .map(HostedProjectRuntime::Wsl)
+                }))
+            }
             ProjectRuntimeTarget::Remote { device_id } => Some(
                 self.remote_controllers
                     .controller_for(&device_id)
@@ -579,11 +691,13 @@ impl RuntimeService {
         };
         match target {
             ProjectRuntimeTarget::Local => None,
-            ProjectRuntimeTarget::Wsl { distribution } => Some(self.require_wsl_enabled().and_then(
-                |_| self.wsl_runtimes
-                    .client_for(&distribution)
-                    .map(HostedProjectRuntime::Wsl),
-            )),
+            ProjectRuntimeTarget::Wsl { distribution } => {
+                Some(self.require_wsl_enabled().and_then(|_| {
+                    self.wsl_runtimes
+                        .client_for(&distribution)
+                        .map(HostedProjectRuntime::Wsl)
+                }))
+            }
             ProjectRuntimeTarget::Remote { device_id } => Some(
                 self.remote_controllers
                     .controller_for_blocking(&device_id, REMOTE_CONNECT_TIMEOUT)
@@ -700,15 +814,10 @@ impl HostedProjectRuntime {
                         "refresh": refresh,
                     }),
                 )
-                .and_then(|value| {
-                    serde_json::from_value(value).map_err(|error| error.to_string())
-                }),
-            Self::Remote(controller) => controller.ai_state(
-                &project.id,
-                &project.name,
-                &project.path,
-                refresh,
-            ),
+                .and_then(|value| serde_json::from_value(value).map_err(|error| error.to_string())),
+            Self::Remote(controller) => {
+                controller.ai_state(&project.id, &project.name, &project.path, refresh)
+            }
         }
     }
 
@@ -744,10 +853,9 @@ impl HostedProjectRuntime {
 
     fn file_list(&self, path: &str, purpose: Option<&str>) -> Result<Value, String> {
         match self {
-            Self::Wsl(client) => client.request(
-                "file.list",
-                json!({ "path": path, "purpose": purpose }),
-            ),
+            Self::Wsl(client) => {
+                client.request("file.list", json!({ "path": path, "purpose": purpose }))
+            }
             Self::Remote(controller) => controller.file_list(Some(path), purpose),
         }
     }
@@ -782,10 +890,7 @@ impl HostedProjectRuntime {
     fn rename_path(&self, path: &str, new_path: &str) -> Result<(), String> {
         match self {
             Self::Wsl(client) => client
-                .request(
-                    "file.rename",
-                    json!({ "path": path, "newPath": new_path }),
-                )
+                .request("file.rename", json!({ "path": path, "newPath": new_path }))
                 .map(|_| ()),
             Self::Remote(controller) => controller.rename_path(path, new_path).map(|_| ()),
         }
@@ -871,9 +976,7 @@ impl HostedProjectRuntime {
                 "git.invoke",
                 json!({ "projectPath": project_path, "op": op, "args": args }),
             ),
-            Self::Remote(controller) => {
-                controller.git_invoke(project_id, op, project_path, args)
-            }
+            Self::Remote(controller) => controller.git_invoke(project_id, op, project_path, args),
         }?;
         git_summary_from_payload(&value)
     }
@@ -950,12 +1053,9 @@ impl HostedProjectRuntime {
                     "removeBranch": remove_branch,
                 }),
             ),
-            Self::Remote(controller) => controller.worktree_remove(
-                project_id,
-                project_path,
-                worktree_path,
-                remove_branch,
-            ),
+            Self::Remote(controller) => {
+                controller.worktree_remove(project_id, project_path, worktree_path, remove_branch)
+            }
         }
     }
 
@@ -1009,8 +1109,8 @@ fn decode_bytes(value: &Value) -> Result<Vec<u8>, String> {
 }
 
 fn hosted_relative_path(project_path: &str, absolute: &str) -> String {
-    let relative = crate::path::relative_path(project_path, absolute)
-        .unwrap_or_else(|| absolute.to_string());
+    let relative =
+        crate::path::relative_path(project_path, absolute).unwrap_or_else(|| absolute.to_string());
     if crate::path::is_windows_path(project_path) {
         relative.replace('\\', "/")
     } else {
@@ -1028,16 +1128,18 @@ fn hosted_git_string(value: &Value, key: &str) -> String {
 
 fn hosted_absolute_path(project_path: &str, relative: Option<&str>) -> String {
     match relative.map(str::trim).filter(|value| !value.is_empty()) {
-        Some(relative) => crate::path::join_path(
-            project_path,
-            relative.trim_start_matches(['/', '\\']),
-        ),
+        Some(relative) => {
+            crate::path::join_path(project_path, relative.trim_start_matches(['/', '\\']))
+        }
         None => project_path.to_string(),
     }
 }
 
 fn hosted_file_entry(project_path: &str, entry: &Value) -> FileEntry {
-    let path = entry.get("path").and_then(Value::as_str).unwrap_or_default();
+    let path = entry
+        .get("path")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     let is_directory = entry
         .get("isDirectory")
         .and_then(Value::as_bool)
@@ -1303,10 +1405,8 @@ mod hosted_runtime_payload_tests {
 
     #[test]
     fn disabled_wsl_integration_rejects_runtime_access_before_platform_launch() {
-        let support_dir = std::env::temp_dir().join(format!(
-            "codux-wsl-disabled-{}",
-            std::process::id()
-        ));
+        let support_dir =
+            std::env::temp_dir().join(format!("codux-wsl-disabled-{}", std::process::id()));
         std::fs::create_dir_all(&support_dir).expect("create support directory");
         std::fs::write(
             support_dir.join("settings.json"),
@@ -1430,13 +1530,64 @@ mod hosted_runtime_payload_tests {
                 .expect("reapply terminal list")
                 .is_empty()
         );
-        let layout_key = crate::terminal_layout::terminal_layout_storage_key(
-            "project-1",
-            "worktree-new",
-        );
+        let layout_key =
+            crate::terminal_layout::terminal_layout_storage_key("project-1", "worktree-new");
         let layout = TerminalLayoutService::new(support_dir.clone()).load(Some(&layout_key));
         assert_eq!(layout.top_panes.len(), 1);
         assert_eq!(layout.top_panes[0].terminal_id, "agent-terminal-1");
+
+        drop(service);
+        std::fs::remove_dir_all(support_dir).ok();
+    }
+
+    #[test]
+    fn remote_terminal_list_removes_closed_terminal_from_layout() {
+        let (service, support_dir) = remote_runtime_service();
+        let payload = json!({
+            "terminals": [{
+                "id": "closed-terminal",
+                "projectId": "project-1",
+                "worktreeId": "worktree-current",
+                "title": "Closed",
+                "isRunning": true
+            }]
+        });
+        service
+            .apply_hosted_workspace_update(
+                "device-1",
+                codux_protocol::REMOTE_TERMINAL_LIST,
+                &payload,
+            )
+            .expect("apply terminal list");
+        let layout_key = crate::terminal_layout::terminal_layout_storage_key(
+            "project-1",
+            "worktree-current",
+        );
+        assert_eq!(
+            TerminalLayoutService::new(support_dir.clone())
+                .load(Some(&layout_key))
+                .top_panes
+                .len(),
+            1
+        );
+
+        let events = service
+            .apply_hosted_workspace_update(
+                "device-1",
+                codux_protocol::REMOTE_TERMINAL_LIST,
+                &json!({ "terminals": [] }),
+            )
+            .expect("apply closed terminal list");
+        assert!(matches!(
+            events.as_slice(),
+            [RemoteHostEvent::TerminalLayoutChanged(_)]
+        ));
+        assert!(
+            TerminalLayoutService::new(support_dir.clone())
+                .load(Some(&layout_key))
+                .top_panes
+                .is_empty()
+        );
 
         drop(service);
         std::fs::remove_dir_all(support_dir).ok();
@@ -1469,10 +1620,8 @@ mod hosted_runtime_payload_tests {
             .expect_err("wrong-device project must be rejected");
 
         assert!(error.contains("does not belong to remote device device-1"));
-        let layout_key = crate::terminal_layout::terminal_layout_storage_key(
-            "project-1",
-            "worktree-valid",
-        );
+        let layout_key =
+            crate::terminal_layout::terminal_layout_storage_key("project-1", "worktree-valid");
         assert!(
             TerminalLayoutService::new(support_dir.clone())
                 .load(Some(&layout_key))
@@ -1659,10 +1808,7 @@ mod hosted_runtime_payload_tests {
             r"C:\workspace\codux\src\main.rs"
         );
         assert_eq!(
-            hosted_relative_path(
-                r"C:\workspace\codux",
-                r"C:\workspace\codux\src\main.rs"
-            ),
+            hosted_relative_path(r"C:\workspace\codux", r"C:\workspace\codux\src\main.rs"),
             "src/main.rs"
         );
         assert_eq!(
@@ -1670,10 +1816,7 @@ mod hosted_runtime_payload_tests {
             "/workspace/codux/src/main.rs"
         );
         assert_eq!(
-            hosted_relative_path(
-                "/workspace/codux",
-                "/workspace/codux/notes\\draft.txt"
-            ),
+            hosted_relative_path("/workspace/codux", "/workspace/codux/notes\\draft.txt"),
             "notes\\draft.txt"
         );
     }

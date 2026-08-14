@@ -83,48 +83,51 @@ pub(in crate::app::settings) fn remote_pairing_overlay(
         .into_any_element()
 }
 
-/// The Devices "+" dropdown, using the shared popup-menu component (auto-anchored
-/// to the button): Share this device (advertise via QR/link) or Connect to a
-/// device (paste another host's ticket).
-pub(super) fn remote_add_dropdown(
-    language: &str,
-    disabled: bool,
-    cx: &mut Context<CoduxApp>,
-) -> AnyElement {
-    let app_entity = cx.entity();
-    let share = settings_text(language, "remote.add.share", "Share this device");
-    let connect = settings_text(language, "remote.add.connect", "Connect to a device");
+/// The Devices "+" button: connect to a device by opening the pairing ticket dialog.
+pub(super) fn remote_add_button(language: &str, cx: &mut Context<CoduxApp>) -> AnyElement {
     Button::new("settings-remote-add")
         .compact()
         .ghost()
-        .disabled(disabled)
         .text_color(cx.theme().secondary_foreground)
         .bg(cx.theme().transparent)
+        .tooltip(settings_text(
+            language,
+            "remote.add.connect",
+            "Connect to a device",
+        ))
         .icon(
             Icon::new(HeroIconName::Plus)
                 .size_3p5()
                 .text_color(cx.theme().secondary_foreground),
         )
-        .dropdown_menu(move |menu, _window, _cx| {
-            let share_entity = app_entity.clone();
-            let connect_entity = app_entity.clone();
-            menu.item(
-                PopupMenuItem::new(share.clone())
-                    .icon(HeroIconName::QrCode)
-                    .on_click(move |_, window, cx| {
-                        cx.update_entity(&share_entity, |app, cx| {
-                            app.create_remote_pairing(window, cx)
-                        });
-                    }),
-            )
-            .item(
-                PopupMenuItem::new(connect.clone())
-                    .icon(HeroIconName::Link)
-                    .on_click(move |_, _window, cx| {
-                        cx.update_entity(&connect_entity, |app, cx| app.open_remote_connect(cx));
-                    }),
-            )
-        })
+        .on_click(cx.listener(|app, _event, _window, cx| app.open_remote_connect(cx)))
+        .into_any_element()
+}
+
+pub(super) fn remote_share_button(
+    language: &str,
+    loading: bool,
+    disabled: bool,
+    cx: &mut Context<CoduxApp>,
+) -> AnyElement {
+    Button::new("settings-remote-share")
+        .compact()
+        .ghost()
+        .loading(loading)
+        .disabled(disabled)
+        .text_color(cx.theme().secondary_foreground)
+        .bg(cx.theme().transparent)
+        .tooltip(settings_text(
+            language,
+            "remote.add.share",
+            "Share this device",
+        ))
+        .icon(
+            Icon::new(HeroIconName::QrCode)
+                .size_3p5()
+                .text_color(cx.theme().secondary_foreground),
+        )
+        .on_click(cx.listener(|app, _event, window, cx| app.create_remote_pairing(window, cx)))
         .into_any_element()
 }
 

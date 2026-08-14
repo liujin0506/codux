@@ -282,7 +282,8 @@ pub(super) fn workspace_toolbar_fingerprint(app: &CoduxApp) -> u64 {
             )
         }),
         app.state.settings.language.clone(),
-        app.state.settings.pet_enabled,
+        app.task_column_collapsed,
+        app.project_column_collapsed,
         !app.state.projects.is_empty(),
         app.project_open_applications
             .iter()
@@ -295,12 +296,6 @@ pub(super) fn workspace_toolbar_fingerprint(app: &CoduxApp) -> u64 {
                 )
             })
             .collect::<Vec<_>>(),
-        workspace_pet_fingerprint(app),
-        workspace_view_hash(&(
-            app.state.daily_level.tokens,
-            app.state.daily_level.current_tier.id.clone(),
-            app.state.daily_level.current_tier.min,
-        )),
     ))
 }
 
@@ -329,52 +324,4 @@ fn assistant_panel_key(panel: Option<AssistantPanel>) -> &'static str {
         Some(AssistantPanel::Git) => "git",
         None => "none",
     }
-}
-
-fn workspace_pet_fingerprint(app: &CoduxApp) -> u64 {
-    workspace_view_hash(&[
-        workspace_view_hash(&(
-            app.state.pet.available,
-            app.state.pet.claimed,
-            app.state.pet.species.clone(),
-            app.state.pet.display_name.clone(),
-            app.state.pet.custom_name.clone(),
-        )),
-        workspace_view_hash(&(
-            app.state.pet.level,
-            app.state.pet.total_xp,
-            app.state.pet.daily_xp,
-            app.state.pet.archived_count,
-            app.state.pet.custom_pet_count,
-            app.state.pet.updated_at,
-        )),
-        workspace_view_hash(&(app.pet_snapshot.updated_at, app.pet_snapshot.progress.level)),
-        workspace_view_hash(
-            &app.pet_custom_pets
-                .iter()
-                .map(|pet| (pet.id.clone(), pet.display_name.clone(), pet.installed_at))
-                .collect::<Vec<_>>(),
-        ),
-        workspace_view_hash(&(
-            app.pet_install_url.clone(),
-            app.pet_install_display_name.clone(),
-            app.pet_install_error.clone(),
-            app.pet_install_previewing,
-            app.pet_installing,
-        )),
-        workspace_view_hash(&app.pet_install_preview.as_ref().map(|preview| {
-            (
-                preview.page_url.clone(),
-                preview.zip_url.clone(),
-                preview.slug.clone(),
-                preview.display_name.clone(),
-                preview.image_url.clone(),
-                preview.local_image_path.clone(),
-            )
-        })),
-        workspace_view_hash(&(
-            app.pet_name_editing,
-            app.visible_pet_sprite_frame(PET_IDLE_FRAME_COUNT),
-        )),
-    ])
 }

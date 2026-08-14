@@ -42,6 +42,7 @@ pub fn wire_status_summary(summary: GitSummary) -> WireStatusSummary {
         upstream: summary.upstream,
         ahead: summary.ahead,
         behind: summary.behind,
+        head_pushed: summary.head_pushed,
         staged: summary.staged,
         unstaged: summary.unstaged,
         untracked: summary.untracked,

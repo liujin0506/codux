@@ -938,3 +938,85 @@ fn codewhale_turn_end_hook_writes_interrupted_lifecycle_event() {
     assert_eq!(metadata.has_completed_turn, Some(false));
     fs::remove_dir_all(dir).unwrap();
 }
+
+#[cfg(not(windows))]
+#[test]
+fn wrapper_uses_configured_executable_path_over_path_lookup() {
+    use std::os::unix::fs::PermissionsExt;
+    use std::process::Command;
+
+    let dir = std::env::temp_dir().join(format!(
+        "codux-wrapper-configured-path-{}",
+        Uuid::new_v4()
+    ));
+    let bridge = AIRuntimeBridge::with_paths(dir.join("root"), dir.join("temp"), dir.join("home"));
+    bridge.stage_assets().unwrap();
+
+    let path_bin = dir.join("path-bin");
+    let custom_bin = dir.join("custom-bin");
+    fs::create_dir_all(&path_bin).unwrap();
+    fs::create_dir_all(&custom_bin).unwrap();
+    let path_codex = path_bin.join("codex");
+    let custom_codex = custom_bin.join("my-codex");
+    fs::write(&path_codex, "#!/bin/sh\nprintf 'from-path\\n'\n").unwrap();
+    fs::write(&custom_codex, "#!/bin/sh\nprintf 'from-custom\\n'\n").unwrap();
+    for binary in [&path_codex, &custom_codex] {
+        let mut permissions = fs::metadata(binary).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(binary, permissions).unwrap();
+    }
+
+    let permissions_file = dir.join("tool-permissions.json");
+    fs::write(
+        &permissions_file,
+        serde_json::json!({
+            "codexPath": custom_codex
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let search_path = format!("{}:/usr/bin:/bin:/usr/sbin:/sbin", path_bin.display());
+    let output = Command::new(bridge.wrapper_bin_dir().join("codex"))
+        .env("PATH", &search_path)
+        .env("DMUX_ORIGINAL_PATH", &search_path)
+        .env("DMUX_SESSION_ID", "terminal-1")
+        .env("DMUX_RUNTIME_EVENT_DIR", dir.join("events"))
+        .env("DMUX_TOOL_PERMISSION_SETTINGS_FILE", &permissions_file)
+        .env_remove("DMUX_ACTIVE_AI_RESOLVED_PATH")
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "wrapper should execute configured binary, stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "from-custom");
+
+    fs::write(
+        &permissions_file,
+        serde_json::json!({
+            "codexPath": ""
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let output = Command::new(bridge.wrapper_bin_dir().join("codex"))
+        .env("PATH", &search_path)
+        .env("DMUX_ORIGINAL_PATH", &search_path)
+        .env("DMUX_SESSION_ID", "terminal-1")
+        .env("DMUX_RUNTIME_EVENT_DIR", dir.join("events"))
+        .env("DMUX_TOOL_PERMISSION_SETTINGS_FILE", &permissions_file)
+        .env_remove("DMUX_ACTIVE_AI_RESOLVED_PATH")
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "empty path should fall back to PATH lookup, stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "from-path");
+    fs::remove_dir_all(dir).unwrap();
+}

@@ -289,7 +289,7 @@ fn review_workspace_header(
         .justify_between()
         .border_b_1()
         .border_color(cx.theme().border)
-        .bg(cx.theme().title_bar)
+        .bg(theme::title_bar_fill())
         .child(
             div()
                 .min_w_0()

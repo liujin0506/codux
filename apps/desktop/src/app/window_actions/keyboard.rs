@@ -52,6 +52,11 @@ impl CoduxApp {
             return;
         }
 
+        if self.handle_terminal_split_shortcuts(event, window, cx) {
+            cx.stop_propagation();
+            return;
+        }
+
         if self.handle_file_picker_key(event, window, cx) {
             cx.stop_propagation();
             return;
@@ -252,6 +257,17 @@ impl CoduxApp {
             self.split_terminal(window, cx);
             return true;
         }
+        if shortcut_matches(shortcuts, "terminal.split.vertical", &actual) {
+            self.split_terminal_vertical(window, cx);
+            return true;
+        }
+        if shortcut_matches(shortcuts, "terminal.split.close", &actual) {
+            if !self.can_close_terminal_split() {
+                return false;
+            }
+            self.close_focused_terminal_split(window, cx);
+            return true;
+        }
         if shortcut_matches(shortcuts, "editor.save", &actual) {
             self.save_selected_file_preview(window, cx);
             return true;
@@ -276,6 +292,37 @@ impl CoduxApp {
             return true;
         }
 
+        false
+    }
+
+    fn handle_terminal_split_shortcuts(
+        &mut self,
+        event: &KeyDownEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if self.window_mode != AppWindowMode::Main {
+            return false;
+        }
+        let actual = shortcut_display_from_keystroke(&event.keystroke);
+        let shortcuts = &self.state.settings.shortcuts;
+        if shortcut_matches(shortcuts, "terminal.split.create", &actual)
+            || shortcut_matches(shortcuts, "terminal.split", &actual)
+        {
+            self.split_terminal(window, cx);
+            return true;
+        }
+        if shortcut_matches(shortcuts, "terminal.split.vertical", &actual) {
+            self.split_terminal_vertical(window, cx);
+            return true;
+        }
+        if shortcut_matches(shortcuts, "terminal.split.close", &actual) {
+            if !self.can_close_terminal_split() {
+                return false;
+            }
+            self.close_focused_terminal_split(window, cx);
+            return true;
+        }
         false
     }
 

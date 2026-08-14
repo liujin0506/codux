@@ -125,63 +125,8 @@ pub(in crate::app) const PROJECT_BADGE_COLORS: &[&str] = &[
 ];
 
 pub(in crate::app) fn project_badge_text_from_name(name: &str) -> Option<String> {
-    let badge = project_badge_segments(name)
-        .map(|segments| project_badge_text_from_segments(&segments))
-        .unwrap_or_default();
-    (!badge.is_empty()).then_some(badge)
-}
-
-fn project_badge_text_from_segments(segments: &[String]) -> String {
-    let chars = if segments.len() > 1
-        && segments
-            .iter()
-            .all(|segment| segment.chars().all(|ch| ch.is_ascii_alphanumeric()))
-    {
-        segments
-            .iter()
-            .filter_map(|segment| segment.chars().next())
-            .take(4)
-            .collect::<Vec<_>>()
-    } else {
-        segments
-            .iter()
-            .flat_map(|segment| segment.chars())
-            .take(4)
-            .collect::<Vec<_>>()
-    };
-
-    chars.into_iter().collect::<String>().to_uppercase()
-}
-
-fn project_badge_segments(name: &str) -> Option<Vec<String>> {
-    let mut segments = Vec::new();
-    let mut current = String::new();
-    let mut prev: Option<char> = None;
-
-    for ch in name.chars() {
-        if !ch.is_alphanumeric() {
-            if !current.is_empty() {
-                segments.push(std::mem::take(&mut current));
-            }
-            prev = None;
-            continue;
-        }
-
-        if matches!(prev, Some(prev) if prev.is_lowercase() && ch.is_uppercase())
-            && !current.is_empty()
-        {
-            segments.push(std::mem::take(&mut current));
-        }
-
-        current.push(ch);
-        prev = Some(ch);
-    }
-
-    if !current.is_empty() {
-        segments.push(current);
-    }
-
-    (!segments.is_empty()).then_some(segments)
+    let ch = name.trim().chars().next()?;
+    Some(ch.to_uppercase().collect())
 }
 
 pub(in crate::app) fn join_relative_child_path(parent: &str, name: &str) -> String {

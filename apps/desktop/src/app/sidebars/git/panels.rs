@@ -33,13 +33,18 @@ pub(super) fn git_panel_header(
         .flex()
         .items_center()
         .justify_between()
-        // Thin translucent darkening: deeper than the panel, still see-through.
-        .bg(theme::vibrancy_raised(color(theme::BG_HEADER)))
+        .border_b_1()
+        .border_color(color(theme::BORDER_SOFT).opacity(0.5))
         .child(
             div()
                 .flex()
                 .items_center()
                 .min_w_0()
+                .child(
+                    Icon::new(HeroIconName::Share)
+                        .size_4()
+                        .text_color(color(theme::TEXT_MUTED)),
+                )
                 .when(git.is_repository, |this| {
                     this.child(
                         Button::new("git-sidebar-branch-menu")
@@ -48,6 +53,7 @@ pub(super) fn git_panel_header(
                             .text_color(cx.theme().foreground)
                             .child(
                                 div()
+                                    .ml(px(8.0))
                                     .h(px(24.0))
                                     .flex()
                                     .items_center()
@@ -58,6 +64,7 @@ pub(super) fn git_panel_header(
                                             .max_w(px(132.0))
                                             .text_size(rems(0.875))
                                             .line_height(rems(1.125))
+                                            .font_weight(FontWeight::SEMIBOLD)
                                             .truncate()
                                             .child(branch.to_string()),
                                     )
@@ -97,39 +104,52 @@ pub(super) fn git_panel_header(
                 .flex()
                 .items_center()
                 .when(git.is_repository, |this| {
-                    this.child(assistant_header_icon_button(
-                        "git-sidebar-ai",
-                        HeroIconName::Sparkles,
-                        cx,
-                        |app, _event, window, cx| {
-                            app.generate_git_commit_message_with_ai(window, cx)
-                        },
-                    ))
+                    let ai_running = running_operation
+                        .is_some_and(|operation| operation.label == "aiCommitMessage");
+                    this.child(
+                        Button::new("git-sidebar-ai")
+                            .compact()
+                            .ghost()
+                            .loading(ai_running)
+                            .disabled(ai_running)
+                            .text_color(cx.theme().secondary_foreground)
+                            .icon(
+                                Icon::new(HeroIconName::Sparkles)
+                                    .size_3p5()
+                                    .text_color(cx.theme().secondary_foreground),
+                            )
+                            .on_click(cx.listener(|app, _event, window, cx| {
+                                app.generate_git_commit_message_with_ai(window, cx)
+                            })),
+                    )
                 })
-                .when_some(running_operation, |this, operation| {
-                    if operation.cancellable {
-                        this.child(assistant_header_icon_button(
-                            "git-sidebar-cancel",
-                            HeroIconName::XCircle,
-                            cx,
-                            move |app, _event, window, cx| {
-                                app.cancel_project_git(window, cx);
-                            },
-                        ))
-                    } else {
-                        this.child(
-                            Button::new("git-sidebar-running")
-                                .compact()
-                                .ghost()
-                                .text_color(cx.theme().secondary_foreground)
-                                .icon(
-                                    Icon::new(HeroIconName::ArrowPath)
-                                        .size_3p5()
-                                        .text_color(cx.theme().secondary_foreground),
-                                ),
-                        )
-                    }
-                }),
+                .when_some(
+                    running_operation.filter(|operation| operation.label != "aiCommitMessage"),
+                    |this, operation| {
+                        if operation.cancellable {
+                            this.child(assistant_header_icon_button(
+                                "git-sidebar-cancel",
+                                HeroIconName::XCircle,
+                                cx,
+                                move |app, _event, window, cx| {
+                                    app.cancel_project_git(window, cx);
+                                },
+                            ))
+                        } else {
+                            this.child(
+                                Button::new("git-sidebar-running")
+                                    .compact()
+                                    .ghost()
+                                    .text_color(cx.theme().secondary_foreground)
+                                    .icon(
+                                        Icon::new(HeroIconName::ArrowPath)
+                                            .size_3p5()
+                                            .text_color(cx.theme().secondary_foreground),
+                                    ),
+                            )
+                        }
+                    },
+                ),
         )
 }
 

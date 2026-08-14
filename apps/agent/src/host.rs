@@ -15,11 +15,12 @@ use codux_protocol::{
     REMOTE_GIT_INVOKE, REMOTE_GIT_READ, REMOTE_GIT_STATUS, REMOTE_HOST_INFO, REMOTE_HOST_METRICS,
     REMOTE_MEMORY_EXTRACT, REMOTE_MEMORY_READ, REMOTE_MEMORY_RESULT, REMOTE_PAIRING_CONFIRMED,
     REMOTE_PAIRING_REQUEST, REMOTE_PROJECT_ADD, REMOTE_PROJECT_LIST, REMOTE_PROJECT_REMOVE,
-    REMOTE_SSH_LIST, REMOTE_SSH_LIST_RESULT, REMOTE_SSH_REMOVE, REMOTE_SSH_UPSERT,
-    REMOTE_TERMINAL_CLOSE, REMOTE_TERMINAL_CLOSED, REMOTE_TERMINAL_CREATE, REMOTE_TERMINAL_CREATED,
-    REMOTE_TERMINAL_INPUT, REMOTE_TERMINAL_OUTPUT, REMOTE_TERMINAL_STATUS, REMOTE_TRANSPORT_IROH,
-    REMOTE_TRANSPORT_PING, REMOTE_TRANSPORT_PONG, REMOTE_WORKTREE_CREATE, REMOTE_WORKTREE_LIST,
-    REMOTE_WORKTREE_MERGE, REMOTE_WORKTREE_REMOVE, REMOTE_WORKTREE_UPDATED,
+    REMOTE_PROJECT_SELECT, REMOTE_PROJECT_SELECTED, REMOTE_SSH_LIST, REMOTE_SSH_LIST_RESULT,
+    REMOTE_SSH_REMOVE, REMOTE_SSH_UPSERT, REMOTE_TERMINAL_CLOSE, REMOTE_TERMINAL_CLOSED,
+    REMOTE_TERMINAL_CREATE, REMOTE_TERMINAL_CREATED, REMOTE_TERMINAL_INPUT, REMOTE_TERMINAL_OUTPUT,
+    REMOTE_TERMINAL_STATUS, REMOTE_TRANSPORT_IROH, REMOTE_TRANSPORT_PING, REMOTE_TRANSPORT_PONG,
+    REMOTE_WORKTREE_CREATE, REMOTE_WORKTREE_DELETE, REMOTE_WORKTREE_LIST, REMOTE_WORKTREE_MERGE,
+    REMOTE_WORKTREE_REMOVE, REMOTE_WORKTREE_SELECT, REMOTE_WORKTREE_UPDATED,
 };
 use codux_remote_transport::{
     RemoteHostTransportConfig, RemoteHostTransportHandlers, RemoteTransport,
@@ -594,6 +595,30 @@ fn make_handler(
                     Err(error) => Some((REMOTE_ERROR, json!({ "message": error }))),
                 }
             }
+            REMOTE_PROJECT_SELECT => {
+                let (project_id, _project_path) = agent_project_target(&payload);
+                if project_id.trim().is_empty() {
+                    Some((
+                        REMOTE_ERROR,
+                        json!({ "message": "Project id or path is required." }),
+                    ))
+                } else {
+                    let worktree_id = payload
+                        .get("worktreeId")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                        .map(str::to_string)
+                        .or_else(|| Some(project_id.clone()));
+                    // Selection is deliberately acknowledged only to the
+                    // requesting controller. The agent's project/worktree
+                    // resources are shared; each device keeps its own view.
+                    Some((
+                        REMOTE_PROJECT_SELECTED,
+                        json!({ "projectId": project_id, "worktreeId": worktree_id }),
+                    ))
+                }
+            }
             REMOTE_PROJECT_LIST => Some((
                 REMOTE_PROJECT_LIST,
                 project_list_payload(AgentProjectStore::new().list(), None, None),
@@ -618,11 +643,17 @@ fn make_handler(
                     .get("id")
                     .or_else(|| payload.get("projectId"))
                     .and_then(Value::as_str);
-                match id {
-                    Some(id) => match AgentProjectStore::new().remove(id) {
+                let path = payload.get("projectPath").and_then(Value::as_str);
+                let store = AgentProjectStore::new();
+                match store
+                    .resolve(id, path)
+                    .map(|project| project.id)
+                    .or_else(|| id.map(str::to_string))
+                {
+                    Some(id) => match store.remove(&id) {
                         Ok(items) => {
-                            fanout.remove_project(id);
-                            remove_ai_stats_watcher_project(id, &ai_stats_watchers);
+                            fanout.remove_project(&id);
+                            remove_ai_stats_watcher_project(&id, &ai_stats_watchers);
                             Some((REMOTE_PROJECT_LIST, project_list_payload(items, None, None)))
                         }
                         Err(error) => Some((REMOTE_ERROR, json!({ "message": error }))),
@@ -688,32 +719,57 @@ fn make_handler(
                 }
             }
             REMOTE_WORKTREE_LIST => {
-                let project_id = payload
-                    .get("projectId")
-                    .and_then(Value::as_str)
-                    .unwrap_or("");
-                let project_path = payload
-                    .get("projectPath")
-                    .and_then(Value::as_str)
-                    .unwrap_or("");
+                let (project_id, project_path) = agent_project_target(&payload);
                 Some((
                     REMOTE_WORKTREE_LIST,
-                    crate::worktree::worktree_list_payload(project_id, project_path),
+                    crate::worktree::worktree_list_payload(&project_id, &project_path),
                 ))
             }
-            REMOTE_WORKTREE_CREATE | REMOTE_WORKTREE_REMOVE | REMOTE_WORKTREE_MERGE => {
-                let project_id = payload
-                    .get("projectId")
+            REMOTE_WORKTREE_SELECT => {
+                let (project_id, project_path) = agent_project_target(&payload);
+                let requested_id = payload
+                    .get("worktreeId")
                     .and_then(Value::as_str)
-                    .unwrap_or("");
-                let project_path = payload
-                    .get("projectPath")
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty());
+                let requested_path = payload
+                    .get("worktreePath")
                     .and_then(Value::as_str)
-                    .unwrap_or("");
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty());
+                let selected_id = requested_path
+                    .map(|path| {
+                        crate::worktree::worktree_id_for_path(&project_id, &project_path, path)
+                    })
+                    .or_else(|| requested_id.map(str::to_string));
+                let mut summary =
+                    crate::worktree::worktree_list_payload(&project_id, &project_path);
+                let exists = selected_id.as_deref().is_some_and(|selected_id| {
+                    summary
+                        .get("worktrees")
+                        .and_then(Value::as_array)
+                        .is_some_and(|worktrees| {
+                            worktrees.iter().any(|worktree| {
+                                worktree.get("id").and_then(Value::as_str) == Some(selected_id)
+                            })
+                        })
+                });
+                if !exists {
+                    Some((REMOTE_ERROR, json!({ "message": "Worktree not found." })))
+                } else {
+                    summary["selectedWorktreeId"] = json!(selected_id);
+                    Some((REMOTE_WORKTREE_UPDATED, summary))
+                }
+            }
+            REMOTE_WORKTREE_CREATE
+            | REMOTE_WORKTREE_REMOVE
+            | REMOTE_WORKTREE_DELETE
+            | REMOTE_WORKTREE_MERGE => {
+                let (project_id, project_path) = agent_project_target(&payload);
                 let result = match kind {
                     REMOTE_WORKTREE_CREATE => crate::worktree::worktree_create_payload(
-                        project_id,
-                        project_path,
+                        &project_id,
+                        &project_path,
                         payload
                             .get("branchName")
                             .and_then(Value::as_str)
@@ -721,7 +777,7 @@ fn make_handler(
                         payload.get("baseBranch").and_then(Value::as_str),
                     ),
                     REMOTE_WORKTREE_MERGE => crate::worktree::worktree_merge(
-                        project_path,
+                        &project_path,
                         payload
                             .get("worktreePath")
                             .and_then(Value::as_str)
@@ -732,9 +788,9 @@ fn make_handler(
                             .and_then(Value::as_bool)
                             .unwrap_or(false),
                     )
-                    .map(|_| crate::worktree::worktree_list_payload(project_id, project_path)),
+                    .map(|_| crate::worktree::worktree_list_payload(&project_id, &project_path)),
                     _ => crate::worktree::worktree_remove(
-                        project_path,
+                        &project_path,
                         payload
                             .get("worktreePath")
                             .and_then(Value::as_str)
@@ -744,7 +800,7 @@ fn make_handler(
                             .and_then(Value::as_bool)
                             .unwrap_or(false),
                     )
-                    .map(|_| crate::worktree::worktree_list_payload(project_id, project_path)),
+                    .map(|_| crate::worktree::worktree_list_payload(&project_id, &project_path)),
                 };
                 match result {
                     Ok(payload) => Some((REMOTE_WORKTREE_UPDATED, payload)),
@@ -813,17 +869,18 @@ fn make_handler(
                     Err(error) => Some((REMOTE_ERROR, json!({ "message": error }))),
                 }
             }
-            REMOTE_SSH_LIST => {
-                // The headless host has no saved SSH profiles of its own yet, so
-                // it returns an empty list using the same shared wire shape.
-                Some((REMOTE_SSH_LIST_RESULT, json!({ "profiles": [] })))
-            }
-            REMOTE_SSH_UPSERT | REMOTE_SSH_REMOVE => Some((
-                REMOTE_ERROR,
-                json!({
-                    "message": "SSH profile management is only available on the desktop host.",
-                }),
-            )),
+            REMOTE_SSH_LIST => match crate::ssh::list_payload() {
+                Ok(result) => Some((REMOTE_SSH_LIST_RESULT, result)),
+                Err(error) => Some((REMOTE_ERROR, json!({ "message": error }))),
+            },
+            REMOTE_SSH_UPSERT => match crate::ssh::upsert_payload(payload) {
+                Ok(result) => Some((REMOTE_SSH_LIST_RESULT, result)),
+                Err(error) => Some((REMOTE_ERROR, json!({ "message": error }))),
+            },
+            REMOTE_SSH_REMOVE => match crate::ssh::remove_payload(&payload) {
+                Ok(result) => Some((REMOTE_SSH_LIST_RESULT, result)),
+                Err(error) => Some((REMOTE_ERROR, json!({ "message": error }))),
+            },
             REMOTE_AI_STATE => {
                 // The controller owns the project record and sends its path; the
                 // agent indexes the host's history for that path directly.
@@ -859,6 +916,34 @@ fn make_handler(
         let Some((reply_kind, reply_payload)) = reply else {
             return;
         };
+        let broadcast_project_list = match kind {
+            REMOTE_PROJECT_ADD | REMOTE_PROJECT_REMOVE => reply_kind == REMOTE_PROJECT_LIST,
+            REMOTE_WORKTREE_LIST
+            | REMOTE_WORKTREE_CREATE
+            | REMOTE_WORKTREE_REMOVE
+            | REMOTE_WORKTREE_DELETE
+            | REMOTE_WORKTREE_MERGE => true,
+            _ => false,
+        };
+        let broadcast_worktree_payload = if matches!(
+            kind,
+            REMOTE_WORKTREE_CREATE
+                | REMOTE_WORKTREE_REMOVE
+                | REMOTE_WORKTREE_DELETE
+                | REMOTE_WORKTREE_MERGE
+        ) && reply_kind == REMOTE_WORKTREE_UPDATED
+        {
+            let mut payload = reply_payload.clone();
+            // The created worktree is selected only on the controller that
+            // initiated the mutation. Other devices receive the shared list
+            // without a selection change.
+            if let Some(object) = payload.as_object_mut() {
+                object.insert("selectedWorktreeId".to_string(), Value::Null);
+            }
+            Some(payload)
+        } else {
+            None
+        };
         let mut reply_envelope = json!({ "type": reply_kind, "payload": reply_payload });
         if let Some(device_id) = device_id {
             reply_envelope["deviceId"] = json!(device_id);
@@ -874,14 +959,37 @@ fn make_handler(
         {
             transport.send(bytes, device_id);
         }
+        if broadcast_project_list {
+            broadcast_agent_envelope(
+                &slot,
+                REMOTE_PROJECT_LIST,
+                project_list_payload(AgentProjectStore::new().list(), None, None),
+            );
+        }
+        if let Some(payload) = broadcast_worktree_payload {
+            broadcast_agent_envelope(&slot, REMOTE_WORKTREE_UPDATED, payload);
+        }
     })
 }
 
-/// Resolve the git target project: id → stored path, path → stored id, then
-/// the raw payload values (mirrors the desktop host's resolution).
-fn git_project_target(payload: &Value) -> (String, String) {
+fn broadcast_agent_envelope(slot: &TransportSlot, kind: &str, payload: Value) {
+    let Ok(bytes) = serde_json::to_vec(&json!({
+        "type": kind,
+        "payload": payload,
+    })) else {
+        return;
+    };
+    if let Ok(guard) = slot.lock()
+        && let Some(transport) = guard.as_ref()
+    {
+        transport.send(bytes, None);
+    }
+}
+
+fn agent_project_target(payload: &Value) -> (String, String) {
     let project_id = payload
         .get("projectId")
+        .or_else(|| payload.get("id"))
         .and_then(Value::as_str)
         .unwrap_or_default()
         .trim();
@@ -890,23 +998,16 @@ fn git_project_target(payload: &Value) -> (String, String) {
         .and_then(Value::as_str)
         .unwrap_or_default()
         .trim();
-    let items = AgentProjectStore::new().list();
-    if !project_id.is_empty()
-        && let Some(item) = items.iter().find(|item| item.id == project_id)
-    {
-        return (item.id.clone(), item.path.clone());
-    }
-    if !project_path.is_empty()
-        && let Some(item) = items.iter().find(|item| {
-            codux_runtime_core::path::local_paths_equal(
-                std::path::Path::new(&item.path),
-                std::path::Path::new(project_path),
-            )
-        })
-    {
-        return (item.id.clone(), item.path.clone());
-    }
-    (project_id.to_string(), project_path.to_string())
+    AgentProjectStore::new()
+        .resolve_or_register(Some(project_id), Some(project_path))
+        .map(|project| (project.id, project.path))
+        .unwrap_or_else(|| (project_id.to_string(), project_path.to_string()))
+}
+
+/// Resolve the git target project: id → stored path, path → stored id, then
+/// the raw payload values (mirrors the desktop host's resolution).
+fn git_project_target(payload: &Value) -> (String, String) {
+    agent_project_target(payload)
 }
 
 fn random_token() -> Result<String, String> {
@@ -957,6 +1058,7 @@ async fn connect_serving_host(
     ),
     String,
 > {
+    crate::ssh::ensure_store()?;
     let slot: TransportSlot = Arc::new(Mutex::new(None));
     let candidate: CandidateSlot = Arc::new(Mutex::new(None));
     let pairing = AgentPairingState::new()?;

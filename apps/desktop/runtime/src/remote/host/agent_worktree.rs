@@ -98,6 +98,9 @@ impl AgentWorktreeHost for DesktopAgentWorktreeHost {
             session_instance_id: Some(
                 uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL, session_key.as_bytes()).to_string(),
             ),
+            tool_permissions_file: crate::tool_permissions::ToolPermissionsService::synced_file_path(
+                runtime.support_dir.clone(),
+            ),
             memory_workspace_root: Some(launch_artifacts.workspace_root),
             memory_prompt_file: Some(launch_artifacts.prompt_file),
             memory_index_file: Some(launch_artifacts.index_file),

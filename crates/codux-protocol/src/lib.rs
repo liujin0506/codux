@@ -129,14 +129,14 @@ pub const REMOTE_AI_SESSION: &str = "ai.session";
 /// Reply to `ai.session`: `{op, result}` carrying the op's JSON.
 pub const REMOTE_AI_SESSION_RESULT: &str = "ai.session.result";
 
-/// Request the host's saved SSH profiles (the host owns them — a remote
-/// terminal's ssh is the host's). Reply carries `RemoteSshProfileSummary`s.
+/// Request the runtime's saved SSH profiles. The runtime that owns the
+/// terminal owns this list, so a remote terminal reads the remote host's
+/// profiles rather than the controller's local list.
 pub const REMOTE_SSH_LIST: &str = "ssh.list";
 /// Reply to `ssh.list`: `{ profiles: [RemoteSshProfileSummary] }`.
 pub const REMOTE_SSH_LIST_RESULT: &str = "ssh.list.result";
-/// Add or update a saved SSH profile on the host. Payload is an
-/// `SSHProfileUpsertRequest` shape; reply is a fresh `ssh.list.result`. Only the
-/// desktop host owns SSH profiles — the headless agent rejects this.
+/// Add or update a saved SSH profile on the runtime. Payload is an
+/// `SSHProfileUpsertRequest` shape; reply is a fresh `ssh.list.result`.
 pub const REMOTE_SSH_UPSERT: &str = "ssh.upsert";
 /// Remove a saved SSH profile by id: `{ id }`. Reply is a fresh `ssh.list.result`.
 pub const REMOTE_SSH_REMOVE: &str = "ssh.remove";
@@ -305,9 +305,7 @@ pub struct RemoteHostProcessMetrics {
     pub memory_bytes: u64,
 }
 
-/// One saved SSH profile sent over `ssh.list`. The host owns the profiles
-/// (a remote terminal's ssh is the host's anyway), so the host sends this list;
-/// secrets are never included.
+/// One saved SSH profile sent over `ssh.list`; secrets are never included.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteSshProfileSummary {

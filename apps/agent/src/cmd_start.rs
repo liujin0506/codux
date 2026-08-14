@@ -27,6 +27,7 @@ pub fn run(detach: bool) -> Result<(), String> {
 }
 
 fn run_foreground(config: CoduxConfig) -> Result<(), String> {
+    crate::ssh::ensure_store()?;
     logo::print_banner(VERSION);
     let _lock = runstate::acquire_instance_lock()?;
     println!(

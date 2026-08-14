@@ -17,6 +17,9 @@ impl CoduxApp {
     ) {
         self.task_column_collapsed = !self.task_column_collapsed;
         self.invalidate_project_shell(cx);
+        // The task column is conditionally mounted by the root layout, so the
+        // root must re-render when its visibility changes.
+        self.invalidate_ui_region(cx, UiRegion::Root);
     }
 
     pub(in crate::app) fn close_active_workspace_item(

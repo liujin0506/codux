@@ -122,6 +122,15 @@ fn sanitize_tool_permission(value: &str) -> String {
     .to_string()
 }
 
+fn sanitize_runtime_tool_path(value: &str) -> String {
+    value
+        .trim()
+        .chars()
+        .filter(|ch| !ch.is_control())
+        .take(4096)
+        .collect()
+}
+
 fn sanitize_codex_effort(value: &str) -> String {
     match value.trim() {
         "none" => "none",
@@ -280,10 +289,12 @@ fn normalize_hour(value: Option<i32>) -> Option<i32> {
 pub fn locale_from_language_setting(language: &str) -> String {
     match language {
         "english" => "en",
-        "simplifiedChinese" | "zh-CN" | "zh_CN" | "zh-Hans" | "zh-Hans-CN"
-        | "zh_Hans_CN" => "zh-Hans",
-        "traditionalChinese" | "zh-TW" | "zh_TW" | "zh-Hant" | "zh-Hant-TW"
-        | "zh_Hant_TW" => "zh-Hant",
+        "simplifiedChinese" | "zh-CN" | "zh_CN" | "zh-Hans" | "zh-Hans-CN" | "zh_Hans_CN" => {
+            "zh-Hans"
+        }
+        "traditionalChinese" | "zh-TW" | "zh_TW" | "zh-Hant" | "zh-Hant-TW" | "zh_Hant_TW" => {
+            "zh-Hant"
+        }
         "japanese" | "ja" => "ja",
         "korean" | "ko" => "ko",
         "french" | "fr" => "fr",
@@ -341,6 +352,8 @@ fn sanitize_shortcut_id(value: &str) -> Result<String, String> {
         "sidebar.tasks.toggle" => Ok("sidebar.tasks.toggle".to_string()),
         "terminal.split" => Ok("terminal.split".to_string()),
         "terminal.split.create" => Ok("terminal.split.create".to_string()),
+        "terminal.split.vertical" => Ok("terminal.split.vertical".to_string()),
+        "terminal.split.close" => Ok("terminal.split.close".to_string()),
         "panel.git" => Ok("panel.git".to_string()),
         "panel.ai" => Ok("panel.ai".to_string()),
         "assistant.git.open" => Ok("assistant.git.open".to_string()),

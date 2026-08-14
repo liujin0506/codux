@@ -167,8 +167,24 @@ pub(super) fn shortcut_definitions() -> Vec<ShortcutDefinition> {
         ShortcutDefinition {
             id: "terminal.split.create",
             label_key: "settings.shortcut.create_split",
-            fallback: "Create Split",
-            default_value: primary_static(primary, "T"),
+            fallback: "Split Right",
+            default_value: primary_static(primary, "D"),
+        },
+        ShortcutDefinition {
+            id: "terminal.split.vertical",
+            label_key: "settings.shortcut.create_split_vertical",
+            fallback: "Split Down",
+            default_value: primary_static(primary, "Shift+D"),
+        },
+        ShortcutDefinition {
+            id: "terminal.split.close",
+            label_key: "settings.shortcut.close_split",
+            fallback: "Close Split",
+            default_value: if cfg!(target_os = "macos") {
+                "⌃D"
+            } else {
+                "Ctrl+Alt+D"
+            },
         },
     ]
 }
@@ -185,6 +201,8 @@ pub(super) fn primary_static(primary: &str, key: &str) -> &'static str {
         ("⌘", "S") => "⌘S",
         ("⌘", "F") => "⌘F",
         ("⌘", "T") => "⌘T",
+        ("⌘", "D") => "⌘D",
+        ("⌘", "Shift+D") => "⌘⇧D",
         ("⌘", "W") => "⌘W",
         ("⌘", "Alt+P") => "⌘⌥P",
         ("⌘", "Alt+T") => "⌘⌥T",
@@ -203,6 +221,8 @@ pub(super) fn primary_static(primary: &str, key: &str) -> &'static str {
         (_, "S") => "Ctrl+S",
         (_, "F") => "Ctrl+F",
         (_, "T") => "Ctrl+T",
+        (_, "D") => "Ctrl+D",
+        (_, "Shift+D") => "Ctrl+Shift+D",
         (_, "W") => "Ctrl+W",
         (_, "Alt+P") => "Ctrl+Alt+P",
         (_, "Alt+T") => "Ctrl+Alt+T",

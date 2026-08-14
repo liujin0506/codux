@@ -113,15 +113,12 @@ pub fn divider_for_surface(surface: Hsla) -> Hsla {
     }
 }
 
-/// Default frosted-glass opacity for the UI chrome (used when no setting is
-/// stored yet). The terminal body derives its own, more-opaque value from this.
+/// Default frosted-glass opacity for the window (used when no setting is
+/// stored yet). Sidebar, panels, and the terminal body all read this value.
 pub const DEFAULT_VIBRANCY_ALPHA: f32 = 0.80;
 /// Content panels (task column, right sidebar) sit this much more opaque than
 /// the chrome so their lists/cards read clearly.
 pub const PANEL_ALPHA_BOOST: f32 = 0.10;
-/// The terminal body is kept this much more opaque than the UI chrome so the
-/// shell text stays legible while the surrounding chrome reads as frosted glass.
-pub const TERMINAL_ALPHA_BOOST: f32 = 0.20;
 
 // 0 = solid (opaque), 1 = transparent (frosted). Alpha stored as f32 bits.
 static DYNAMIC_WINDOW_TRANSPARENT: AtomicU32 = AtomicU32::new(1);
@@ -145,10 +142,10 @@ pub fn vibrancy_alpha() -> f32 {
     load_alpha(&DYNAMIC_VIBRANCY_ALPHA, DEFAULT_VIBRANCY_ALPHA)
 }
 
-/// The terminal body opacity, derived from the single UI opacity setting plus a
-/// fixed boost so the terminal is always a bit more solid than the chrome.
+/// The terminal body opacity. Same slider as the rest of the window so the
+/// workspace frosts in lockstep with the chrome.
 pub fn terminal_alpha() -> f32 {
-    (vibrancy_alpha() + TERMINAL_ALPHA_BOOST).min(1.0)
+    vibrancy_alpha()
 }
 
 /// Apply the persisted appearance to the dynamic state read at render time.
@@ -184,14 +181,25 @@ pub fn vibrancy(base: Hsla) -> Hsla {
     }
 }
 
-/// Tint for content panels (task column, right sidebar): a step more opaque than
-/// the chrome so their content reads clearly while still showing the blur.
+/// Tint for content panels (right sidebar): a step more opaque than the chrome
+/// so their content reads clearly while still showing the blur.
 pub fn vibrancy_panel(base: Hsla) -> Hsla {
     if window_is_solid() {
         base
     } else {
         base.opacity((vibrancy_alpha() + PANEL_ALPHA_BOOST).min(1.0))
     }
+}
+
+/// Fill for the 44px column headers / title bar. Same frost as the sidebar and
+/// terminal so the middle column does not sit as a solid strip.
+pub fn title_bar_fill() -> Hsla {
+    vibrancy(color(STATUS_BAR))
+}
+
+/// Fill for the 28px window bottom bar (status bar and the matching project-column footer).
+pub fn status_bar_fill() -> Hsla {
+    vibrancy(color(STATUS_BAR))
 }
 
 /// Whether the resolved app surface is dark — decides whether elevated surfaces
@@ -275,8 +283,10 @@ enum CoduxTitlebarKind {
 #[cfg(target_os = "macos")]
 fn codux_traffic_light_position(kind: CoduxTitlebarKind) -> Option<gpui::Point<gpui::Pixels>> {
     match kind {
-        // Vertically center the lights in the 52px main header.
-        CoduxTitlebarKind::Main => Some(point(px(12.0), px(20.0))),
+        // Vertically center the lights in the 44px main header. Native
+        // `configure_native_window_buttons` also nudges each button down 5px,
+        // so 11 + 5 = 16, which centers 12px lights in 44px.
+        CoduxTitlebarKind::Main => Some(point(px(12.0), px(11.0))),
         CoduxTitlebarKind::Child => Some(point(px(12.0), px(17.0))),
     }
 }
@@ -1265,5 +1275,17 @@ mod tests {
             fallback.ground,
             app_theme_palette("codux dark").expect("flagship").ground
         );
+    }
+
+    #[test]
+    fn terminal_fill_follows_window_opacity() {
+        let previous_solid = window_is_solid();
+        let previous_alpha = vibrancy_alpha();
+        set_window_appearance(true, 0.45);
+        assert!((terminal_alpha() - vibrancy_alpha()).abs() < f32::EPSILON);
+        assert!((terminal_fill(color(BG_TERMINAL)).a - 0.45).abs() < 0.001);
+        assert!((title_bar_fill().a - 0.45).abs() < 0.001);
+        assert!((status_bar_fill().a - 0.45).abs() < 0.001);
+        set_window_appearance(!previous_solid, previous_alpha);
     }
 }

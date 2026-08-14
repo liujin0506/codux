@@ -250,9 +250,8 @@ impl CoduxApp {
         self.invalidate_terminal_workspace(cx);
     }
 
-    pub(in crate::app) fn split_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let source_index = self
-            .focused_terminal_runtime_id(window, cx)
+    fn focused_terminal_pane_index(&self, window: &Window, cx: &mut Context<Self>) -> usize {
+        self.focused_terminal_runtime_id(window, cx)
             .or_else(|| {
                 let active_id = self.active_terminal_runtime_id();
                 (!active_id.trim().is_empty()).then_some(active_id)
@@ -264,7 +263,15 @@ impl CoduxApp {
                         .position(|slot| slot.terminal_id.as_deref() == Some(terminal_id.as_str()))
                 })
             })
-            .unwrap_or(0);
+            .unwrap_or(0)
+    }
+
+    pub(in crate::app) fn can_close_terminal_split(&self) -> bool {
+        self.main_terminal().is_some_and(|tab| tab.panes.len() > 1)
+    }
+
+    pub(in crate::app) fn split_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let source_index = self.focused_terminal_pane_index(window, cx);
         self.split_terminal_direction(
             TerminalSplitDirection::Right,
             TerminalSplitScope::Inner,
@@ -272,6 +279,53 @@ impl CoduxApp {
             window,
             cx,
         );
+    }
+
+    pub(in crate::app) fn split_terminal_vertical(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let source_index = self.focused_terminal_pane_index(window, cx);
+        self.split_terminal_direction(
+            TerminalSplitDirection::Down,
+            TerminalSplitScope::Inner,
+            source_index,
+            window,
+            cx,
+        );
+    }
+
+    pub(in crate::app) fn restart_terminal_session(
+        &mut self,
+        terminal_id: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.can_close_terminal_split() {
+            return;
+        }
+        let pane_index = self.main_terminal().and_then(|tab| {
+            tab.panes.iter().position(|slot| {
+                Self::terminal_slot_terminal_id(tab, 0, slot).as_deref() == Some(terminal_id)
+            })
+        });
+        let Some(pane_index) = pane_index else {
+            return;
+        };
+        self.reset_terminal_pane(pane_index, window, cx);
+    }
+
+    pub(in crate::app) fn close_focused_terminal_split(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.can_close_terminal_split() {
+            return;
+        }
+        let pane_index = self.focused_terminal_pane_index(window, cx);
+        self.close_terminal_pane(pane_index, window, cx);
     }
 
     /// Single sync point after any split-tree mutation: the tree is the source

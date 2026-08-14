@@ -14,13 +14,138 @@ struct IconPalette {
 pub const ICON_SIZE: u32 = 128;
 const MACOS_ICON_CONTENT_INSET_RATIO: f32 = 0.09;
 const WINDOWS_ICON_CONTENT_INSET_RATIO: f32 = 0.0;
+/// Matches `rx="40"` on the 128×128 settings SVGs.
+const ICON_CORNER_RATIO: f32 = 40.0 / 128.0;
 
 pub fn render_app_icon(style: &str, size: u32) -> AppIconImage {
-    render_app_icon_with_inset(style, size, MACOS_ICON_CONTENT_INSET_RATIO)
+    load_bundled_app_icon(style, size, MACOS_ICON_CONTENT_INSET_RATIO)
+        .unwrap_or_else(|| render_app_icon_with_inset(style, size, MACOS_ICON_CONTENT_INSET_RATIO))
 }
 
 pub fn render_windows_app_icon(style: &str, size: u32) -> AppIconImage {
-    render_app_icon_with_inset(style, size, WINDOWS_ICON_CONTENT_INSET_RATIO)
+    load_bundled_app_icon(style, size, WINDOWS_ICON_CONTENT_INSET_RATIO)
+        .unwrap_or_else(|| render_app_icon_with_inset(style, size, WINDOWS_ICON_CONTENT_INSET_RATIO))
+}
+
+fn load_bundled_app_icon(style: &str, size: u32, inset_ratio: f32) -> Option<AppIconImage> {
+    let path = crate::runtime_bridge::runtime_assets_path()
+        .join("icons")
+        .join("icon.png");
+    let mut source = image::open(&path).ok()?.into_rgba8();
+    apply_icon_style_tint(&mut source, style);
+    apply_icon_corner_mask(&mut source);
+    Some(fit_icon_into_canvas(&source, size, inset_ratio))
+}
+
+struct IconStyleTint {
+    plate: [f32; 3],
+    mark_top: [f32; 3],
+    mark_bottom: [f32; 3],
+}
+
+fn rgb8(hex: u32) -> [f32; 3] {
+    [
+        ((hex >> 16) & 0xFF) as f32 / 255.0,
+        ((hex >> 8) & 0xFF) as f32 / 255.0,
+        (hex & 0xFF) as f32 / 255.0,
+    ]
+}
+
+fn icon_style_tint(style: &str) -> Option<IconStyleTint> {
+    match style {
+        "cobalt" => Some(IconStyleTint {
+            plate: rgb8(0x12151C),
+            mark_top: rgb8(0xB7C6DB),
+            mark_bottom: rgb8(0x5B6C86),
+        }),
+        "sunset" => Some(IconStyleTint {
+            plate: rgb8(0x140A08),
+            mark_top: rgb8(0xFFB089),
+            mark_bottom: rgb8(0xE23A2E),
+        }),
+        "forest" => Some(IconStyleTint {
+            plate: rgb8(0x07140F),
+            mark_top: rgb8(0x7DFFC3),
+            mark_bottom: rgb8(0x1F9A64),
+        }),
+        _ => None,
+    }
+}
+
+fn apply_icon_style_tint(image: &mut image::RgbaImage, style: &str) {
+    let Some(tint) = icon_style_tint(style) else {
+        return;
+    };
+    let width = image.width().max(1);
+    let height = image.height().max(1) as f32;
+    for (index, pixel) in image.pixels_mut().enumerate() {
+        let alpha = pixel[3];
+        if alpha < 8 {
+            continue;
+        }
+        let r = pixel[0] as f32 / 255.0;
+        let g = pixel[1] as f32 / 255.0;
+        let b = pixel[2] as f32 / 255.0;
+        let max = r.max(g).max(b);
+        let min = r.min(g).min(b);
+        let lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        let sat = if max > 1e-4 { (max - min) / max } else { 0.0 };
+        if lum > 0.78 && sat < 0.20 {
+            continue;
+        }
+        if lum < 0.22 && sat < 0.35 {
+            pixel[0] = to_u8(tint.plate[0]);
+            pixel[1] = to_u8(tint.plate[1]);
+            pixel[2] = to_u8(tint.plate[2]);
+            continue;
+        }
+        let row = (index as u32 / width) as f32;
+        let t = (row + 0.5) / height;
+        let rgb = mix_rgb(tint.mark_top, tint.mark_bottom, t);
+        pixel[0] = to_u8(rgb[0]);
+        pixel[1] = to_u8(rgb[1]);
+        pixel[2] = to_u8(rgb[2]);
+    }
+}
+
+fn apply_icon_corner_mask(image: &mut image::RgbaImage) {
+    let width = image.width().max(1);
+    let height = image.height().max(1);
+    let size_x = width as f32;
+    let size_y = height as f32;
+    let radius = size_x.min(size_y) * ICON_CORNER_RATIO;
+    for (index, pixel) in image.pixels_mut().enumerate() {
+        if pixel[3] == 0 {
+            continue;
+        }
+        let x = (index as u32 % width) as f32 + 0.5;
+        let y = (index as u32 / width) as f32 + 0.5;
+        let distance = rounded_rect_distance(x, y, 0.0, 0.0, size_x, size_y, radius);
+        let coverage = smoothstep(1.0, -1.0, distance);
+        pixel[3] = to_u8(pixel[3] as f32 / 255.0 * coverage);
+    }
+}
+
+fn fit_icon_into_canvas(
+    source: &image::RgbaImage,
+    size: u32,
+    inset_ratio: f32,
+) -> AppIconImage {
+    let inset = (size as f32 * inset_ratio).round().max(0.0) as u32;
+    let content = size.saturating_sub(inset.saturating_mul(2)).max(1);
+    let resized = image::imageops::resize(
+        source,
+        content,
+        content,
+        image::imageops::FilterType::Lanczos3,
+    );
+    let mut canvas = image::RgbaImage::new(size, size);
+    image::imageops::replace(&mut canvas, &resized, inset as i64, inset as i64);
+    AppIconImage {
+        pixels: canvas.into_raw(),
+        width: size,
+        height: size,
+    }
 }
 
 fn render_app_icon_with_inset(style: &str, size: u32, inset_ratio: f32) -> AppIconImage {
@@ -250,7 +375,7 @@ mod tests {
 
     #[test]
     fn rendered_icon_keeps_macos_visual_padding() {
-        let image = render_app_icon("default", 512);
+        let image = render_app_icon_with_inset("default", 512, MACOS_ICON_CONTENT_INSET_RATIO);
         let mut min_x = image.width;
         let mut min_y = image.height;
         let mut max_x = 0;
@@ -275,7 +400,7 @@ mod tests {
 
     #[test]
     fn rendered_windows_icon_uses_full_canvas() {
-        let image = render_windows_app_icon("default", 256);
+        let image = render_app_icon_with_inset("default", 256, WINDOWS_ICON_CONTENT_INSET_RATIO);
         let mut min_x = image.width;
         let mut min_y = image.height;
         let mut max_x = 0;
@@ -297,5 +422,39 @@ mod tests {
         assert_eq!(min_y, 0);
         assert_eq!(max_x, image.width - 1);
         assert_eq!(max_y, image.height - 1);
+    }
+
+    #[test]
+    fn default_icon_loads_bundled_png() {
+        let path = crate::runtime_bridge::runtime_assets_path().join("icons/icon.png");
+        assert!(
+            path.is_file(),
+            "bundled app icon missing: {}",
+            path.display()
+        );
+        let image = render_app_icon("default", 128);
+        assert_eq!(image.width, 128);
+        assert_eq!(image.height, 128);
+        assert_eq!(image.pixels.len(), 128 * 128 * 4);
+        assert!(image.pixels.chunks_exact(4).any(|pixel| pixel[3] > 0));
+        assert_eq!(
+            image.pixels[3], 0,
+            "macOS Dock icons keep transparent padding"
+        );
+    }
+
+    #[test]
+    fn color_styles_tint_the_bundled_png() {
+        let forest = render_app_icon("forest", 128);
+        let has_green_mark = forest.pixels.chunks_exact(4).any(|pixel| {
+            pixel[3] > 80 && pixel[1] > pixel[0].saturating_add(20) && pixel[1] > 80
+        });
+        assert!(has_green_mark, "forest style should tint the chevron green");
+
+        let sunset = render_app_icon("sunset", 128);
+        let has_warm_mark = sunset.pixels.chunks_exact(4).any(|pixel| {
+            pixel[3] > 80 && pixel[0] > pixel[2].saturating_add(20) && pixel[0] > 80
+        });
+        assert!(has_warm_mark, "sunset style should tint the chevron warm");
     }
 }
