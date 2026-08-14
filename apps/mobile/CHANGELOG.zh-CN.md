@@ -8,6 +8,10 @@
 
 - 手机终端切换页在 Worktree 后增加「会话」页签，复用桌面端 / 平板的 AI 会话记录。
 
+### 修复
+
+- Android Kotlin 的 `jvmTarget` 改为 Kotlin 2.3 要求的 `compilerOptions` DSL。
+
 ## [2.0.5] - 2026-08-15
 
 ### 调整
