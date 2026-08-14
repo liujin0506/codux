@@ -1,0 +1,122 @@
+# CNB counterpart of .github/workflows.
+# Cloud runners are Linux Docker only, so macOS/Windows GPUI packaging stays on GitHub Actions.
+# - Build Desktop Test  → cargo check (non-GPUI), release-script tests, Linux agent package
+# - Release Agent       → v* tag, Debian 10 baseline Linux agent, CNB Release attachments
+
+main:
+  push: &desktop_test
+    - name: Build Desktop Test
+      runner:
+        cpus: 8
+      docker:
+        image: docker.cnb.cool/examples/language/rust-1.87
+        volumes:
+          - /root/.cargo/registry
+          - /root/.cargo/git
+      env:
+        CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
+        RELEASE_BUILD_ID: linux-x86_64
+        RELEASE_STAGE_DIR: release-artifacts
+      stages:
+        - name: Setup Node
+          script: |
+            set -euo pipefail
+            if ! command -v node >/dev/null 2>&1; then
+              curl -fsSL https://nodejs.org/dist/v22.16.0/node-v22.16.0-linux-x64.tar.gz \
+                | tar -xz -C /usr/local --strip-components=1
+            fi
+            node -v
+        - name: Check
+          script: cargo check --workspace --exclude codux --target "${CARGO_BUILD_TARGET}"
+        - name: Test release scripts
+          script: |
+            node apps/desktop/scripts/release/test-package-gpui.mjs
+            node apps/desktop/scripts/release/test-publish-github-release.mjs
+            node apps/agent/scripts/release/test-agent-release-scripts.mjs
+        - name: Build
+          script: cargo build -p codux-agent --release --target "${CARGO_BUILD_TARGET}"
+        - name: Package
+          script: node apps/agent/scripts/release/package-agent.mjs
+        - name: Upload package artifacts
+          image: cnbcool/attachments:latest
+          settings:
+            attachments:
+              - release-artifacts/linux-x86_64/*
+  pull_request: *desktop_test
+
+$:
+  web_trigger: *desktop_test
+
+v*:
+  tag_push:
+    - name: Release Agent linux-x86_64
+      runner:
+        tags: cnb:arch:amd64
+        cpus: 8
+      services:
+        - docker
+      docker:
+        image: node:22
+      env:
+        CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
+        LINUX_DOCKER_PLATFORM: linux/amd64
+        RELEASE_BUILD_ID: linux-x86_64
+        RELEASE_STAGE_DIR: release-artifacts
+        RELEASE_NOTES_PATH: dist/release-notes.md
+      stages:
+        - name: Resolve release metadata
+          script: |
+            set -euo pipefail
+            mkdir -p dist
+            node apps/desktop/scripts/release/prepare-release.mjs "${CNB_BRANCH}" auto
+        - name: Create release
+          type: git:release
+          options:
+            title: "$CNB_BRANCH"
+            descriptionFromFile: dist/release-notes.md
+        - name: Build Linux agent on Debian 10 baseline
+          script: bash .cnb/build-linux-agent.sh
+        - name: Package agent
+          script: node apps/agent/scripts/release/package-agent.mjs
+        - name: Upload agent artifacts
+          image: cnbcool/attachments:latest
+          settings:
+            attachments:
+              - release-artifacts/linux-x86_64/*
+        - name: resolve linux-x86_64
+          type: cnb:resolve
+          options:
+            key: agent-linux-amd64
+    - name: Release Agent linux-aarch64
+      runner:
+        tags: cnb:arch:arm64
+        cpus: 8
+      services:
+        - docker
+      docker:
+        image: node:22
+      env:
+        CARGO_BUILD_TARGET: aarch64-unknown-linux-gnu
+        LINUX_DOCKER_PLATFORM: linux/arm64
+        RELEASE_BUILD_ID: linux-aarch64
+        RELEASE_STAGE_DIR: release-artifacts
+        RELEASE_NOTES_PATH: dist/release-notes.md
+      stages:
+        - name: await linux-x86_64 release
+          type: cnb:await
+          options:
+            key: agent-linux-amd64
+        - name: Resolve release metadata
+          script: |
+            set -euo pipefail
+            mkdir -p dist
+            node apps/desktop/scripts/release/prepare-release.mjs "${CNB_BRANCH}" auto
+        - name: Build Linux agent on Debian 10 baseline
+          script: bash .cnb/build-linux-agent.sh
+        - name: Package agent
+          script: node apps/agent/scripts/release/package-agent.mjs
+        - name: Upload agent artifacts
+          image: cnbcool/attachments:latest
+          settings:
+            attachments:
+              - release-artifacts/linux-aarch64/*
