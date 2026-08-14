@@ -136,7 +136,9 @@ class _CoduxHomePageState extends State<CoduxHomePage>
     final topInset = media.viewPadding.top;
     final bottomInset = media.viewPadding.bottom;
     final leftInset = media.viewPadding.left;
-    final keyboardVisible = media.viewInsets.bottom > bottomInset + 8.0;
+    final keyboardVisible =
+        media.viewInsets.bottom > bottomInset + 8.0 &&
+        media.viewInsets.bottom > 80.0;
     if (c._keyboardVisible != keyboardVisible) {
       c._keyboardVisible = keyboardVisible;
       if (keyboardVisible) {
