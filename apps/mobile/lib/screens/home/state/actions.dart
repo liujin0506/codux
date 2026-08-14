@@ -184,11 +184,13 @@ extension _HomePageActions on HomeController {
     return _terminalOutputController.cachedOutput(sessionId)?.trimRight() ?? '';
   }
 
+  // ignore: unused_element
   Future<void> _startVoiceInput() async {
     if (_showVoiceOverlay) return;
     _applyState(() => _showVoiceOverlay = true);
   }
 
+  // ignore: unused_element
   Future<void> _chooseUploadForTerminal() async {
     if (_terminalUploadLoading) return;
     CoduxLog.info(

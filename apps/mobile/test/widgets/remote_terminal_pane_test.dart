@@ -56,6 +56,30 @@ void main() {
     await tester.pump();
 
     expect(sent, ['\u0003']);
+    expect(find.text('ctrl'), findsNothing);
+  });
+
+  testWidgets('ime open expands the toolbar to two rows', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: AppPreferences(
+          accent: AccentChoices.cyan,
+          locale: LocaleChoices.english,
+          themeMode: ThemeMode.dark,
+          child: SizedBox(
+            width: 360,
+            height: 720,
+            child: _pane(keyboardVisible: true),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('^C'), findsOneWidget);
+    expect(find.text('ctrl'), findsOneWidget);
+    expect(find.text('shft'), findsOneWidget);
   });
 
   test('keyboard lift follows cursor visibility', () {
@@ -86,7 +110,10 @@ void main() {
   });
 }
 
-RemoteTerminalPane _pane({ValueChanged<String>? onSendKey}) {
+RemoteTerminalPane _pane({
+  ValueChanged<String>? onSendKey,
+  bool keyboardVisible = false,
+}) {
   return RemoteTerminalPane(
     connected: true,
     showTerminal: true,
@@ -102,7 +129,7 @@ RemoteTerminalPane _pane({ValueChanged<String>? onSendKey}) {
     pendingBufferSessionId: null,
     connectionStatusText: 'connecting',
     terminalHistoryLoadingText: 'loading',
-    keyboardVisible: false,
+    keyboardVisible: keyboardVisible,
     keyboardRequested: false,
     keyboardRequestSerial: 0,
     repaintSignal: TerminalRepaintSignal(),
@@ -117,8 +144,6 @@ RemoteTerminalPane _pane({ValueChanged<String>? onSendKey}) {
     onRequestKeyboard: () {},
     onPaste: () {},
     onCopy: () {},
-    onUpload: () {},
-    onVoiceInput: () {},
     handedAway: false,
     onTakeOver: () {},
   );

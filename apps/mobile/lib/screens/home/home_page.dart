@@ -416,8 +416,6 @@ class _CoduxHomePageState extends State<CoduxHomePage>
       onRequestKeyboard: c._requestTerminalKeyboard,
       onPaste: c._pasteToTerminal,
       onCopy: c._copyTerminalSelection,
-      onUpload: c._chooseUploadForTerminal,
-      onVoiceInput: c._startVoiceInput,
       handedAway: c._remoteHandedAway,
       onTakeOver: () => c._takeOverTerminalViewport(),
     );

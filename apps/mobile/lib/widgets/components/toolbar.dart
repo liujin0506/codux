@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:codux_protocol_ffi/codux_protocol_ffi.dart';
@@ -12,23 +13,27 @@ class Toolbar extends StatefulWidget {
     required this.onSendKey,
     required this.onPaste,
     required this.onCopy,
-    required this.onUpload,
-    required this.onVoiceInput,
     required this.applicationCursor,
     required this.keyboardVisible,
-    required this.uploading,
     required this.bottomInset,
     required this.onToggleKeyboard,
   });
 
+  static const double rowHeight = 32;
+  static const double verticalPadding = 4;
+  static const double rowGap = 4;
+  static const double cornerInset = 16;
+
+  static double heightFor({required bool expanded}) {
+    final rows = expanded ? 2 : 1;
+    return verticalPadding * 2 + rowHeight * rows + (expanded ? rowGap : 0);
+  }
+
   final ValueChanged<String> onSendKey;
   final VoidCallback onPaste;
   final VoidCallback onCopy;
-  final VoidCallback onUpload;
-  final VoidCallback onVoiceInput;
   final bool applicationCursor;
   final bool keyboardVisible;
-  final bool uploading;
   final double bottomInset;
   final VoidCallback onToggleKeyboard;
 
@@ -39,25 +44,23 @@ class Toolbar extends StatefulWidget {
 class _ToolbarState extends State<Toolbar> {
   bool _ctrl = false;
   bool _shift = false;
-  bool _alt = false;
 
   void _clearModifiers() {
-    if (!_ctrl && !_shift && !_alt) return;
+    if (!_ctrl && !_shift) return;
     setState(() {
       _ctrl = false;
       _shift = false;
-      _alt = false;
     });
   }
 
   void _send(String key, {String keyChar = ''}) {
-    final input = keyChar.isNotEmpty && !_ctrl && !_shift && !_alt
+    final input = keyChar.isNotEmpty && !_ctrl && !_shift
         ? terminalTextInput(keyChar)
         : terminalKeyInput(
             key: key,
             keyChar: keyChar,
             shift: _shift,
-            alt: _alt,
+            alt: false,
             control: _ctrl,
             applicationCursor: widget.applicationCursor,
           );
@@ -68,6 +71,9 @@ class _ToolbarState extends State<Toolbar> {
   @override
   Widget build(BuildContext context) {
     final prefs = AppPreferences.of(context);
+    final viewPadding = MediaQuery.viewPaddingOf(context);
+    final leftInset = math.max(viewPadding.left, Toolbar.cornerInset);
+    final rightInset = math.max(viewPadding.right, Toolbar.cornerInset);
     final row1 = [
       _ToolItem(
         label: 'esc',
@@ -80,29 +86,12 @@ class _ToolbarState extends State<Toolbar> {
         onTap: () => _send('tab'),
       ),
       _ToolItem(
-        icon: Icons.mic_none_rounded,
-        label: prefs.t('toolbar.voice'),
-        kind: _ToolKind.special,
-        onTap: widget.onVoiceInput,
-      ),
-      _ToolItem(
-        icon: Icons.content_copy_rounded,
-        label: 'copy',
-        kind: _ToolKind.special,
-        onTap: widget.onCopy,
-      ),
-      _ToolItem(
-        icon: Icons.content_paste_rounded,
-        label: 'paste',
-        kind: _ToolKind.special,
-        onTap: widget.onPaste,
-      ),
-      _ToolItem(
-        icon: Icons.upload_file_rounded,
-        label: prefs.t('toolbar.upload'),
-        kind: _ToolKind.special,
-        busy: widget.uploading,
-        onTap: widget.onUpload,
+        label: '^C',
+        kind: _ToolKind.danger,
+        onTap: () {
+          widget.onSendKey('\u0003');
+          _clearModifiers();
+        },
       ),
       _ToolItem(
         icon: Icons.keyboard_arrow_up_rounded,
@@ -112,59 +101,6 @@ class _ToolbarState extends State<Toolbar> {
         onTap: () => _send('up'),
       ),
       _ToolItem(
-        icon: Icons.backspace_outlined,
-        label: 'del',
-        kind: _ToolKind.special,
-        repeatable: true,
-        onTap: () => _send('backspace'),
-      ),
-      _ToolItem(
-        icon: Icons.keyboard_return_rounded,
-        label: prefs.t('toolbar.enter'),
-        kind: _ToolKind.enter,
-        onTap: () => _send('enter'),
-      ),
-    ];
-    final row2 = [
-      _ToolItem(
-        label: '^C',
-        kind: _ToolKind.danger,
-        onTap: () {
-          widget.onSendKey('\u0003');
-          _clearModifiers();
-        },
-      ),
-      _ToolItem(
-        label: 'ctrl',
-        kind: _ToolKind.modifier,
-        active: _ctrl,
-        onTap: () => setState(() => _ctrl = !_ctrl),
-      ),
-      _ToolItem(
-        label: 'shft',
-        kind: _ToolKind.modifier,
-        active: _shift,
-        onTap: () => setState(() => _shift = !_shift),
-      ),
-      _ToolItem(
-        label: 'alt',
-        kind: _ToolKind.modifier,
-        active: _alt,
-        onTap: () => setState(() => _alt = !_alt),
-      ),
-      _ToolItem(
-        label: '/',
-        kind: _ToolKind.special,
-        onTap: () => _send('/', keyChar: '/'),
-      ),
-      _ToolItem(
-        icon: Icons.keyboard_arrow_left_rounded,
-        label: '←',
-        kind: _ToolKind.icon,
-        repeatable: true,
-        onTap: () => _send('left'),
-      ),
-      _ToolItem(
         icon: Icons.keyboard_arrow_down_rounded,
         label: '↓',
         kind: _ToolKind.icon,
@@ -172,11 +108,10 @@ class _ToolbarState extends State<Toolbar> {
         onTap: () => _send('down'),
       ),
       _ToolItem(
-        icon: Icons.keyboard_arrow_right_rounded,
-        label: '→',
-        kind: _ToolKind.icon,
-        repeatable: true,
-        onTap: () => _send('right'),
+        icon: Icons.keyboard_return_rounded,
+        label: prefs.t('toolbar.enter'),
+        kind: _ToolKind.enter,
+        onTap: () => _send('enter'),
       ),
       _ToolItem(
         icon: widget.keyboardVisible
@@ -187,13 +122,66 @@ class _ToolbarState extends State<Toolbar> {
         onTap: widget.onToggleKeyboard,
       ),
     ];
+    final row2 = widget.keyboardVisible
+        ? [
+            _ToolItem(
+              label: 'ctrl',
+              kind: _ToolKind.modifier,
+              active: _ctrl,
+              onTap: () => setState(() => _ctrl = !_ctrl),
+            ),
+            _ToolItem(
+              label: '/',
+              kind: _ToolKind.special,
+              onTap: () => _send('/', keyChar: '/'),
+            ),
+            _ToolItem(
+              icon: Icons.content_paste_rounded,
+              label: 'paste',
+              kind: _ToolKind.special,
+              onTap: widget.onPaste,
+            ),
+            _ToolItem(
+              icon: Icons.keyboard_arrow_left_rounded,
+              label: '←',
+              kind: _ToolKind.icon,
+              repeatable: true,
+              onTap: () => _send('left'),
+            ),
+            _ToolItem(
+              icon: Icons.keyboard_arrow_right_rounded,
+              label: '→',
+              kind: _ToolKind.icon,
+              repeatable: true,
+              onTap: () => _send('right'),
+            ),
+            _ToolItem(
+              label: 'shft',
+              kind: _ToolKind.modifier,
+              active: _shift,
+              onTap: () => setState(() => _shift = !_shift),
+            ),
+            _ToolItem(
+              icon: Icons.content_copy_rounded,
+              label: 'copy',
+              kind: _ToolKind.special,
+              onTap: widget.onCopy,
+            ),
+          ]
+        : const <_ToolItem>[];
 
     return Container(
       color: AppColors.terminalChrome,
       child: SizedBox(
-        height: 76 + widget.bottomInset,
+        height: Toolbar.heightFor(expanded: widget.keyboardVisible) +
+            widget.bottomInset,
         child: Padding(
-          padding: EdgeInsets.fromLTRB(6, 4, 6, 4 + widget.bottomInset),
+          padding: EdgeInsets.fromLTRB(
+            leftInset,
+            Toolbar.verticalPadding,
+            rightInset,
+            Toolbar.verticalPadding + widget.bottomInset,
+          ),
           child: _ToolGrid(row1: row1, row2: row2),
         ),
       ),
@@ -204,14 +192,13 @@ class _ToolbarState extends State<Toolbar> {
 enum _ToolKind { special, modifier, icon, enter, danger }
 
 class _ToolItem {
-  _ToolItem({
+  const _ToolItem({
     this.icon,
     this.label,
     required this.kind,
     required this.onTap,
     this.active = false,
     this.repeatable = false,
-    this.busy = false,
   }) : assert(icon != null || label != null);
 
   final IconData? icon;
@@ -220,7 +207,6 @@ class _ToolItem {
   final VoidCallback onTap;
   final bool active;
   final bool repeatable;
-  final bool busy;
 }
 
 class _ToolGrid extends StatelessWidget {
@@ -229,18 +215,18 @@ class _ToolGrid extends StatelessWidget {
   final List<_ToolItem> row1;
   final List<_ToolItem> row2;
 
-  static const double _gap = 4;
-
   @override
   Widget build(BuildContext context) => Column(
     children: [
       Expanded(
-        child: _ToolRow(items: row1, gap: _gap),
+        child: _ToolRow(items: row1, gap: Toolbar.rowGap),
       ),
-      const SizedBox(height: 4),
-      Expanded(
-        child: _ToolRow(items: row2, gap: _gap),
-      ),
+      if (row2.isNotEmpty) ...[
+        const SizedBox(height: Toolbar.rowGap),
+        Expanded(
+          child: _ToolRow(items: row2, gap: Toolbar.rowGap),
+        ),
+      ],
     ],
   );
 }
@@ -322,28 +308,18 @@ class _ToolButtonState extends State<_ToolButton> {
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        onTapDown: item.busy ? null : (_) => _startRepeat(),
-        onTapUp: item.busy ? null : (_) => _stopRepeat(),
-        onTapCancel: item.busy ? null : _stopRepeat,
-        onTap: item.busy ? null : item.onTap,
+        onTapDown: (_) => _startRepeat(),
+        onTapUp: (_) => _stopRepeat(),
+        onTapCancel: _stopRepeat,
+        onTap: item.onTap,
         child: Semantics(
           label: item.label,
           button: true,
-          enabled: !item.busy,
           child: Container(
             width: double.infinity,
             height: double.infinity,
             alignment: Alignment.center,
-            child: item.busy
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: foreground,
-                    ),
-                  )
-                : item.icon != null
+            child: item.icon != null
                 ? Icon(
                     item.icon,
                     size: item.kind == _ToolKind.enter ? 20 : 17,

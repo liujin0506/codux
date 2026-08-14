@@ -53,7 +53,7 @@ The mobile client focuses on three things:
 | Device Management | Ready | Save multiple Mac devices locally, edit relay address / display name, and reconnect in the background. |
 | Remote Terminal | Ready | Render the Rust-backed remote PTY screen model and send explicit user input back to the Mac host. |
 | Keyboard Handling | Ready | Keeps terminal height stable while shifting the surface around the Android IME, avoiding TUI redraw corruption. |
-| Quick Keys | Ready | Two-row terminal toolbar with Esc, Tab, Copy, Paste, Upload, arrows, Delete, Enter, Ctrl, Shift, Alt, keyboard toggle, and `^C`. |
+| Quick Keys | Ready | One-row terminal toolbar with Esc, Tab, `^C`, up/down, Enter, and the keyboard toggle; opening the IME adds Ctrl, `/`, Paste, left/right, Shift, and Copy. |
 | Files | Ready | Browse project files, remember per-project path, open/edit files, rename, copy path, and delete through the Mac host. |
 | AI Stats | Ready | Shows current project and recent AI usage data forwarded by the Codux host. |
 | Updates | Ready | Checks the latest GitHub Release for `liujin0506/codux-flutter`. |
