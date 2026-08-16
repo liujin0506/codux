@@ -157,14 +157,11 @@ fn fetch_manifest_release(
 
 fn release_from_manifest_version(version: &str, channel: Channel) -> Result<Release, String> {
     let version = version.trim().trim_start_matches('v');
-    match channel {
-        Channel::Stable if version.contains("-beta") => {
-            return Err(format!("stable manifest version is a beta: {version}"));
-        }
-        Channel::Beta if !version.contains("-beta") => {
-            return Err(format!("beta manifest version is not a beta: {version}"));
-        }
-        _ => {}
+    // The beta channel tracks whatever is newest: publish-github-release.mjs
+    // deliberately refreshes the beta manifest on stable releases too, so beta
+    // hosts are never stranded behind stable. Only the reverse is an error.
+    if matches!(channel, Channel::Stable) && version.contains("-beta") {
+        return Err(format!("stable manifest version is a beta: {version}"));
     }
     let tag_name = format!("v{version}");
     Ok(Release {
@@ -327,13 +324,14 @@ mod tests {
     }
 
     #[test]
-    fn manifest_release_rejects_stable_versions() {
-        let error = match release_from_manifest_version("2.0.0", Channel::Beta) {
-            Ok(_) => panic!("expected stable manifest version to fail"),
-            Err(error) => error,
-        };
+    fn beta_manifest_release_accepts_stable_versions() {
+        // A stable release refreshes the beta manifest as well, so a beta host
+        // must be able to update onto it.
+        let release = release_from_manifest_version("2.0.8", Channel::Beta).unwrap();
+        let expected = current_agent_asset_name("2.0.8");
 
-        assert_eq!(error, "beta manifest version is not a beta: 2.0.0");
+        assert_eq!(release.tag_name, "v2.0.8");
+        assert!(release.assets.iter().any(|asset| asset.name == expected));
     }
 
     #[test]
