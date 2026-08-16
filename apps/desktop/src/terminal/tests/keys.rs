@@ -269,6 +269,17 @@ fn keeps_macos_app_shortcuts_out_of_terminal_input() {
     );
 }
 #[test]
+fn preserves_control_s_for_terminal_queue_input() {
+    assert_eq!(
+        bytes(modified_key("s", false, false, true, false), normal_mode()),
+        b"\x13"
+    );
+    assert_eq!(
+        bytes(modified_key("S", true, false, true, false), normal_mode()),
+        b"\x13"
+    );
+}
+#[test]
 fn preserves_control_q_for_terminal_flow_control() {
     assert_eq!(
         bytes(modified_key("q", false, false, true, false), normal_mode()),

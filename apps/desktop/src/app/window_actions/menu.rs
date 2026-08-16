@@ -211,6 +211,12 @@ impl CoduxApp {
         register!(
             native_menu::EditorSave,
             |app: &mut CoduxApp, window: &mut Window, cx: &mut Context<CoduxApp>| {
+                // The global ctrl-s binding consumes the keystroke before the
+                // terminal key handler sees it — forward queue/interrupt keys
+                // such as Kimi Code's Ctrl+S to the PTY.
+                if app.forward_editor_save_to_terminal(window, cx) {
+                    return;
+                }
                 app.save_selected_file_preview(window, cx)
             }
         );

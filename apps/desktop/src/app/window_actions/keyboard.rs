@@ -177,6 +177,37 @@ impl CoduxApp {
             && !keystroke.modifiers.shift
     }
 
+    pub(in crate::app) fn forward_editor_save_to_terminal(
+        &self,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        #[cfg(target_os = "macos")]
+        {
+            let _ = (window, cx);
+            return false;
+        }
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            let Some(terminal) = self.focused_or_active_terminal_view(window, cx) else {
+                return false;
+            };
+            let keystroke = Keystroke {
+                key: "s".into(),
+                key_char: Some("s".into()),
+                modifiers: Modifiers {
+                    control: true,
+                    ..Default::default()
+                },
+            };
+            terminal.update(cx, |terminal, cx| {
+                terminal.handle_terminal_keystroke(&keystroke, cx);
+            });
+            true
+        }
+    }
+
     pub(in crate::app) fn handle_configured_shortcut(
         &mut self,
         event: &KeyDownEvent,
@@ -269,6 +300,9 @@ impl CoduxApp {
             return true;
         }
         if shortcut_matches(shortcuts, "editor.save", &actual) {
+            if self.forward_editor_save_to_terminal(window, cx) {
+                return true;
+            }
             self.save_selected_file_preview(window, cx);
             return true;
         }
