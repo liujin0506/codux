@@ -5,8 +5,14 @@ import 'package:codux_flutter/theme/app_theme.dart';
 import 'package:codux_flutter/models/workspace_mode.dart';
 import 'package:codux_flutter/widgets/components/remote_terminal_pane.dart';
 import 'package:codux_flutter/widgets/components/self_drawn_terminal_view.dart';
+import 'package:codux_flutter/widgets/components/toolbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+// The tool FAB carries its own `^C` action, so scope toolbar key lookups to the
+// toolbar itself instead of matching every `^C` on screen.
+Finder _toolbarKey(String label) =>
+    find.descendant(of: find.byType(Toolbar), matching: find.text(label));
 
 void main() {
   testWidgets('terminal content starts at top of terminal body', (
@@ -52,7 +58,7 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.text('^C'));
+    await tester.tap(_toolbarKey('^C'));
     await tester.pump();
 
     expect(sent, ['\u0003']);
@@ -77,9 +83,9 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('^C'), findsOneWidget);
-    expect(find.text('ctrl'), findsOneWidget);
-    expect(find.text('shft'), findsOneWidget);
+    expect(_toolbarKey('^C'), findsOneWidget);
+    expect(_toolbarKey('ctrl'), findsOneWidget);
+    expect(_toolbarKey('shft'), findsOneWidget);
   });
 
   test('keyboard lift follows cursor visibility', () {
