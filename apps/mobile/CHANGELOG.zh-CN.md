@@ -4,6 +4,17 @@
 
 ## [Unreleased]
 
+## [2.0.8] - 2026-08-16
+
+### 修复
+
+- 修复连 Linux Agent 时 AI 用量在 worktree 下不准确的问题：Agent 现与 Desktop 一致按 worktree 作用域读取实时 session，并在索引完成后自动推送更新。
+- 修复纯 Agent 场景下 viewport lease 过期后误显示「桌面端接管」的问题，改为区分「连接中断」与「其他设备使用中」。
+
+### 调整
+
+- 终端悬浮工具球移至左下角，新增 Esc / Enter / ^C / Shift+Tab 快捷发送。
+
 ## [2.0.7] - 2026-08-16
 
 ### 新增

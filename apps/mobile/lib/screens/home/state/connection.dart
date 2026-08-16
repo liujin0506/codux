@@ -583,6 +583,7 @@ extension _HomePageConnection on HomeController {
     final generation = _remoteSyncController.beginConnectionGeneration();
     if (switchingDevice) {
       _hostRuntimeInstanceId = null;
+      _isHeadlessAgentHost = false;
       _resetRemoteRuntime(keepProjects: false);
       _terminalOutputController.resetAll();
       _terminalRepaint.tick();

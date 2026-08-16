@@ -193,6 +193,7 @@ RemoteTerminalPane _pane({
     onUpload: onUpload ?? () {},
     onVoice: onVoice ?? () {},
     handedAway: false,
+    handoffMessageKey: 'terminal.handoff.takenOver',
     onTakeOver: () {},
   );
 }

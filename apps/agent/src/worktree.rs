@@ -50,6 +50,31 @@ pub fn worktree_list_payload(project_id: &str, project_path: &str) -> Value {
     payload
 }
 
+/// Resolve a stable worktree id to its filesystem path and display name.
+pub fn worktree_for_id(
+    project_id: &str,
+    project_path: &str,
+    worktree_id: &str,
+) -> Option<(String, String)> {
+    if worktree_id == project_id {
+        let name = Path::new(project_path)
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("main")
+            .to_string();
+        return Some((project_path.to_string(), name));
+    }
+    scan_worktrees(project_path)
+        .into_iter()
+        .find(|entry| entry_id(project_id, &entry) == worktree_id)
+        .map(|entry| {
+            (
+                entry.path.clone(),
+                worktree_display_name(&entry.branch, &entry.path),
+            )
+        })
+}
+
 /// Resolve a controller-provided worktree path to the stable id derived from
 /// the agent-owned project id. The default worktree intentionally uses the
 /// project id itself, matching the shared runtime convention.

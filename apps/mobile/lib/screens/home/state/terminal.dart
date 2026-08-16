@@ -22,6 +22,9 @@ extension _HomePageTerminal on HomeController {
     final localOwner = _activeDevice == null
         ? ''
         : 'remote:${_activeDevice!.deviceId.trim()}';
+    if (sessionId == _sessionId) {
+      _terminalViewportOwner = owner;
+    }
     final becameLocalOwner =
         localOwner.isNotEmpty && owner == localOwner && previousOwner != owner;
     // Handoff: if any other owner (desktop or another remote device) took the
@@ -565,6 +568,13 @@ extension _HomePageTerminal on HomeController {
     _claimTerminalViewport(
       sessionId: id,
       intent: _TerminalViewportClaimIntent.force,
+    );
+  }
+
+  String _terminalHandoffMessageKey() {
+    return terminalHandoffMessageKey(
+      isHeadlessAgentHost: _isHeadlessAgentHost,
+      viewportOwner: _terminalViewportOwner,
     );
   }
 
