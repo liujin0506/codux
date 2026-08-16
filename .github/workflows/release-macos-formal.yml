@@ -138,19 +138,27 @@ jobs:
           echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET"
 
       - name: Import Apple signing certificate
+        if: ${{ env.APPLE_CERTIFICATE != '' }}
         shell: bash
         run: |
           certificate_path="$RUNNER_TEMP/apple-certificate.p12"
           keychain_path="$RUNNER_TEMP/apple-signing.keychain-db"
+          keychain_password="${KEYCHAIN_PASSWORD:-$(uuidgen)}"
           echo "$APPLE_CERTIFICATE" | base64 --decode > "$certificate_path"
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
           security set-keychain-settings -lut 21600 "$keychain_path"
           security default-keychain -s "$keychain_path"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
-          security import "$certificate_path" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -k "$keychain_path"
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" -P "${APPLE_CERTIFICATE_PASSWORD:-}" -T /usr/bin/codesign -k "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain_path"
           security list-keychains -d user -s "$keychain_path" $(security list-keychains -d user | sed 's/[\" ]//g')
           security find-identity -v -p codesigning "$keychain_path"
+
+      - name: Skip Apple signing
+        if: ${{ env.APPLE_CERTIFICATE == '' }}
+        shell: bash
+        run: |
+          echo "APPLE_CERTIFICATE is not configured; packaging an ad-hoc signed bundle without notarization."
 
       - name: Apply release version
         shell: bash
