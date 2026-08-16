@@ -91,6 +91,7 @@ extension _HomePageProtocol on HomeController {
           _startLatencyProbe();
           final payload = message.payload;
           if (payload is Map) {
+            _isHeadlessAgentHost = isHeadlessAgentHostApp(payload);
             _terminalBufferCapability = TerminalBufferCapability.fromHostInfo(
               payload,
             );

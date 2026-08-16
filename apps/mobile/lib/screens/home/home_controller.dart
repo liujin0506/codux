@@ -96,6 +96,8 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
   // Handoff: true when the desktop (or another device) owns this session. The
   // phone stays passive until the on-screen "Take over here" action forces it.
   bool _remoteHandedAway = false;
+  String _terminalViewportOwner = '';
+  bool _isHeadlessAgentHost = false;
   // The last automatic claim, used to collapse bind/focus/first-layout triggers
   // for the same session into one request window.
   DateTime? _lastViewportClaimAt;
@@ -629,6 +631,7 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
         if (previous.sessionId == _sessionId) return;
         _terminalViewportInteractive = false;
         _remoteHandedAway = false;
+        _terminalViewportOwner = '';
         _lastViewportClaimAt = null;
         _lastViewportClaimSession = null;
       },

@@ -4,6 +4,17 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.8] - 2026-08-16
+
+### Fixed
+
+- Fixed inaccurate AI usage stats when mobile connects to a Linux Agent worktree by scoping live sessions to the worktree and re-pushing stats after indexing completes.
+- Fixed the agent-only handoff placeholder incorrectly saying the terminal was taken over on desktop when the viewport lease expired.
+
+### Changed
+
+- Moved the terminal floating tool menu to the bottom-left and added Esc, Enter, ^C, and Shift+Tab quick-send actions.
+
 ## [2.0.7] - 2026-08-16
 
 ### Added

@@ -8,6 +8,13 @@ All notable changes to this project will be documented in this file.
 
 - Paused automatic memory queue processing when no eligible extraction provider is configured, preventing repeated failures and UI refresh churn while preserving queued work until a provider becomes available.
 
+## [2.0.8] - 2026-08-16
+
+### Fixed
+
+- Fixed inaccurate AI usage stats on Linux Agent worktrees by scoping live sessions to the selected worktree, re-pushing stats after indexing completes, and aligning `ai.session` worktree path resolution with the desktop host.
+- Fixed the mobile handoff placeholder incorrectly saying a terminal was taken over on desktop when connected to a headless Agent.
+
 ## [2.0.7] - 2026-08-16
 
 ### Fixed

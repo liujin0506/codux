@@ -52,6 +52,7 @@ import '../../services/terminal_input_batcher.dart';
 import '../../services/terminal_input_reliable_sender.dart';
 import '../../services/terminal_upload_metadata.dart';
 import '../../services/update_check_service.dart';
+import '../../services/terminal_handoff_message.dart';
 import '../../services/terminal_viewport_controller.dart';
 import '../../services/remote_state_versions.dart';
 import '../../theme/app_theme.dart';
@@ -427,6 +428,7 @@ class _CoduxHomePageState extends State<CoduxHomePage>
       onUpload: c._chooseUploadForTerminal,
       onVoice: c._startVoiceInput,
       handedAway: c._remoteHandedAway,
+      handoffMessageKey: c._terminalHandoffMessageKey(),
       onTakeOver: () => c._takeOverTerminalViewport(),
     );
 

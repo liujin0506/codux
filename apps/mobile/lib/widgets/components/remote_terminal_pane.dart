@@ -47,6 +47,7 @@ class RemoteTerminalPane extends StatefulWidget {
     required this.onUpload,
     required this.onVoice,
     required this.handedAway,
+    required this.handoffMessageKey,
     required this.onTakeOver,
   });
 
@@ -84,6 +85,7 @@ class RemoteTerminalPane extends StatefulWidget {
   // Handoff: the desktop (or another device) currently owns this session. Show a
   // placeholder instead of the live terminal; onTakeOver reclaims it to here.
   final bool handedAway;
+  final String handoffMessageKey;
   final VoidCallback onTakeOver;
 
   @override
@@ -120,7 +122,7 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
             ),
             const SizedBox(height: 16),
             Text(
-              prefs.t('terminal.handoff.takenOver'),
+              prefs.t(widget.handoffMessageKey),
               style: TextStyle(fontSize: 15, color: AppColors.terminalTextDim),
             ),
             const SizedBox(height: 20),
@@ -299,7 +301,8 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
                     bottomOffset:
                         (showTerminalToolbar ? terminalToolbarHeight : 0) +
                         AppSpacing.m,
-                    rightInset: edgeInset,
+                    leftInset: edgeInset,
+                    onSendKey: widget.onSendKey,
                     uploadLoading: widget.terminalUploadLoading,
                     onUpload: widget.onUpload,
                     onVoice: widget.onVoice,
