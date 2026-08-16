@@ -28,20 +28,22 @@ pub fn open_indexer_at(data_dir: &Path) -> AIHistoryIndexer {
 pub fn ai_stats_payload(
     indexer: &AIHistoryIndexer,
     current_sessions: &dyn RemoteAICurrentSessionProvider,
-    id: &str,
+    project_id: &str,
     name: &str,
     path: &str,
+    current_session_scope_id: &str,
 ) -> Value {
     let request = AIHistoryProjectRequest {
-        id: id.to_string(),
+        id: project_id.to_string(),
         name: name.to_string(),
         path: path.to_string(),
     };
-    let live_sessions = current_sessions.current_sessions(id);
+    let live_sessions = current_sessions.current_sessions(current_session_scope_id);
     match indexer.project_state(request) {
-        Ok(state) => stats_payload_from_state(id, name, state, live_sessions),
+        Ok(state) => stats_payload_from_state(project_id, name, state, live_sessions),
         Err(_) => {
-            let mut payload = codux_runtime_core::ai_stats::empty_ai_stats_payload(id, name);
+            let mut payload =
+                codux_runtime_core::ai_stats::empty_ai_stats_payload(project_id, name);
             if let Some(object) = payload.as_object_mut() {
                 object.insert("currentSessions".to_string(), json!(live_sessions));
             }

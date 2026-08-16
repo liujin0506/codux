@@ -71,7 +71,7 @@ type CandidateSlot = Arc<Mutex<Option<(String, String)>>>;
 /// Devices watching a project's `ai.stats` (project_id -> device ids). A device
 /// registers by requesting `ai.stats`; the poller re-pushes fresh stats to them
 /// when the live AI runtime changes, so remote views tick like the desktop's.
-type AIStatsWatchers = Arc<Mutex<HashMap<String, HashSet<String>>>>;
+type AIStatsWatchers = Arc<Mutex<HashMap<String, HashMap<String, String>>>>;
 
 struct AgentWorktreeRuntime {
     _control: Arc<AgentWorktreeControl>,
@@ -202,6 +202,81 @@ impl AgentPairingState {
         let device_id = device_id.trim();
         let device_token = device_token.trim();
         self.authorization.is_authorized(device_id, device_token)
+    }
+}
+
+fn register_ai_stats_watcher(
+    watchers: &AIStatsWatchers,
+    project_id: &str,
+    device_id: &str,
+    scope_id: &str,
+) {
+    let Ok(mut watchers) = watchers.lock() else {
+        return;
+    };
+    for (id, devices) in watchers.iter_mut() {
+        if id != project_id {
+            devices.remove(device_id);
+        }
+    }
+    watchers.retain(|_, devices| !devices.is_empty());
+    watchers
+        .entry(project_id.to_string())
+        .or_default()
+        .insert(device_id.to_string(), scope_id.to_string());
+}
+
+fn register_ai_stats_watcher_for_request(
+    watchers: &AIStatsWatchers,
+    device_id: Option<&str>,
+    project_id: &str,
+    scope_id: &str,
+) {
+    if let Some(device_id) = device_id.filter(|value| !value.trim().is_empty()) {
+        register_ai_stats_watcher(watchers, project_id, device_id, scope_id);
+    }
+}
+
+fn send_ai_stats_to_device(slot: &TransportSlot, device_id: &str, payload: Value) {
+    let envelope = json!({ "type": REMOTE_AI_STATS, "payload": payload, "deviceId": device_id });
+    let Ok(bytes) = serde_json::to_vec(&envelope) else {
+        return;
+    };
+    if let Ok(guard) = slot.lock()
+        && let Some(transport) = guard.as_ref()
+    {
+        transport.send(bytes, Some(device_id));
+    }
+}
+
+fn push_ai_stats_for_project(
+    slot: &TransportSlot,
+    indexer: &AIHistoryIndexer,
+    provider: &AgentAICurrentSessionProvider,
+    watchers: &AIStatsWatchers,
+    project_id: &str,
+) {
+    let devices = match watchers.lock() {
+        Ok(watchers) => watchers.get(project_id).cloned(),
+        Err(_) => return,
+    };
+    let Some(devices) = devices.filter(|devices| !devices.is_empty()) else {
+        return;
+    };
+    let projects = AgentProjectStore::new().list();
+    let Some(project) = projects.into_iter().find(|item| item.id == project_id) else {
+        return;
+    };
+    for (device_id, scope_id) in devices {
+        let payload = crate::ai_stats::ai_stats_payload(
+            indexer,
+            provider,
+            &project.id,
+            &project.name,
+            &project.path,
+            &scope_id,
+        );
+        send_ai_stats_to_device(slot, &device_id, payload);
     }
 }
 
@@ -808,8 +883,6 @@ fn make_handler(
                 }
             }
             REMOTE_AI_STATS => {
-                // Resolve the project (path is needed to scan its CLI history),
-                // falling back to the first project like the desktop host.
                 let project_id = payload
                     .get("projectId")
                     .and_then(Value::as_str)
@@ -818,40 +891,69 @@ fn make_handler(
                 let project = store
                     .list()
                     .into_iter()
-                    .find(|item| item.id == project_id)
-                    .or_else(|| store.list().into_iter().next());
+                    .find(|item| item.id == project_id);
                 match project {
                     Some(project) => {
-                        // Register the requesting device as a watcher (one project
-                        // per device) so the poller re-pushes on runtime change.
-                        if let Some(device_id) = device_id.filter(|value| !value.trim().is_empty())
-                            && let Ok(mut watchers) = ai_stats_watchers.lock()
+                        let current_session_scope_id = payload
+                            .get("worktreeId")
+                            .and_then(Value::as_str)
+                            .filter(|value| !value.trim().is_empty())
+                            .unwrap_or(&project.id)
+                            .to_string();
+                        if payload
+                            .get("refresh")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false)
                         {
-                            for (id, devices) in watchers.iter_mut() {
-                                if id != &project.id {
-                                    devices.remove(device_id);
-                                }
+                            let request = codux_ai_history::normalized::AIHistoryProjectRequest {
+                                id: project.id.clone(),
+                                name: project.name.clone(),
+                                path: project.path.clone(),
+                            };
+                            if let Err(error) = indexer.refresh_project(request) {
+                                Some((REMOTE_ERROR, json!({ "message": error })))
+                            } else {
+                                register_ai_stats_watcher_for_request(
+                                    &ai_stats_watchers,
+                                    device_id,
+                                    &project.id,
+                                    &current_session_scope_id,
+                                );
+                                Some((
+                                    REMOTE_AI_STATS,
+                                    crate::ai_stats::ai_stats_payload(
+                                        &indexer,
+                                        ai_current_sessions.as_ref(),
+                                        &project.id,
+                                        &project.name,
+                                        &project.path,
+                                        &current_session_scope_id,
+                                    ),
+                                ))
                             }
-                            watchers.retain(|_, devices| !devices.is_empty());
-                            watchers
-                                .entry(project.id.clone())
-                                .or_default()
-                                .insert(device_id.to_string());
-                        }
-                        Some((
-                            REMOTE_AI_STATS,
-                            crate::ai_stats::ai_stats_payload(
-                                &indexer,
-                                ai_current_sessions.as_ref(),
+                        } else {
+                            register_ai_stats_watcher_for_request(
+                                &ai_stats_watchers,
+                                device_id,
                                 &project.id,
-                                &project.name,
-                                &project.path,
-                            ),
-                        ))
+                                &current_session_scope_id,
+                            );
+                            Some((
+                                REMOTE_AI_STATS,
+                                crate::ai_stats::ai_stats_payload(
+                                    &indexer,
+                                    ai_current_sessions.as_ref(),
+                                    &project.id,
+                                    &project.name,
+                                    &project.path,
+                                    &current_session_scope_id,
+                                ),
+                            ))
+                        }
                     }
                     None => Some((
                         REMOTE_ERROR,
-                        json!({ "message": "Unable to load AI stats." }),
+                        json!({ "message": "Project not found for AI stats." }),
                     )),
                 }
             }
@@ -1215,12 +1317,27 @@ fn spawn_ai_stats_poller(
     watchers: AIStatsWatchers,
 ) {
     tokio::spawn(async move {
+        use codux_ai_history::indexer::AIHistoryEvent;
         use codux_protocol::RemoteAICurrentSession;
         use codux_runtime_core::ai_stats::RemoteAICurrentSessionProvider;
         let mut last: HashMap<String, Vec<RemoteAICurrentSession>> = HashMap::new();
         let mut ticker = tokio::time::interval(std::time::Duration::from_millis(1000));
         loop {
             ticker.tick().await;
+            for event in indexer.drain_events() {
+                if let AIHistoryEvent::ProjectState { state } = event
+                    && !state.is_loading
+                    && !state.queued
+                {
+                    push_ai_stats_for_project(
+                        &slot,
+                        &indexer,
+                        provider.as_ref(),
+                        &watchers,
+                        &state.project_id,
+                    );
+                }
+            }
             let projects = AgentProjectStore::new().list();
             let project_ids = projects
                 .iter()
@@ -1235,7 +1352,13 @@ fn spawn_ai_stats_poller(
                 }
                 Err(_) => continue,
             };
-            last.retain(|project_id, _| snapshot.contains_key(project_id));
+            last.retain(|scope_key, _| {
+                snapshot.values().any(|devices| {
+                    devices
+                        .values()
+                        .any(|scope_id| scope_key == scope_id)
+                })
+            });
             if snapshot.is_empty() {
                 continue;
             }
@@ -1243,32 +1366,33 @@ fn spawn_ai_stats_poller(
                 if devices.is_empty() {
                     continue;
                 }
-                let current = provider.current_sessions(&project_id);
-                if last.get(&project_id) == Some(&current) {
-                    continue;
-                }
-                last.insert(project_id.clone(), current);
                 let Some(project) = projects.iter().find(|item| item.id == project_id) else {
                     continue;
                 };
-                let payload = crate::ai_stats::ai_stats_payload(
-                    &indexer,
-                    provider.as_ref(),
-                    &project.id,
-                    &project.name,
-                    &project.path,
-                );
-                for device in &devices {
-                    let envelope =
-                        json!({ "type": REMOTE_AI_STATS, "payload": payload, "deviceId": device });
-                    let Ok(bytes) = serde_json::to_vec(&envelope) else {
-                        continue;
-                    };
-                    if let Ok(guard) = slot.lock()
-                        && let Some(transport) = guard.as_ref()
-                    {
-                        transport.send(bytes, Some(device));
+                let mut changed_scopes: HashSet<String> = HashSet::new();
+                for scope_id in devices.values() {
+                    let current = provider.current_sessions(scope_id);
+                    if last.get(scope_id) != Some(&current) {
+                        last.insert(scope_id.clone(), current);
+                        changed_scopes.insert(scope_id.clone());
                     }
+                }
+                if changed_scopes.is_empty() {
+                    continue;
+                }
+                for (device_id, scope_id) in devices {
+                    if !changed_scopes.contains(&scope_id) {
+                        continue;
+                    }
+                    let payload = crate::ai_stats::ai_stats_payload(
+                        &indexer,
+                        provider.as_ref(),
+                        &project.id,
+                        &project.name,
+                        &project.path,
+                        &scope_id,
+                    );
+                    send_ai_stats_to_device(&slot, &device_id, payload);
                 }
             }
         }
@@ -1882,11 +2006,14 @@ mod tests {
         let watchers: AIStatsWatchers = Arc::new(Mutex::new(HashMap::from([
             (
                 "project-1".to_string(),
-                HashSet::from(["phone-a".to_string(), "phone-b".to_string()]),
+                HashMap::from([
+                    ("phone-a".to_string(), "project-1".to_string()),
+                    ("phone-b".to_string(), "project-1".to_string()),
+                ]),
             ),
             (
                 "project-2".to_string(),
-                HashSet::from(["phone-a".to_string()]),
+                HashMap::from([("phone-a".to_string(), "project-2".to_string())]),
             ),
         ])));
 
@@ -1894,7 +2021,7 @@ mod tests {
 
         assert_eq!(
             watchers.lock().unwrap().get("project-1").cloned(),
-            Some(HashSet::from(["phone-b".to_string()]))
+            Some(HashMap::from([("phone-b".to_string(), "project-1".to_string())]))
         );
         assert!(!watchers.lock().unwrap().contains_key("project-2"));
     }
@@ -1904,11 +2031,14 @@ mod tests {
         let watchers: AIStatsWatchers = Arc::new(Mutex::new(HashMap::from([
             (
                 "project-1".to_string(),
-                HashSet::from(["phone-a".to_string(), "phone-b".to_string()]),
+                HashMap::from([
+                    ("phone-a".to_string(), "project-1".to_string()),
+                    ("phone-b".to_string(), "worktree-x".to_string()),
+                ]),
             ),
             (
                 "project-2".to_string(),
-                HashSet::from(["phone-a".to_string()]),
+                HashMap::from([("phone-a".to_string(), "project-2".to_string())]),
             ),
         ])));
 
@@ -1917,6 +2047,23 @@ mod tests {
         let watchers = watchers.lock().unwrap();
         assert!(!watchers.contains_key("project-1"));
         assert!(watchers.contains_key("project-2"));
+    }
+
+    #[test]
+    fn register_ai_stats_watcher_tracks_scope_and_switches_projects() {
+        let watchers: AIStatsWatchers = Arc::new(Mutex::new(HashMap::new()));
+        register_ai_stats_watcher(&watchers, "project-a", "device-1", "project-a");
+        register_ai_stats_watcher(&watchers, "project-a", "device-2", "worktree-x");
+        {
+            let locked = watchers.lock().unwrap();
+            assert_eq!(locked["project-a"]["device-2"], "worktree-x");
+        }
+        register_ai_stats_watcher(&watchers, "project-b", "device-1", "project-b");
+        {
+            let locked = watchers.lock().unwrap();
+            assert!(!locked["project-a"].contains_key("device-1"));
+            assert_eq!(locked["project-b"]["device-1"], "project-b");
+        }
     }
 
     #[test]

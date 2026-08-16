@@ -1,24 +1,30 @@
+import 'package:codux_protocol_ffi/codux_protocol_ffi.dart';
 import 'package:flutter/material.dart';
 
 import '../../i18n.dart';
 import '../../theme/app_theme.dart';
 
-/// Expandable floating tool menu for the terminal pane (upload, voice, …).
+/// Expandable floating tool menu for terminal actions not on the bottom toolbar.
 class TerminalToolFab extends StatefulWidget {
   const TerminalToolFab({
     super.key,
     required this.bottomOffset,
-    required this.rightInset,
+    required this.leftInset,
+    required this.onSendKey,
     required this.onUpload,
     required this.onVoice,
     this.uploadLoading = false,
   });
 
   final double bottomOffset;
-  final double rightInset;
+  final double leftInset;
+  final ValueChanged<String> onSendKey;
   final VoidCallback onUpload;
   final VoidCallback onVoice;
   final bool uploadLoading;
+
+  static const _panelFill = Color(0xB3161616);
+  static const _panelFillActive = Color(0xCC161616);
 
   @override
   State<TerminalToolFab> createState() => _TerminalToolFabState();
@@ -66,38 +72,82 @@ class _TerminalToolFabState extends State<TerminalToolFab>
     action();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final prefs = AppPreferences.of(context);
-    final accent = Theme.of(context).colorScheme.secondary;
-    final actions = [
+  void _sendKey(
+    String key, {
+    String keyChar = '',
+    bool shift = false,
+  }) {
+    final input = keyChar.isNotEmpty && !shift
+        ? terminalTextInput(keyChar)
+        : terminalKeyInput(
+            key: key,
+            keyChar: keyChar,
+            shift: shift,
+            alt: false,
+            control: false,
+            applicationCursor: false,
+          );
+    _run(() => widget.onSendKey(input));
+  }
+
+  List<_TerminalToolAction> _actions(AppPreferences prefs) {
+    return [
       _TerminalToolAction(
-        icon: Icons.mic_none_rounded,
-        label: prefs.t('toolbar.voice'),
-        onTap: () => _run(widget.onVoice),
+        icon: Icons.cancel_outlined,
+        label: prefs.t('terminal.tool.esc'),
+        onTap: () => _sendKey('escape'),
+      ),
+      _TerminalToolAction(
+        icon: Icons.keyboard_return_rounded,
+        label: prefs.t('toolbar.enter'),
+        onTap: () => _sendKey('enter'),
+      ),
+      _TerminalToolAction(
+        icon: Icons.close_rounded,
+        label: prefs.t('terminal.tool.interrupt'),
+        labelColor: AppColors.danger,
+        iconColor: AppColors.danger,
+        onTap: () => _run(() => widget.onSendKey('\u0003')),
+      ),
+      _TerminalToolAction(
+        icon: Icons.arrow_back_rounded,
+        label: prefs.t('terminal.tool.shiftTab'),
+        onTap: () => _sendKey('tab', shift: true),
       ),
       _TerminalToolAction(
         icon: Icons.upload_rounded,
         label: prefs.t('toolbar.upload'),
         onTap: widget.uploadLoading ? null : () => _run(widget.onUpload),
       ),
+      _TerminalToolAction(
+        icon: Icons.mic_none_rounded,
+        label: prefs.t('toolbar.voice'),
+        onTap: () => _run(widget.onVoice),
+      ),
     ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = AppPreferences.of(context);
+    final accent = Theme.of(context).colorScheme.secondary;
+    final actions = _actions(prefs);
 
     return Positioned(
-      right: widget.rightInset,
+      left: widget.leftInset,
       bottom: widget.bottomOffset,
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizeTransition(
             sizeFactor: _expand,
-            alignment: AlignmentDirectional(-1, 1),
+            alignment: AlignmentDirectional.bottomStart,
             child: FadeTransition(
               opacity: _expand,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (var index = 0; index < actions.length; index += 1) ...[
                     _TerminalToolFabItem(
@@ -114,10 +164,9 @@ class _TerminalToolFabState extends State<TerminalToolFab>
           ),
           Material(
             color: _expanded
-                ? accent.withValues(alpha: 0.18)
-                : AppColors.terminalElevated,
-            elevation: _expanded ? 4 : 2,
-            shadowColor: Colors.black.withValues(alpha: 0.35),
+                ? TerminalToolFab._panelFillActive
+                : TerminalToolFab._panelFill,
+            elevation: 0,
             shape: const CircleBorder(),
             child: InkWell(
               customBorder: const CircleBorder(),
@@ -153,11 +202,15 @@ class _TerminalToolAction {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.labelColor,
+    this.iconColor,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
+  final Color? labelColor;
+  final Color? iconColor;
 }
 
 class _TerminalToolFabItem extends StatelessWidget {
@@ -172,10 +225,15 @@ class _TerminalToolFabItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = action.onTap != null;
+    final iconColor = enabled
+        ? (action.iconColor ?? accent)
+        : AppColors.terminalTextDim;
+    final labelColor = enabled
+        ? (action.labelColor ?? AppColors.terminalText)
+        : AppColors.terminalTextDim;
     return Material(
-      color: AppColors.terminalElevated,
-      elevation: 3,
-      shadowColor: Colors.black.withValues(alpha: 0.35),
+      color: TerminalToolFab._panelFill,
+      elevation: 0,
       borderRadius: BorderRadius.circular(AppRadius.lg),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -190,19 +248,19 @@ class _TerminalToolFabItem extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  action.label,
-                  style: const TextStyle(
-                    color: AppColors.terminalText,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.s),
                 Icon(
                   action.icon,
                   size: 20,
-                  color: enabled ? accent : AppColors.terminalTextDim,
+                  color: iconColor,
+                ),
+                const SizedBox(width: AppSpacing.s),
+                Text(
+                  action.label,
+                  style: TextStyle(
+                    color: labelColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
