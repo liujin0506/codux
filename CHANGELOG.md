@@ -8,6 +8,12 @@ All notable changes to this project will be documented in this file.
 
 - Paused automatic memory queue processing when no eligible extraction provider is configured, preventing repeated failures and UI refresh churn while preserving queued work until a provider becomes available.
 
+## [2.0.7] - 2026-08-16
+
+### Fixed
+
+- Headless Agent hosts now handle mobile terminal file uploads, matching the desktop host upload path and `terminal.uploaded` reply flow.
+
 ## [2.0.4] - 2026-08-14
 
 ### Added

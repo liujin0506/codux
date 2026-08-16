@@ -9,6 +9,7 @@ import '../../services/terminal_repaint_signal.dart';
 import '../../theme/app_theme.dart';
 import 'connect_hint.dart';
 import 'self_drawn_terminal_view.dart';
+import 'terminal_tool_fab.dart';
 import 'toolbar.dart';
 
 class RemoteTerminalPane extends StatefulWidget {
@@ -43,6 +44,8 @@ class RemoteTerminalPane extends StatefulWidget {
     required this.onRequestKeyboard,
     required this.onPaste,
     required this.onCopy,
+    required this.onUpload,
+    required this.onVoice,
     required this.handedAway,
     required this.onTakeOver,
   });
@@ -76,6 +79,8 @@ class RemoteTerminalPane extends StatefulWidget {
   final VoidCallback onRequestKeyboard;
   final VoidCallback onPaste;
   final VoidCallback onCopy;
+  final VoidCallback onUpload;
+  final VoidCallback onVoice;
   // Handoff: the desktop (or another device) currently owns this session. Show a
   // placeholder instead of the live terminal; onTakeOver reclaims it to here.
   final bool handedAway;
@@ -285,6 +290,19 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
                       onPaste: widget.onPaste,
                       onCopy: widget.onCopy,
                     ),
+                  ),
+                if (widget.showTerminal &&
+                    widget.connected &&
+                    widget.workspaceMode == WorkspaceMode.terminal &&
+                    !widget.handedAway)
+                  TerminalToolFab(
+                    bottomOffset:
+                        (showTerminalToolbar ? terminalToolbarHeight : 0) +
+                        AppSpacing.m,
+                    rightInset: edgeInset,
+                    uploadLoading: widget.terminalUploadLoading,
+                    onUpload: widget.onUpload,
+                    onVoice: widget.onVoice,
                   ),
               ],
             );

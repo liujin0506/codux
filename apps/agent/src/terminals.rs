@@ -14,10 +14,15 @@ use codux_protocol::{
     REMOTE_ERROR, REMOTE_PROJECT_LIST, REMOTE_RESOURCE_SUBSCRIBE, REMOTE_RESOURCE_TERMINALS,
     REMOTE_RESOURCE_UNSUBSCRIBE, REMOTE_TERMINAL_BUFFER_MAX_CHARS, REMOTE_TERMINAL_CLOSED,
     REMOTE_TERMINAL_CREATED, REMOTE_TERMINAL_INPUT_ACK, REMOTE_TERMINAL_LIST,
-    REMOTE_TERMINAL_OUTPUT, REMOTE_TERMINAL_VIEWPORT_STATE, RemoteTerminalBufferWindow,
-    RemoteTerminalSubscriptions, terminal_buffer_payloads, terminal_live_output_payload,
+    REMOTE_TERMINAL_OUTPUT, REMOTE_TERMINAL_UPLOADED, REMOTE_TERMINAL_VIEWPORT_STATE,
+    RemoteTerminalBufferWindow, RemoteTerminalSubscriptions, terminal_buffer_payloads,
+    terminal_live_output_payload,
 };
-use codux_remote_transport::RemoteTransport;
+use codux_remote_transport::{RemoteTransport, RemoteTransportUpload};
+use codux_runtime_core::upload::{
+    sanitized_upload_name, terminal_upload_directory, terminal_upload_path_input,
+    unique_upload_path,
+};
 use codux_runtime_core::terminal::terminal_snapshot_payload;
 use codux_runtime_live::remote_terminal_dispatch::{
     self, RemoteTerminalDispatch, TerminalMessage, apply_terminal_osc_color_env,
@@ -1357,6 +1362,59 @@ pub fn handle_terminal(
     }
 }
 
+/// Persist a controller-uploaded blob for a terminal session, insert its path
+/// into the PTY, and notify the uploader (same semantics as the desktop host).
+pub(crate) fn handle_terminal_upload(
+    driver: &TerminalManager,
+    transport: &TransportSlot,
+    upload: RemoteTransportUpload,
+) -> Result<(), String> {
+    use std::fs;
+
+    let device_id = upload.device_id.trim();
+    let session_id = upload.session_id.trim();
+    if session_id.is_empty() {
+        return Err("Terminal session is required.".to_string());
+    }
+    if upload.bytes.is_empty() || upload.bytes.len() > codux_protocol::REMOTE_BLOB_MAX_BYTES {
+        return Err("Upload size is not supported.".to_string());
+    }
+    let name = sanitized_upload_name(&upload.name);
+    let kind = if upload.kind.trim().eq_ignore_ascii_case("image") {
+        "image"
+    } else {
+        "file"
+    };
+    let directory = terminal_upload_directory(session_id);
+    fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    let path = unique_upload_path(&directory, &name);
+    fs::write(&path, &upload.bytes).map_err(|error| error.to_string())?;
+    let text = format!("{} ", terminal_upload_path_input(&path));
+    driver
+        .write(session_id, text.as_bytes())
+        .map_err(|error| error.to_string())?;
+    reply(
+        transport,
+        if device_id.is_empty() {
+            None
+        } else {
+            Some(device_id)
+        },
+        Some(session_id),
+        None,
+        REMOTE_TERMINAL_UPLOADED,
+        json!({
+            "path": path.to_string_lossy().to_string(),
+            "name": path.file_name().and_then(|value| value.to_str()).unwrap_or_default(),
+            "kind": kind,
+            "mode": "path",
+            "tool": Value::Null,
+            "inserted": true,
+        }),
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1649,6 +1707,71 @@ mod tests {
         assert_eq!(
             driver.viewport_state(&session_id).unwrap().owner,
             "remote:phone-a"
+        );
+
+        driver.kill(&session_id).ok();
+        std::fs::remove_dir_all(temp).ok();
+    }
+
+    #[test]
+    fn terminal_upload_writes_file_and_notifies_controller() {
+        let driver = Arc::new(TerminalManager::new());
+        let temp = std::env::temp_dir().join(format!(
+            "codux-agent-upload-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&temp).unwrap();
+        let session_id = driver
+            .create(
+                TerminalPtyConfig {
+                    cwd: Some(temp.to_string_lossy().to_string()),
+                    ..Default::default()
+                },
+                |_| {},
+            )
+            .expect("create terminal");
+        let (transport, received) = test_transport(&["phone-a"]);
+        let upload = codux_remote_transport::RemoteTransportUpload {
+            device_id: "phone-a".to_string(),
+            session_id: session_id.clone(),
+            name: "probe.png".to_string(),
+            mime: "image/png".to_string(),
+            kind: "image".to_string(),
+            bytes: b"png-bytes".to_vec(),
+            ticket: String::new(),
+        };
+
+        handle_terminal_upload(&driver, &transport, upload).expect("upload");
+
+        let messages = received.lock().unwrap();
+        let uploaded = messages
+            .get("phone-a")
+            .and_then(|items| {
+                items.iter().find(|message| {
+                    message.get("type").and_then(Value::as_str) == Some(REMOTE_TERMINAL_UPLOADED)
+                })
+            })
+            .expect("terminal.uploaded");
+        let path = uploaded
+            .get("payload")
+            .and_then(|payload| payload.get("path"))
+            .and_then(Value::as_str)
+            .expect("upload path");
+        assert!(std::path::Path::new(path).exists());
+        assert_eq!(
+            std::fs::read(path).expect("read upload"),
+            b"png-bytes".to_vec()
+        );
+        assert_eq!(
+            uploaded
+                .get("payload")
+                .and_then(|payload| payload.get("inserted"))
+                .and_then(Value::as_bool),
+            Some(true)
         );
 
         driver.kill(&session_id).ok();
