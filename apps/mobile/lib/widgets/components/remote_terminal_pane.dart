@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../i18n.dart';
+import '../../services/remote_capabilities.dart';
 import '../../models/workspace_mode.dart';
 import '../../services/remote_terminal_output_controller.dart';
 import '../../services/terminal_repaint_signal.dart';
@@ -47,6 +48,7 @@ class RemoteTerminalPane extends StatefulWidget {
     required this.onUpload,
     required this.onVoice,
     required this.handedAway,
+    required this.aiTool,
     required this.handoffMessageKey,
     required this.onTakeOver,
   });
@@ -85,6 +87,8 @@ class RemoteTerminalPane extends StatefulWidget {
   // Handoff: the desktop (or another device) currently owns this session. Show a
   // placeholder instead of the live terminal; onTakeOver reclaims it to here.
   final bool handedAway;
+  /// Host-configured AI shortcut shown in the tool FAB.
+  final MobileAiToolCapability aiTool;
   final String handoffMessageKey;
   final VoidCallback onTakeOver;
 
@@ -303,6 +307,7 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
                         AppSpacing.m,
                     leftInset: edgeInset,
                     onSendKey: widget.onSendKey,
+                    aiTool: widget.aiTool,
                     uploadLoading: widget.terminalUploadLoading,
                     onUpload: widget.onUpload,
                     onVoice: widget.onVoice,

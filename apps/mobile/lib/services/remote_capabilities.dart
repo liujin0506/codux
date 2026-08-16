@@ -60,6 +60,38 @@ class TerminalBufferCapability {
   }
 }
 
+/// Host-configured AI shortcut for the terminal tool menu. The host decides
+/// both whether the button exists and what it runs, so the phone never invents
+/// a command of its own.
+class MobileAiToolCapability {
+  const MobileAiToolCapability({this.command = '', this.label = ''});
+
+  final String command;
+
+  /// Host-supplied caption. Empty means "use the app's own translation".
+  final String label;
+
+  static const fallback = MobileAiToolCapability();
+
+  bool get enabled => command.isNotEmpty;
+
+  factory MobileAiToolCapability.fromHostInfo(Object? payload) {
+    if (payload is! Map) return fallback;
+    final capabilities = payload['capabilities'];
+    if (capabilities is! Map) return fallback;
+    final mobileTools = capabilities['mobileTools'];
+    if (mobileTools is! Map) return fallback;
+    final aiCommand = mobileTools['aiCommand'];
+    if (aiCommand is! Map) return fallback;
+    final command = '${aiCommand['command'] ?? ''}'.trim();
+    if (command.isEmpty) return fallback;
+    return MobileAiToolCapability(
+      command: command,
+      label: '${aiCommand['label'] ?? ''}'.trim(),
+    );
+  }
+}
+
 class RemoteResourceSubscriptionCapability {
   const RemoteResourceSubscriptionCapability([this.resources = const {}]);
 

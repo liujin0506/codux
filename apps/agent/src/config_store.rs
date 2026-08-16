@@ -26,6 +26,13 @@ pub struct CoduxConfig {
     pub relay_url: String,
     /// Optional bearer token for a custom relay.
     pub relay_authentication: String,
+    /// Whether phones show the AI shortcut in the terminal tool menu.
+    pub mobile_ai_button: bool,
+    /// Command the AI shortcut runs. An empty command hides the button even
+    /// when `mobile_ai_button` is on.
+    pub mobile_ai_command: String,
+    /// Optional button caption; phones fall back to their own translation.
+    pub mobile_ai_label: String,
 }
 
 impl Default for CoduxConfig {
@@ -37,6 +44,9 @@ impl Default for CoduxConfig {
             relay_preset: "global".to_string(),
             relay_url: String::new(),
             relay_authentication: String::new(),
+            mobile_ai_button: false,
+            mobile_ai_command: String::new(),
+            mobile_ai_label: String::new(),
         }
     }
 }

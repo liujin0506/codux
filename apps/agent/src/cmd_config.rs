@@ -3,7 +3,7 @@
 //! the host identity (host_id/token), which would invalidate paired desktops.
 
 use dialoguer::theme::ColorfulTheme;
-use dialoguer::{Input, Select};
+use dialoguer::{Confirm, Input, Select};
 
 use crate::config_store::{CoduxConfig, RELAY_PRESET_CUSTOM};
 
@@ -13,6 +13,9 @@ pub struct ConfigArgs {
     pub relay_preset: Option<String>,
     pub relay_url: Option<String>,
     pub relay_authentication: Option<String>,
+    pub mobile_ai_button: Option<bool>,
+    pub mobile_ai_command: Option<String>,
+    pub mobile_ai_label: Option<String>,
 }
 
 impl ConfigArgs {
@@ -21,6 +24,9 @@ impl ConfigArgs {
             || self.relay_preset.is_some()
             || self.relay_url.is_some()
             || self.relay_authentication.is_some()
+            || self.mobile_ai_button.is_some()
+            || self.mobile_ai_command.is_some()
+            || self.mobile_ai_label.is_some()
     }
 }
 
@@ -100,6 +106,36 @@ pub fn run(args: ConfigArgs) -> Result<(), String> {
         config.relay_authentication = String::new();
     }
 
+    // 4. Mobile AI shortcut — the phone only shows the button when this host
+    // says so, and always runs the command configured here.
+    let mobile_ai_button = Confirm::with_theme(&theme)
+        .with_prompt("Show the AI shortcut in the phone's terminal tool menu")
+        .default(config.mobile_ai_button)
+        .interact()
+        .map_err(|error| error.to_string())?;
+    config.mobile_ai_button = mobile_ai_button;
+    if mobile_ai_button {
+        let command: String = Input::with_theme(&theme)
+            .with_prompt("AI shortcut command")
+            .with_initial_text(config.mobile_ai_command.clone())
+            .allow_empty(true)
+            .interact_text()
+            .map_err(|error| error.to_string())?;
+        config.mobile_ai_command = command.trim().to_string();
+
+        let label: String = Input::with_theme(&theme)
+            .with_prompt("AI shortcut caption (optional)")
+            .with_initial_text(config.mobile_ai_label.clone())
+            .allow_empty(true)
+            .interact_text()
+            .map_err(|error| error.to_string())?;
+        config.mobile_ai_label = label.trim().to_string();
+
+        if config.mobile_ai_command.is_empty() {
+            println!("No command set, so the phone keeps the AI shortcut hidden.");
+        }
+    }
+
     // Preserve (or mint once) the stable host identity.
     config.ensure_identity()?;
     config.save()?;
@@ -132,6 +168,12 @@ fn run_non_interactive(args: ConfigArgs) -> Result<(), String> {
         args.relay_url.as_deref(),
         args.relay_authentication.as_deref(),
     )?;
+    apply_mobile_ai_args(
+        &mut config,
+        args.mobile_ai_button,
+        args.mobile_ai_command.as_deref(),
+        args.mobile_ai_label.as_deref(),
+    );
     config.ensure_identity()?;
     config.save()?;
 
@@ -142,6 +184,25 @@ fn run_non_interactive(args: ConfigArgs) -> Result<(), String> {
     );
     println!("relay: {}", config.relay_preset);
     Ok(())
+}
+
+/// Apply the non-interactive mobile AI shortcut flags. Only provided flags are
+/// touched, so `--mobile-ai-command` alone keeps the current switch.
+pub fn apply_mobile_ai_args(
+    config: &mut CoduxConfig,
+    button: Option<bool>,
+    command: Option<&str>,
+    label: Option<&str>,
+) {
+    if let Some(button) = button {
+        config.mobile_ai_button = button;
+    }
+    if let Some(command) = command {
+        config.mobile_ai_command = command.trim().to_string();
+    }
+    if let Some(label) = label {
+        config.mobile_ai_label = label.trim().to_string();
+    }
 }
 
 pub fn apply_relay_args(

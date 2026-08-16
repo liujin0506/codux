@@ -428,6 +428,7 @@ class _CoduxHomePageState extends State<CoduxHomePage>
       onUpload: c._chooseUploadForTerminal,
       onVoice: c._startVoiceInput,
       handedAway: c._remoteHandedAway,
+      aiTool: c._mobileAiTool,
       handoffMessageKey: c._terminalHandoffMessageKey(),
       onTakeOver: () => c._takeOverTerminalViewport(),
     );

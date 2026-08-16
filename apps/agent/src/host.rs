@@ -32,7 +32,7 @@ use codux_runtime_core::{
         file_read_blob_bytes, file_read_payload, file_rename, file_write, file_write_bytes,
     },
     git::git_status_payload,
-    host::{HostInfoPayload, host_info_payload},
+    host::{HostInfoPayload, MobileAiTool, host_info_payload},
     project::project_list_payload,
 };
 use codux_runtime_live::{
@@ -62,6 +62,8 @@ pub struct AgentHostConfig {
     pub relay_url: String,
     /// Optional bearer token for a custom relay.
     pub relay_authentication: String,
+    /// Host-configured AI shortcut for the mobile terminal tool menu.
+    pub mobile_ai_tool: MobileAiTool,
 }
 
 type TransportSlot = Arc<Mutex<Option<Arc<dyn RemoteTransport>>>>;
@@ -337,6 +339,7 @@ struct AgentMessageHandlerContext {
     ai_stats_watchers: AIStatsWatchers,
     host_id: String,
     name: String,
+    mobile_ai_tool: MobileAiTool,
 }
 
 fn make_handler(
@@ -352,6 +355,7 @@ fn make_handler(
         ai_stats_watchers,
         host_id,
         name,
+        mobile_ai_tool,
     } = context;
     Arc::new(move |source: String, data: Vec<u8>| {
         let Ok(envelope) = serde_json::from_slice::<Value>(&data) else {
@@ -563,6 +567,7 @@ fn make_handler(
                         codux_protocol::REMOTE_RESOURCE_TERMINALS.to_string(),
                     ],
                     transports: Vec::new(),
+                    mobile_ai_tool: mobile_ai_tool.clone(),
                 }),
             )),
             REMOTE_FILE_LIST => {
@@ -1227,6 +1232,7 @@ async fn connect_serving_host(
                 ai_stats_watchers: Arc::clone(&ai_stats_watchers),
                 host_id: cfg.host_id.clone(),
                 name: cfg.name.clone(),
+                mobile_ai_tool: cfg.mobile_ai_tool.clone(),
             }),
             on_upload: {
                 let driver = Arc::clone(&driver);
@@ -1566,6 +1572,7 @@ pub async fn run_serve_smoke_async() -> Result<String, String> {
         relay_preset: "global".to_string(),
         relay_url: "https://relay.example".to_string(),
         relay_authentication: String::new(),
+        mobile_ai_tool: MobileAiTool::default(),
     };
     // Keep the smoke's project store out of the real ~/.codux-agent.
     let data_dir = std::env::temp_dir().join(format!("codux-agent-data-{}", std::process::id()));

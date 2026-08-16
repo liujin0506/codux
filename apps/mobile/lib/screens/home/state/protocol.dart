@@ -98,6 +98,7 @@ extension _HomePageProtocol on HomeController {
             _resourceSubscriptionCoordinator.configure(
               RemoteResourceSubscriptionCapability.fromHostInfo(payload),
             );
+            _mobileAiTool = MobileAiToolCapability.fromHostInfo(payload);
             if (payload['name'] != null) {
               _updateDevice(
                 target.deviceId,

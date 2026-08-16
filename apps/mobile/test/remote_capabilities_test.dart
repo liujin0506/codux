@@ -102,4 +102,48 @@ void main() {
     expect(capability.supports('git.status'), isTrue);
     expect(capability.supports('worktrees'), isFalse);
   });
+
+  test('ai shortcut reads the host command and caption', () {
+    final capability = MobileAiToolCapability.fromHostInfo({
+      'capabilities': {
+        'mobileTools': {
+          'aiCommand': {'command': '  claude  ', 'label': '  Claude  '},
+        },
+      },
+    });
+
+    expect(capability.enabled, isTrue);
+    expect(capability.command, 'claude');
+    expect(capability.label, 'Claude');
+  });
+
+  test('ai shortcut stays off when the host advertises nothing usable', () {
+    expect(
+      MobileAiToolCapability.fromHostInfo({'protocolVersion': 'v3.0'}).enabled,
+      isFalse,
+    );
+    expect(
+      MobileAiToolCapability.fromHostInfo({
+        'capabilities': {
+          'mobileTools': {
+            'aiCommand': {'command': '   '},
+          },
+        },
+      }).enabled,
+      isFalse,
+    );
+  });
+
+  test('ai shortcut without a caption defers to the app translation', () {
+    final capability = MobileAiToolCapability.fromHostInfo({
+      'capabilities': {
+        'mobileTools': {
+          'aiCommand': {'command': 'codex'},
+        },
+      },
+    });
+
+    expect(capability.enabled, isTrue);
+    expect(capability.label, isEmpty);
+  });
 }

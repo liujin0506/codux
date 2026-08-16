@@ -2,6 +2,7 @@ import 'package:codux_protocol_ffi/codux_protocol_ffi.dart';
 import 'package:flutter/material.dart';
 
 import '../../i18n.dart';
+import '../../services/remote_capabilities.dart';
 import '../../theme/app_theme.dart';
 
 /// Expandable floating tool menu for terminal actions not on the bottom toolbar.
@@ -13,6 +14,7 @@ class TerminalToolFab extends StatefulWidget {
     required this.onSendKey,
     required this.onUpload,
     required this.onVoice,
+    this.aiTool = MobileAiToolCapability.fallback,
     this.uploadLoading = false,
   });
 
@@ -21,6 +23,10 @@ class TerminalToolFab extends StatefulWidget {
   final ValueChanged<String> onSendKey;
   final VoidCallback onUpload;
   final VoidCallback onVoice;
+
+  /// Host-configured AI shortcut. The action only appears while the host
+  /// advertises a command.
+  final MobileAiToolCapability aiTool;
   final bool uploadLoading;
 
   static const _panelFill = Color(0xB3161616);
@@ -90,8 +96,34 @@ class _TerminalToolFabState extends State<TerminalToolFab>
     _run(() => widget.onSendKey(input));
   }
 
+  /// Type the host's command and submit it, the way a user would.
+  void _sendCommand(String command) {
+    _run(() {
+      widget.onSendKey(terminalTextInput(command));
+      widget.onSendKey(
+        terminalKeyInput(
+          key: 'enter',
+          keyChar: '',
+          shift: false,
+          alt: false,
+          control: false,
+          applicationCursor: false,
+        ),
+      );
+    });
+  }
+
   List<_TerminalToolAction> _actions(AppPreferences prefs) {
+    final aiTool = widget.aiTool;
     return [
+      if (aiTool.enabled)
+        _TerminalToolAction(
+          icon: Icons.auto_awesome_rounded,
+          label: aiTool.label.isNotEmpty
+              ? aiTool.label
+              : prefs.t('terminal.tool.ai'),
+          onTap: () => _sendCommand(aiTool.command),
+        ),
       _TerminalToolAction(
         icon: Icons.cancel_outlined,
         label: prefs.t('terminal.tool.esc'),
