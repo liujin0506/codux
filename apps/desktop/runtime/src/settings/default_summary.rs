@@ -55,6 +55,8 @@ impl Default for SettingsSummary {
             remote_relay_preset: "global".to_string(),
             remote_relay_url: String::new(),
             remote_relay_authentication: String::new(),
+            remote_mobile_ai_button: false,
+            remote_mobile_ai_commands: Vec::new(),
             remote_cached_devices: 0,
             update_enabled: true,
             update_channel: "stable".to_string(),

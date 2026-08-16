@@ -826,7 +826,12 @@
       "settings.ai.tool.reasoning_effort.low": "Low",
       "settings.ai.tool.reasoning_effort.medium": "Medium",
       "settings.ai.tool.reasoning_effort.high": "High",
-      "settings.ai.tool.reasoning_effort.xhigh": "XHigh"
+      "settings.ai.tool.reasoning_effort.xhigh": "XHigh",
+      "settings.remote.mobile_ai": "Phone AI Shortcuts",
+      "settings.remote.mobile_ai.help": "Show these commands in the phone's terminal tool menu. Tapping one runs it.",
+      "settings.remote.mobile_ai.add": "Add shortcut",
+      "settings.remote.mobile_ai.command_placeholder": "Command, for example claude",
+      "settings.remote.mobile_ai.label_placeholder": "Caption (optional)"
     },
     "es": {
       "settings.ai_auto_refresh": "Actualización automática de IA",
@@ -3719,7 +3724,12 @@
       "settings.ai.tool.reasoning_effort.low": "低",
       "settings.ai.tool.reasoning_effort.medium": "中",
       "settings.ai.tool.reasoning_effort.high": "高",
-      "settings.ai.tool.reasoning_effort.xhigh": "极高"
+      "settings.ai.tool.reasoning_effort.xhigh": "极高",
+      "settings.remote.mobile_ai": "手机 AI 快捷命令",
+      "settings.remote.mobile_ai.help": "在手机的终端工具菜单里显示这些命令，点击即执行。",
+      "settings.remote.mobile_ai.add": "添加快捷命令",
+      "settings.remote.mobile_ai.command_placeholder": "命令，例如 claude",
+      "settings.remote.mobile_ai.label_placeholder": "按钮文案（可选）"
     },
     "zh-Hant": {
       "settings.ai_auto_refresh": "AI 自動重新整理",
@@ -4134,7 +4144,12 @@
       "settings.ai.tool.reasoning_effort.low": "低",
       "settings.ai.tool.reasoning_effort.medium": "中",
       "settings.ai.tool.reasoning_effort.high": "高",
-      "settings.ai.tool.reasoning_effort.xhigh": "極高"
+      "settings.ai.tool.reasoning_effort.xhigh": "極高",
+      "settings.remote.mobile_ai": "手機 AI 快捷指令",
+      "settings.remote.mobile_ai.help": "在手機的終端工具選單裡顯示這些指令，點擊即執行。",
+      "settings.remote.mobile_ai.add": "新增快捷指令",
+      "settings.remote.mobile_ai.command_placeholder": "指令，例如 claude",
+      "settings.remote.mobile_ai.label_placeholder": "按鈕文字（選填）"
     }
   }
 }

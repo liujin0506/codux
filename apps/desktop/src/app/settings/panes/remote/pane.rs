@@ -312,6 +312,9 @@ pub(in crate::app::settings) fn settings_remote_pane(
                             .children(custom)
                             .into_any_element()
                     },
+                    super::mobile_ai::settings_remote_mobile_ai_section(
+                        settings, window, cx, language,
+                    ),
                     div()
                         .py(px(10.0))
                         .flex()
