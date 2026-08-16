@@ -1126,7 +1126,13 @@ async fn connect_serving_host(
                 host_id: cfg.host_id.clone(),
                 name: cfg.name.clone(),
             }),
-            on_upload: Arc::new(|_| Ok(())),
+            on_upload: {
+                let driver = Arc::clone(&driver);
+                let slot = Arc::clone(&slot);
+                Arc::new(move |upload| {
+                    crate::terminals::handle_terminal_upload(&driver, &slot, upload)
+                })
+            },
             on_state: {
                 let driver = Arc::clone(&driver);
                 let fanout = fanout.clone();

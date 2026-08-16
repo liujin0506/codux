@@ -4,6 +4,16 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.7] - 2026-08-16
+
+### Added
+
+- Restored terminal file/image upload and local voice input behind an expandable floating tool menu on the phone terminal pane.
+
+### Changed
+
+- Updated upload status copy to refer to hosts instead of computers so Agent pairing reads correctly.
+
 ## [2.0.6] - 2026-08-15
 
 ### Changed

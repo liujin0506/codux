@@ -108,11 +108,57 @@ void main() {
       80,
     );
   });
+
+  testWidgets('terminal tool fab exposes upload and voice actions', (
+    tester,
+  ) async {
+    var uploadTapped = false;
+    var voiceTapped = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: AppPreferences(
+          accent: AccentChoices.cyan,
+          locale: LocaleChoices.english,
+          themeMode: ThemeMode.dark,
+          child: SizedBox(
+            width: 360,
+            height: 720,
+            child: _pane(
+              onUpload: () => uploadTapped = true,
+              onVoice: () => voiceTapped = true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.apps_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text('Upload'), findsOneWidget);
+    expect(find.text('Voice'), findsOneWidget);
+
+    await tester.tap(find.text('Upload'));
+    await tester.pump();
+    expect(uploadTapped, isTrue);
+
+    await tester.tap(find.byIcon(Icons.apps_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.tap(find.text('Voice'));
+    await tester.pump();
+    expect(voiceTapped, isTrue);
+  });
 }
 
 RemoteTerminalPane _pane({
   ValueChanged<String>? onSendKey,
   bool keyboardVisible = false,
+  VoidCallback? onUpload,
+  VoidCallback? onVoice,
 }) {
   return RemoteTerminalPane(
     connected: true,
@@ -144,6 +190,8 @@ RemoteTerminalPane _pane({
     onRequestKeyboard: () {},
     onPaste: () {},
     onCopy: () {},
+    onUpload: onUpload ?? () {},
+    onVoice: onVoice ?? () {},
     handedAway: false,
     onTakeOver: () {},
   );
