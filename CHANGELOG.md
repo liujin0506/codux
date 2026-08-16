@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.11] - 2026-08-16
+
+### Fixed
+- Fixed Kimi Code (and similar CLIs) Ctrl+S queue/interrupt input on Windows/Linux by forwarding the shortcut to the focused terminal instead of triggering editor save.
+- Fixed macOS developer Performance Monitor HUD repeatedly spawning `ps` for CPU sampling, which could trigger corporate EDR/security policies.
+
 ## [2.0.9] - 2026-08-16
 
 ### Added
