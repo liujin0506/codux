@@ -4,6 +4,12 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.9] - 2026-08-16
+
+### Added
+
+- Added AI shortcuts to the terminal tool menu. The connected host decides whether they appear and what they run, so a phone never offers a command the host does not have.
+
 ## [2.0.8] - 2026-08-16
 
 ### Fixed
