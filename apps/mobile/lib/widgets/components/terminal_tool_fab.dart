@@ -114,15 +114,14 @@ class _TerminalToolFabState extends State<TerminalToolFab>
   }
 
   List<_TerminalToolAction> _actions(AppPreferences prefs) {
-    final aiTool = widget.aiTool;
     return [
-      if (aiTool.enabled)
+      for (final entry in widget.aiTool.commands)
         _TerminalToolAction(
           icon: Icons.auto_awesome_rounded,
-          label: aiTool.label.isNotEmpty
-              ? aiTool.label
+          label: entry.label.isNotEmpty
+              ? entry.label
               : prefs.t('terminal.tool.ai'),
-          onTap: () => _sendCommand(aiTool.command),
+          onTap: () => _sendCommand(entry.command),
         ),
       _TerminalToolAction(
         icon: Icons.cancel_outlined,

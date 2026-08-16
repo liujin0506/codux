@@ -103,21 +103,46 @@ void main() {
     expect(capability.supports('worktrees'), isFalse);
   });
 
-  test('ai shortcut reads the host command and caption', () {
+  test('ai shortcuts read the host commands in order', () {
     final capability = MobileAiToolCapability.fromHostInfo({
       'capabilities': {
         'mobileTools': {
-          'aiCommand': {'command': '  claude  ', 'label': '  Claude  '},
+          'aiCommands': [
+            {'command': '  claude  ', 'label': '  Claude  '},
+            {'command': 'codex'},
+            // Blank commands never become dead buttons.
+            {'command': '   ', 'label': 'Ghost'},
+          ],
         },
       },
     });
 
     expect(capability.enabled, isTrue);
-    expect(capability.command, 'claude');
-    expect(capability.label, 'Claude');
+    expect(capability.commands.length, 2);
+    expect(capability.commands.first.command, 'claude');
+    expect(capability.commands.first.label, 'Claude');
+    expect(capability.commands.last.command, 'codex');
+    // No caption means the app falls back to its own translation.
+    expect(capability.commands.last.label, isEmpty);
   });
 
-  test('ai shortcut stays off when the host advertises nothing usable', () {
+  test('ai shortcuts are capped so the menu stays usable', () {
+    final capability = MobileAiToolCapability.fromHostInfo({
+      'capabilities': {
+        'mobileTools': {
+          'aiCommands': [
+            for (var index = 0; index < MobileAiToolCapability.maxCommands + 3; index += 1)
+              {'command': 'cmd-$index'},
+          ],
+        },
+      },
+    });
+
+    expect(capability.commands.length, MobileAiToolCapability.maxCommands);
+    expect(capability.commands.first.command, 'cmd-0');
+  });
+
+  test('ai shortcuts stay off when the host advertises nothing usable', () {
     expect(
       MobileAiToolCapability.fromHostInfo({'protocolVersion': 'v3.0'}).enabled,
       isFalse,
@@ -126,24 +151,13 @@ void main() {
       MobileAiToolCapability.fromHostInfo({
         'capabilities': {
           'mobileTools': {
-            'aiCommand': {'command': '   '},
+            'aiCommands': [
+              {'command': '   '},
+            ],
           },
         },
       }).enabled,
       isFalse,
     );
-  });
-
-  test('ai shortcut without a caption defers to the app translation', () {
-    final capability = MobileAiToolCapability.fromHostInfo({
-      'capabilities': {
-        'mobileTools': {
-          'aiCommand': {'command': 'codex'},
-        },
-      },
-    });
-
-    expect(capability.enabled, isTrue);
-    expect(capability.label, isEmpty);
   });
 }

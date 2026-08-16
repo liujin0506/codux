@@ -184,7 +184,7 @@ void main() {
     expect(find.byIcon(Icons.auto_awesome_rounded), findsNothing);
   });
 
-  testWidgets('terminal tool fab runs the host ai command with a submit', (
+  testWidgets('terminal tool fab runs the host ai commands with a submit', (
     tester,
   ) async {
     final sent = <String>[];
@@ -200,10 +200,10 @@ void main() {
             height: 720,
             child: _pane(
               onSendKey: sent.add,
-              aiTool: const MobileAiToolCapability(
-                command: 'claude',
-                label: 'Claude',
-              ),
+              aiTool: const MobileAiToolCapability([
+                MobileAiCommand(command: 'claude', label: 'Claude'),
+                MobileAiCommand(command: 'codex'),
+              ]),
             ),
           ),
         ),
@@ -215,14 +215,24 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    // The host-supplied caption wins over the app's own translation.
+    // The host-supplied caption wins; the entry without one falls back to the
+    // app's translation.
     expect(find.text('Claude'), findsOneWidget);
+    expect(find.text('AI'), findsOneWidget);
 
     await tester.tap(find.text('Claude'));
     await tester.pump();
 
     // Typed as text, then submitted with a carriage return.
     expect(sent, ['claude', '\r']);
+
+    await tester.tap(find.byIcon(Icons.apps_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.tap(find.text('AI'));
+    await tester.pump();
+
+    expect(sent, ['claude', '\r', 'codex', '\r']);
   });
 }
 

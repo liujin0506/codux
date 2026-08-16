@@ -59,15 +59,16 @@ enum Command {
         /// Set the custom relay auth token.
         #[arg(long)]
         relay_authentication: Option<String>,
-        /// Show or hide the AI shortcut in the phone's terminal tool menu.
+        /// Show or hide the AI shortcuts in the phone's terminal tool menu.
         #[arg(long)]
         mobile_ai_button: Option<bool>,
-        /// Command the phone's AI shortcut runs.
-        #[arg(long)]
-        mobile_ai_command: Option<String>,
-        /// Caption for the phone's AI shortcut (defaults to the app's own).
-        #[arg(long)]
-        mobile_ai_label: Option<String>,
+        /// Command a phone AI shortcut runs. Repeat for several; the flags
+        /// replace the whole list, in menu order.
+        #[arg(long = "mobile-ai-command")]
+        mobile_ai_commands: Option<Vec<String>>,
+        /// Caption for the shortcut at the same position (optional).
+        #[arg(long = "mobile-ai-label")]
+        mobile_ai_labels: Option<Vec<String>>,
     },
     /// Install and enable Codux as a system startup service.
     Install,
@@ -161,16 +162,16 @@ fn main() {
             relay_url,
             relay_authentication,
             mobile_ai_button,
-            mobile_ai_command,
-            mobile_ai_label,
+            mobile_ai_commands,
+            mobile_ai_labels,
         }) => cmd_config::run(cmd_config::ConfigArgs {
             device_name,
             relay_preset,
             relay_url,
             relay_authentication,
             mobile_ai_button,
-            mobile_ai_command,
-            mobile_ai_label,
+            mobile_ai_commands,
+            mobile_ai_labels,
         }),
         Some(Command::Install) => cmd_service::install(),
         Some(Command::Uninstall) => cmd_service::uninstall(),

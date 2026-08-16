@@ -650,8 +650,14 @@ impl RemoteHostRuntime {
                 transports,
                 mobile_ai_tool: runtime_host::MobileAiTool {
                     enabled: settings.mobile_ai_button,
-                    command: settings.mobile_ai_command,
-                    label: settings.mobile_ai_label,
+                    commands: settings
+                        .mobile_ai_commands
+                        .into_iter()
+                        .map(|entry| runtime_host::MobileAiCommand {
+                            command: entry.command,
+                            label: entry.label,
+                        })
+                        .collect(),
                 },
             }),
         );

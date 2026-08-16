@@ -1,29 +1,42 @@
 use codux_protocol::{REMOTE_PROTOCOL_VERSION, RemoteTransportCandidate, host_capabilities};
 use serde_json::{Value, json};
 
-/// Host-configured shortcut the mobile terminal offers in its tool menu. The
-/// host owns both the command text and whether the button is shown at all, so
-/// phones never hard-code a command the host may not have installed.
+/// One host-configured shortcut in the mobile terminal's tool menu.
 #[derive(Clone, Debug, Default)]
-pub struct MobileAiTool {
-    pub enabled: bool,
+pub struct MobileAiCommand {
     pub command: String,
     /// Optional button caption; phones fall back to their own translation.
     pub label: String,
 }
 
+/// The host-configured AI shortcuts the mobile terminal offers. The host owns
+/// both the command list and whether the buttons are shown at all, so phones
+/// never hard-code a command the host may not have installed.
+#[derive(Clone, Debug, Default)]
+pub struct MobileAiTool {
+    pub enabled: bool,
+    pub commands: Vec<MobileAiCommand>,
+}
+
 impl MobileAiTool {
-    /// A shortcut is only advertised when it is switched on and actually has a
-    /// command to run.
-    fn advertised(&self) -> Option<(&str, &str)> {
+    /// The tool menu is a vertical stack above the FAB, so cap how many
+    /// shortcuts a host can push before it runs off a phone screen.
+    pub const MAX_COMMANDS: usize = 5;
+
+    /// Shortcuts are only advertised when the switch is on and they actually
+    /// carry a command to run.
+    fn advertised(&self) -> Vec<(&str, &str)> {
         if !self.enabled {
-            return None;
+            return Vec::new();
         }
-        let command = self.command.trim();
-        if command.is_empty() {
-            return None;
-        }
-        Some((command, self.label.trim()))
+        self.commands
+            .iter()
+            .filter_map(|entry| {
+                let command = entry.command.trim();
+                (!command.is_empty()).then_some((command, entry.label.trim()))
+            })
+            .take(Self::MAX_COMMANDS)
+            .collect()
     }
 }
 
@@ -41,12 +54,13 @@ pub struct HostInfoPayload {
 pub fn host_info_payload(input: HostInfoPayload) -> Value {
     let mut capabilities = host_capabilities();
     capabilities["resourceSubscriptions"] = json!(input.resource_subscriptions);
-    if let Some((command, label)) = input.mobile_ai_tool.advertised() {
+    let commands = input.mobile_ai_tool.advertised();
+    if !commands.is_empty() {
         capabilities["mobileTools"] = json!({
-            "aiCommand": {
-                "command": command,
-                "label": label,
-            }
+            "aiCommands": commands
+                .into_iter()
+                .map(|(command, label)| json!({ "command": command, "label": label }))
+                .collect::<Vec<_>>(),
         });
     }
     json!({
@@ -65,6 +79,13 @@ pub fn host_info_payload(input: HostInfoPayload) -> Value {
 mod tests {
     use super::*;
     use codux_protocol::iroh_transport_candidate;
+
+    fn command(command: &str, label: &str) -> MobileAiCommand {
+        MobileAiCommand {
+            command: command.to_string(),
+            label: label.to_string(),
+        }
+    }
 
     fn payload_with(mobile_ai_tool: MobileAiTool) -> Value {
         host_info_payload(HostInfoPayload {
@@ -113,37 +134,60 @@ mod tests {
     }
 
     #[test]
-    fn mobile_ai_command_is_advertised_when_enabled() {
+    fn mobile_ai_commands_are_advertised_in_configured_order() {
         let payload = payload_with(MobileAiTool {
             enabled: true,
-            command: "  claude  ".to_string(),
-            label: " Claude ".to_string(),
+            commands: vec![
+                command("  claude  ", " Claude "),
+                command("codex", ""),
+                // Blank commands are dropped rather than shipped as dead buttons.
+                command("   ", "Ghost"),
+            ],
         });
 
-        assert_eq!(
-            payload["capabilities"]["mobileTools"]["aiCommand"]["command"],
-            "claude"
-        );
-        assert_eq!(
-            payload["capabilities"]["mobileTools"]["aiCommand"]["label"],
-            "Claude"
-        );
+        let advertised = &payload["capabilities"]["mobileTools"]["aiCommands"];
+        assert_eq!(advertised.as_array().map(Vec::len), Some(2));
+        assert_eq!(advertised[0]["command"], "claude");
+        assert_eq!(advertised[0]["label"], "Claude");
+        assert_eq!(advertised[1]["command"], "codex");
+        assert_eq!(advertised[1]["label"], "");
     }
 
     #[test]
-    fn mobile_ai_command_is_hidden_when_switched_off_or_empty() {
+    fn mobile_ai_commands_are_capped_so_the_menu_stays_usable() {
+        let payload = payload_with(MobileAiTool {
+            enabled: true,
+            commands: (0..MobileAiTool::MAX_COMMANDS + 3)
+                .map(|index| command(&format!("cmd-{index}"), ""))
+                .collect(),
+        });
+
+        let advertised = &payload["capabilities"]["mobileTools"]["aiCommands"];
+        assert_eq!(
+            advertised.as_array().map(Vec::len),
+            Some(MobileAiTool::MAX_COMMANDS)
+        );
+        assert_eq!(advertised[0]["command"], "cmd-0");
+    }
+
+    #[test]
+    fn mobile_ai_commands_are_hidden_when_switched_off_or_empty() {
         let disabled = payload_with(MobileAiTool {
             enabled: false,
-            command: "claude".to_string(),
-            label: String::new(),
+            commands: vec![command("claude", "")],
         });
         assert!(disabled["capabilities"]["mobileTools"].is_null());
 
         let blank = payload_with(MobileAiTool {
             enabled: true,
-            command: "   ".to_string(),
-            label: String::new(),
+            commands: vec![command("   ", "")],
         });
         assert!(blank["capabilities"]["mobileTools"].is_null());
+
+        let none = payload_with(MobileAiTool {
+            enabled: true,
+            commands: Vec::new(),
+        });
+        assert!(none["capabilities"]["mobileTools"].is_null());
     }
 }
