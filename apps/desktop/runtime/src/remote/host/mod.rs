@@ -628,6 +628,9 @@ impl RemoteHostRuntime {
 
     fn send_host_info(self: &Arc<Self>, envelope: &RemoteEnvelope) {
         let transports = self.transport_candidates_snapshot();
+        // The phone only shows the AI shortcut when this host says so, and it
+        // always runs the command configured here.
+        let settings = remote_settings_from_raw(&self.service().raw_settings());
         self.reply(
             envelope,
             REMOTE_HOST_INFO,
@@ -645,6 +648,17 @@ impl RemoteHostRuntime {
                     REMOTE_RESOURCE_AI_STATS.to_string(),
                 ],
                 transports,
+                mobile_ai_tool: runtime_host::MobileAiTool {
+                    enabled: settings.mobile_ai_button,
+                    commands: settings
+                        .mobile_ai_commands
+                        .into_iter()
+                        .map(|entry| runtime_host::MobileAiCommand {
+                            command: entry.command,
+                            label: entry.label,
+                        })
+                        .collect(),
+                },
             }),
         );
     }

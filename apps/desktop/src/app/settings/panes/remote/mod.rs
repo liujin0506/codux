@@ -2,6 +2,7 @@ use super::options::*;
 use super::widgets::*;
 use super::*;
 
+mod mobile_ai;
 mod overlays;
 mod pane;
 mod relay;

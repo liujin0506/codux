@@ -1,3 +1,11 @@
+/// One phone AI shortcut as shown in the settings pane.
+#[derive(Clone, Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsMobileAiCommand {
+    pub command: String,
+    pub label: String,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsSummary {
@@ -58,6 +66,10 @@ pub struct SettingsSummary {
     pub remote_relay_preset: String,
     pub remote_relay_url: String,
     pub remote_relay_authentication: String,
+    /// Whether phones show the AI shortcuts in the terminal tool menu.
+    pub remote_mobile_ai_button: bool,
+    /// Shortcuts the phone offers, in menu order.
+    pub remote_mobile_ai_commands: Vec<SettingsMobileAiCommand>,
     pub remote_cached_devices: usize,
     pub update_enabled: bool,
     pub update_channel: String,

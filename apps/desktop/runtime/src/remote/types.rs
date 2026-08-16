@@ -96,6 +96,24 @@ pub(crate) struct RemoteSettings {
     pub(crate) host_token: String,
     #[serde(default)]
     pub(crate) cached_devices: Vec<RemoteDeviceSettings>,
+    /// Whether phones show the AI shortcuts in the terminal tool menu.
+    #[serde(default)]
+    pub(crate) mobile_ai_button: bool,
+    /// Shortcuts the phone offers, in menu order. An empty list hides the
+    /// buttons even when the switch is on.
+    #[serde(default)]
+    pub(crate) mobile_ai_commands: Vec<RemoteMobileAiCommandSettings>,
+}
+
+/// One entry of `remote.mobileAiCommands` in the desktop settings file.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RemoteMobileAiCommandSettings {
+    #[serde(default)]
+    pub(crate) command: String,
+    /// Optional caption; phones fall back to their own translation.
+    #[serde(default)]
+    pub(crate) label: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

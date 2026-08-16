@@ -4,8 +4,13 @@
 
 ## [Unreleased]
 
-### 修复
+## [2.0.9] - 2026-08-16
 
+### 新增
+- 手机端终端工具菜单新增由主机配置的 AI 快捷命令。主机通过 `host.info` 下发最多五条命令：桌面端在「设置 → 远程」里配置，headless Agent 用 `codux config` 或 `--mobile-ai-*` 参数配置。点击即输入命令并回车执行。
+
+### 修复
+- 修复 `codux update --beta` 在 beta 通道指向正式版时报「beta manifest version is not a beta」的问题——而正式版发布本来就会刷新 beta 通道，以免 beta 主机落后于正式版。
 - 未配置可用的记忆提取 Provider 时暂停自动消费记忆队列，避免反复失败和 UI 刷新，同时保留待处理任务并在 Provider 可用后继续处理。
 
 ## [2.0.8] - 2026-08-16

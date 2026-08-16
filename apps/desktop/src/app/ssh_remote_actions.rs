@@ -670,6 +670,50 @@ impl CoduxApp {
         self.invalidate_remote_panel(cx);
     }
 
+    pub(super) fn toggle_remote_mobile_ai_button(
+        &mut self,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let enabled = !self.state.settings.remote_mobile_ai_button;
+        self.apply_remote_mobile_ai_result(
+            self.runtime_service.set_remote_mobile_ai_button(enabled),
+            cx,
+        );
+    }
+
+    /// Replace the phone AI shortcut list. Blank commands are dropped by the
+    /// runtime, so an emptied row simply removes itself.
+    pub(super) fn set_remote_mobile_ai_commands(
+        &mut self,
+        commands: Vec<(String, String)>,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.apply_remote_mobile_ai_result(
+            self.runtime_service.set_remote_mobile_ai_commands(commands),
+            cx,
+        );
+    }
+
+    fn apply_remote_mobile_ai_result(
+        &mut self,
+        result: Result<(SettingsSummary, RemoteSummary), String>,
+        cx: &mut Context<Self>,
+    ) {
+        match result {
+            Ok((settings, remote)) => {
+                self.apply_settings_summary(settings);
+                self.state.remote = remote;
+                self.status_message = "mobile AI shortcuts saved".to_string();
+            }
+            Err(error) => {
+                self.status_message = format!("failed to save mobile AI shortcuts: {error}");
+            }
+        }
+        self.invalidate_remote_panel(cx);
+    }
+
     pub(super) fn set_remote_relay_preset(
         &mut self,
         relay_preset: String,

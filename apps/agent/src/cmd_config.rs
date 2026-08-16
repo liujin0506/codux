@@ -3,9 +3,11 @@
 //! the host identity (host_id/token), which would invalidate paired desktops.
 
 use dialoguer::theme::ColorfulTheme;
-use dialoguer::{Input, Select};
+use dialoguer::{Confirm, Input, Select};
 
-use crate::config_store::{CoduxConfig, RELAY_PRESET_CUSTOM};
+use codux_runtime_core::host::MobileAiTool;
+
+use crate::config_store::{CoduxConfig, MobileAiCommandConfig, RELAY_PRESET_CUSTOM};
 
 #[derive(Clone, Debug, Default)]
 pub struct ConfigArgs {
@@ -13,6 +15,9 @@ pub struct ConfigArgs {
     pub relay_preset: Option<String>,
     pub relay_url: Option<String>,
     pub relay_authentication: Option<String>,
+    pub mobile_ai_button: Option<bool>,
+    pub mobile_ai_commands: Option<Vec<String>>,
+    pub mobile_ai_labels: Option<Vec<String>>,
 }
 
 impl ConfigArgs {
@@ -21,6 +26,9 @@ impl ConfigArgs {
             || self.relay_preset.is_some()
             || self.relay_url.is_some()
             || self.relay_authentication.is_some()
+            || self.mobile_ai_button.is_some()
+            || self.mobile_ai_commands.is_some()
+            || self.mobile_ai_labels.is_some()
     }
 }
 
@@ -100,6 +108,56 @@ pub fn run(args: ConfigArgs) -> Result<(), String> {
         config.relay_authentication = String::new();
     }
 
+    // 4. Mobile AI shortcuts — the phone only shows the buttons when this host
+    // says so, and always runs the commands configured here.
+    let mobile_ai_button = Confirm::with_theme(&theme)
+        .with_prompt("Show AI shortcuts in the phone's terminal tool menu")
+        .default(config.mobile_ai_button)
+        .interact()
+        .map_err(|error| error.to_string())?;
+    config.mobile_ai_button = mobile_ai_button;
+    if mobile_ai_button {
+        let existing = config.mobile_ai_commands.clone();
+        let mut commands: Vec<MobileAiCommandConfig> = Vec::new();
+        while commands.len() < MobileAiTool::MAX_COMMANDS {
+            let index = commands.len();
+            let command: String = Input::with_theme(&theme)
+                .with_prompt(format!("Shortcut {} command (blank to finish)", index + 1))
+                .with_initial_text(
+                    existing
+                        .get(index)
+                        .map(|entry| entry.command.clone())
+                        .unwrap_or_default(),
+                )
+                .allow_empty(true)
+                .interact_text()
+                .map_err(|error| error.to_string())?;
+            let command = command.trim().to_string();
+            if command.is_empty() {
+                break;
+            }
+            let label: String = Input::with_theme(&theme)
+                .with_prompt(format!("Shortcut {} caption (optional)", index + 1))
+                .with_initial_text(
+                    existing
+                        .get(index)
+                        .map(|entry| entry.label.clone())
+                        .unwrap_or_default(),
+                )
+                .allow_empty(true)
+                .interact_text()
+                .map_err(|error| error.to_string())?;
+            commands.push(MobileAiCommandConfig {
+                command,
+                label: label.trim().to_string(),
+            });
+        }
+        config.mobile_ai_commands = commands;
+        if config.mobile_ai_commands.is_empty() {
+            println!("No commands set, so the phone keeps the AI shortcuts hidden.");
+        }
+    }
+
     // Preserve (or mint once) the stable host identity.
     config.ensure_identity()?;
     config.save()?;
@@ -132,6 +190,12 @@ fn run_non_interactive(args: ConfigArgs) -> Result<(), String> {
         args.relay_url.as_deref(),
         args.relay_authentication.as_deref(),
     )?;
+    apply_mobile_ai_args(
+        &mut config,
+        args.mobile_ai_button,
+        args.mobile_ai_commands,
+        args.mobile_ai_labels,
+    )?;
     config.ensure_identity()?;
     config.save()?;
 
@@ -141,6 +205,59 @@ fn run_non_interactive(args: ConfigArgs) -> Result<(), String> {
         crate::paths::config_path().display()
     );
     println!("relay: {}", config.relay_preset);
+    Ok(())
+}
+
+/// Apply the non-interactive mobile AI shortcut flags. Only provided flags are
+/// touched, so `--mobile-ai-button` alone keeps the current command list.
+/// Passing `--mobile-ai-command` replaces the list; labels pair with commands
+/// by position and may be omitted.
+pub fn apply_mobile_ai_args(
+    config: &mut CoduxConfig,
+    button: Option<bool>,
+    commands: Option<Vec<String>>,
+    labels: Option<Vec<String>>,
+) -> Result<(), String> {
+    if let Some(button) = button {
+        config.mobile_ai_button = button;
+    }
+    match (commands, labels) {
+        (Some(commands), labels) => {
+            let labels = labels.unwrap_or_default();
+            if labels.len() > commands.len() {
+                return Err(
+                    "more --mobile-ai-label values than --mobile-ai-command values".to_string(),
+                );
+            }
+            let entries: Vec<MobileAiCommandConfig> = commands
+                .iter()
+                .enumerate()
+                .filter_map(|(index, command)| {
+                    let command = command.trim();
+                    (!command.is_empty()).then(|| MobileAiCommandConfig {
+                        command: command.to_string(),
+                        label: labels
+                            .get(index)
+                            .map(|label| label.trim().to_string())
+                            .unwrap_or_default(),
+                    })
+                })
+                .collect();
+            if entries.len() > MobileAiTool::MAX_COMMANDS {
+                return Err(format!(
+                    "at most {} AI shortcuts are supported",
+                    MobileAiTool::MAX_COMMANDS
+                ));
+            }
+            config.mobile_ai_commands = entries;
+        }
+        (None, Some(_)) => {
+            return Err(
+                "--mobile-ai-label needs a matching --mobile-ai-command".to_string(),
+            );
+        }
+        (None, None) => {}
+    }
     Ok(())
 }
 

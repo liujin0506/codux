@@ -298,6 +298,22 @@ pub struct RemoteSettings {
     pub host_token: String,
     #[serde(default)]
     pub cached_devices: Vec<RemoteHostDeviceSettings>,
+    /// Whether phones show the AI shortcuts in the terminal tool menu.
+    #[serde(default)]
+    pub mobile_ai_button: bool,
+    /// Shortcuts the phone offers, in menu order.
+    #[serde(default)]
+    pub mobile_ai_commands: Vec<RemoteMobileAiCommandSettings>,
+}
+
+/// One phone AI shortcut: the command it runs plus an optional caption.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteMobileAiCommandSettings {
+    #[serde(default)]
+    pub command: String,
+    #[serde(default)]
+    pub label: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -4,7 +4,8 @@ use crate::config::ConfigStore;
 use crate::llm::{self, LLMProviderTestResult};
 pub use app_settings::{
     AIRuntimeToolSettings, AppSettings, AppSettingsStore, NotificationChannelSettings,
-    RemoteHostDeviceSettings, RemoteSettings, UpdateSettings, sync_process_locale_preference,
+    RemoteHostDeviceSettings, RemoteMobileAiCommandSettings, RemoteSettings, UpdateSettings,
+    sync_process_locale_preference,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};

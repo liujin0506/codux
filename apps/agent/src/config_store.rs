@@ -26,6 +26,26 @@ pub struct CoduxConfig {
     pub relay_url: String,
     /// Optional bearer token for a custom relay.
     pub relay_authentication: String,
+    /// Whether phones show the AI shortcuts in the terminal tool menu.
+    pub mobile_ai_button: bool,
+    /// Shortcuts the phone offers, in menu order. An empty list hides the
+    /// buttons even when `mobile_ai_button` is on.
+    pub mobile_ai_commands: Vec<MobileAiCommandConfig>,
+}
+
+/// One entry of `mobile_ai_commands` in `codux.toml`:
+///
+/// ```toml
+/// [[mobile_ai_commands]]
+/// command = "claude"
+/// label = "Claude"
+/// ```
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "snake_case")]
+pub struct MobileAiCommandConfig {
+    pub command: String,
+    /// Optional caption; phones fall back to their own translation.
+    pub label: String,
 }
 
 impl Default for CoduxConfig {
@@ -37,6 +57,8 @@ impl Default for CoduxConfig {
             relay_preset: "global".to_string(),
             relay_url: String::new(),
             relay_authentication: String::new(),
+            mobile_ai_button: false,
+            mobile_ai_commands: Vec::new(),
         }
     }
 }

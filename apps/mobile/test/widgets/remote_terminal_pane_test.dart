@@ -4,6 +4,7 @@ import 'package:codux_flutter/services/terminal_repaint_signal.dart';
 import 'package:codux_flutter/theme/app_theme.dart';
 import 'package:codux_flutter/models/workspace_mode.dart';
 import 'package:codux_flutter/widgets/components/remote_terminal_pane.dart';
+import 'package:codux_flutter/services/remote_capabilities.dart';
 import 'package:codux_flutter/widgets/components/self_drawn_terminal_view.dart';
 import 'package:codux_flutter/widgets/components/toolbar.dart';
 import 'package:flutter/material.dart';
@@ -158,6 +159,81 @@ void main() {
     await tester.pump();
     expect(voiceTapped, isTrue);
   });
+
+  testWidgets('terminal tool fab hides the ai shortcut without a host command', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: AppPreferences(
+          accent: AccentChoices.cyan,
+          locale: LocaleChoices.english,
+          themeMode: ThemeMode.dark,
+          child: SizedBox(width: 360, height: 720, child: _pane()),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.apps_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text('AI'), findsNothing);
+    expect(find.byIcon(Icons.auto_awesome_rounded), findsNothing);
+  });
+
+  testWidgets('terminal tool fab runs the host ai commands with a submit', (
+    tester,
+  ) async {
+    final sent = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: AppPreferences(
+          accent: AccentChoices.cyan,
+          locale: LocaleChoices.english,
+          themeMode: ThemeMode.dark,
+          child: SizedBox(
+            width: 360,
+            height: 720,
+            child: _pane(
+              onSendKey: sent.add,
+              aiTool: const MobileAiToolCapability([
+                MobileAiCommand(command: 'claude', label: 'Claude'),
+                MobileAiCommand(command: 'codex'),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.apps_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // The host-supplied caption wins; the entry without one falls back to the
+    // app's translation.
+    expect(find.text('Claude'), findsOneWidget);
+    expect(find.text('AI'), findsOneWidget);
+
+    await tester.tap(find.text('Claude'));
+    await tester.pump();
+
+    // Typed as text, then submitted with a carriage return.
+    expect(sent, ['claude', '\r']);
+
+    await tester.tap(find.byIcon(Icons.apps_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.tap(find.text('AI'));
+    await tester.pump();
+
+    expect(sent, ['claude', '\r', 'codex', '\r']);
+  });
 }
 
 RemoteTerminalPane _pane({
@@ -165,6 +241,7 @@ RemoteTerminalPane _pane({
   bool keyboardVisible = false,
   VoidCallback? onUpload,
   VoidCallback? onVoice,
+  MobileAiToolCapability aiTool = MobileAiToolCapability.fallback,
 }) {
   return RemoteTerminalPane(
     connected: true,
@@ -199,6 +276,7 @@ RemoteTerminalPane _pane({
     onUpload: onUpload ?? () {},
     onVoice: onVoice ?? () {},
     handedAway: false,
+    aiTool: aiTool,
     handoffMessageKey: 'terminal.handoff.takenOver',
     onTakeOver: () {},
   );

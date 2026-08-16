@@ -584,6 +584,7 @@ extension _HomePageConnection on HomeController {
     if (switchingDevice) {
       _hostRuntimeInstanceId = null;
       _isHeadlessAgentHost = false;
+      _mobileAiTool = MobileAiToolCapability.fallback;
       _resetRemoteRuntime(keepProjects: false);
       _terminalOutputController.resetAll();
       _terminalRepaint.tick();

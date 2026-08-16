@@ -365,6 +365,50 @@ impl RuntimeService {
         Ok((settings, remote))
     }
 
+    /// Mirrors the protocol-side cap so the settings file cannot grow a list
+    /// the phone would truncate anyway.
+    pub const MOBILE_AI_COMMAND_LIMIT: usize = codux_runtime_core::host::MobileAiTool::MAX_COMMANDS;
+
+    /// Toggle whether phones show the AI shortcuts. The host re-reads this on
+    /// the next host.info, so a reconnect is not required.
+    pub fn set_remote_mobile_ai_button(
+        &self,
+        enabled: bool,
+    ) -> Result<(SettingsSummary, RemoteSummary), String> {
+        self.update_remote_mobile_ai_settings(|remote| remote.mobile_ai_button = enabled)
+    }
+
+    /// Replace the phone AI shortcut list. Half-typed rows are kept as-is —
+    /// blank commands are filtered out when host.info is built, so clearing a
+    /// field while editing does not make the row disappear under the cursor.
+    pub fn set_remote_mobile_ai_commands(
+        &self,
+        commands: Vec<(String, String)>,
+    ) -> Result<(SettingsSummary, RemoteSummary), String> {
+        self.update_remote_mobile_ai_settings(move |remote| {
+            remote.mobile_ai_commands = commands
+                .iter()
+                .take(Self::MOBILE_AI_COMMAND_LIMIT)
+                .map(
+                    |(command, label)| crate::settings::RemoteMobileAiCommandSettings {
+                        command: command.trim().to_string(),
+                        label: label.trim().to_string(),
+                    },
+                )
+                .collect();
+        })
+    }
+
+    fn update_remote_mobile_ai_settings(
+        &self,
+        update: impl FnOnce(&mut crate::settings::RemoteSettings),
+    ) -> Result<(SettingsSummary, RemoteSummary), String> {
+        self.update_app_settings(|settings| update(&mut settings.remote))?;
+        let remote = self.remote_host.reload_snapshot_from_settings();
+        let settings = self.reload_settings();
+        Ok((settings, remote))
+    }
+
     fn update_remote_relay_settings(
         &self,
         relay_preset: String,

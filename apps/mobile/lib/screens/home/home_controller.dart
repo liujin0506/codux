@@ -98,6 +98,9 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
   bool _remoteHandedAway = false;
   String _terminalViewportOwner = '';
   bool _isHeadlessAgentHost = false;
+  // Host-configured AI shortcut for the terminal tool menu; empty until the
+  // host advertises one in host.info.
+  MobileAiToolCapability _mobileAiTool = MobileAiToolCapability.fallback;
   // The last automatic claim, used to collapse bind/focus/first-layout triggers
   // for the same session into one request window.
   DateTime? _lastViewportClaimAt;

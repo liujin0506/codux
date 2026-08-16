@@ -4,8 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Fixed
+## [2.0.9] - 2026-08-16
 
+### Added
+- Added host-configured AI shortcuts to the mobile terminal's tool menu. Hosts advertise up to five commands over `host.info`; the desktop configures them in Settings → Remote, and headless agents through `codux config` or its `--mobile-ai-*` flags. Tapping a shortcut types the command and submits it.
+
+### Fixed
+- Fixed `codux update --beta` failing with "beta manifest version is not a beta" whenever the beta channel tracked a stable release, which is exactly what a stable publish does to keep beta hosts from falling behind.
 - Paused automatic memory queue processing when no eligible extraction provider is configured, preventing repeated failures and UI refresh churn while preserving queued work until a provider becomes available.
 
 ## [2.0.8] - 2026-08-16

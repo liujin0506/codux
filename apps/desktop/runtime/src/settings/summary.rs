@@ -273,6 +273,31 @@ fn summary_from_raw(raw: &Map<String, Value>) -> SettingsSummary {
             .map(str::trim)
             .unwrap_or_default()
             .to_string(),
+        remote_mobile_ai_button: remote
+            .and_then(|remote| remote.get("mobileAiButton"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        remote_mobile_ai_commands: remote
+            .and_then(|remote| remote.get("mobileAiCommands"))
+            .and_then(Value::as_array)
+            .map(|entries| {
+                entries
+                    .iter()
+                    .filter_map(|entry| {
+                        let command = entry.get("command").and_then(Value::as_str)?.trim();
+                        (!command.is_empty()).then(|| crate::settings::SettingsMobileAiCommand {
+                            command: command.to_string(),
+                            label: entry
+                                .get("label")
+                                .and_then(Value::as_str)
+                                .unwrap_or_default()
+                                .trim()
+                                .to_string(),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
         remote_cached_devices: remote
             .and_then(|remote| remote.get("cachedDevices"))
             .and_then(Value::as_array)

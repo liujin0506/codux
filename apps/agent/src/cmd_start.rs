@@ -46,6 +46,17 @@ fn run_foreground(config: CoduxConfig) -> Result<(), String> {
         relay_preset: config.relay_preset.clone(),
         relay_url: config.relay_url.clone(),
         relay_authentication: config.relay_authentication.clone(),
+        mobile_ai_tool: codux_runtime_core::host::MobileAiTool {
+            enabled: config.mobile_ai_button,
+            commands: config
+                .mobile_ai_commands
+                .iter()
+                .map(|entry| codux_runtime_core::host::MobileAiCommand {
+                    command: entry.command.clone(),
+                    label: entry.label.clone(),
+                })
+                .collect(),
+        },
     };
     let runtime = tokio::runtime::Runtime::new().map_err(|error| error.to_string())?;
     let result = runtime.block_on(host::run_host(cfg));
