@@ -92,7 +92,7 @@ class _TerminalToolFabState extends State<TerminalToolFab>
         children: [
           SizeTransition(
             sizeFactor: _expand,
-            axisAlignment: 1,
+            alignment: AlignmentDirectional(-1, 1),
             child: FadeTransition(
               opacity: _expand,
               child: Column(
