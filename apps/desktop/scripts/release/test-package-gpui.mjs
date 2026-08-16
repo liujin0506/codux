@@ -9,7 +9,24 @@ import path from "node:path";
 process.env.CODUX_PACKAGE_GPUI_TEST_MODE = "true";
 process.env.RELEASE_STAGE_DIR = "target/release-package-test";
 
-const { __testPackageWindows, __testStageRuntimeAssets, __testWindowsNsisScript } = await import("./package-gpui.mjs");
+const { __testIsReleaseBuild, __testPackageWindows, __testStageRuntimeAssets, __testWindowsNsisScript } =
+  await import("./package-gpui.mjs");
+
+// Test mode must not count as a release build, or packaging in CI would demand
+// the updater signing key that only real release runs carry.
+{
+  const oldActions = process.env.GITHUB_ACTIONS;
+  const oldRequire = process.env.RELEASE_REQUIRE_TAURI_SIGNATURE;
+  process.env.GITHUB_ACTIONS = "true";
+  delete process.env.RELEASE_REQUIRE_TAURI_SIGNATURE;
+  assert.equal(__testIsReleaseBuild(), false, "test mode should not require a release signature");
+  process.env.RELEASE_REQUIRE_TAURI_SIGNATURE = "true";
+  assert.equal(__testIsReleaseBuild(), true, "an explicit signature requirement still wins");
+  if (oldActions === undefined) delete process.env.GITHUB_ACTIONS;
+  else process.env.GITHUB_ACTIONS = oldActions;
+  if (oldRequire === undefined) delete process.env.RELEASE_REQUIRE_TAURI_SIGNATURE;
+  else process.env.RELEASE_REQUIRE_TAURI_SIGNATURE = oldRequire;
+}
 
 const script = __testWindowsNsisScript(
   path.join("C:", "tmp", "Codux"),
