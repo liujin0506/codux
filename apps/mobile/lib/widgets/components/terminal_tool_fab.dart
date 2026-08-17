@@ -5,6 +5,13 @@ import '../../i18n.dart';
 import '../../services/remote_capabilities.dart';
 import '../../theme/app_theme.dart';
 
+const _terminalToolFabBorder = Color(0x40FFFFFF);
+const _terminalToolFabShadow = BoxShadow(
+  color: Color(0x73000000),
+  blurRadius: 10,
+  offset: Offset(0, 3),
+);
+
 /// Expandable floating tool menu for terminal actions not on the bottom toolbar.
 class TerminalToolFab extends StatefulWidget {
   const TerminalToolFab({
@@ -28,13 +35,6 @@ class TerminalToolFab extends StatefulWidget {
   /// advertises a command.
   final MobileAiToolCapability aiTool;
   final bool uploadLoading;
-
-  static const _fabBorder = Color(0x40FFFFFF);
-  static const _fabShadow = BoxShadow(
-    color: Color(0x73000000),
-    blurRadius: 10,
-    offset: Offset(0, 3),
-  );
 
   @override
   State<TerminalToolFab> createState() => _TerminalToolFabState();
@@ -203,8 +203,8 @@ class _TerminalToolFabState extends State<TerminalToolFab>
               color: _expanded
                   ? AppColors.terminalChrome
                   : AppColors.terminalElevated,
-              border: Border.all(color: TerminalToolFab._fabBorder),
-              boxShadow: const [TerminalToolFab._fabShadow],
+              border: Border.all(color: _terminalToolFabBorder),
+              boxShadow: const [_terminalToolFabShadow],
             ),
             child: Material(
               color: Colors.transparent,
@@ -278,8 +278,8 @@ class _TerminalToolFabItem extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.terminalElevated,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: TerminalToolFab._fabBorder),
-        boxShadow: const [TerminalToolFab._fabShadow],
+        border: Border.all(color: _terminalToolFabBorder),
+        boxShadow: const [_terminalToolFabShadow],
       ),
       child: Material(
         color: Colors.transparent,
