@@ -984,10 +984,9 @@ void main() {
       await tester.pumpAndSettle(const Duration(milliseconds: 300));
       sent.clear();
 
-      await _openPhoneProjectPicker(tester);
-      await tester.tap(find.text('Project 2'));
+      await _tapProjectTab(tester, 'Project 2', settle: false);
       await tester.pump(const Duration(milliseconds: 80));
-      await tester.tap(find.text('Project 3'));
+      await _tapProjectTab(tester, 'Project 3', settle: false);
       await tester.pump(const Duration(milliseconds: 80));
       fake.emitEncrypted(
         const RelayEnvelope(
@@ -2541,22 +2540,39 @@ bool _isTerminalBaselineSubscribe(Map<String, dynamic> envelope) {
   return payload is Map && payload['baseline'] == true;
 }
 
-Future<void> _openPhoneProjectPicker(WidgetTester tester) async {
-  await tester.pumpAndSettle(const Duration(milliseconds: 300));
+Future<void> _openPhoneProjectPicker(
+  WidgetTester tester, {
+  bool settle = true,
+}) async {
+  if (settle) {
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+  }
   if (find.byIcon(Icons.more_vert).evaluate().isEmpty &&
       find.text('Mac').evaluate().isNotEmpty) {
     await tester.tap(find.text('Mac').first);
-    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    if (settle) {
+      await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    } else {
+      await tester.pump();
+    }
   }
   await tester.tap(find.byIcon(Icons.more_vert));
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
   await tester.tap(
     find.byWidgetPredicate(
       (widget) =>
           widget is PopupMenuItem<String> && widget.value == 'projects',
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
 }
 
 Future<void> _openTerminalSwitcher(WidgetTester tester) async {
@@ -2583,23 +2599,41 @@ Future<void> _openTerminalSwitcher(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _tapProjectTab(WidgetTester tester, String label) async {
-  await tester.pumpAndSettle(const Duration(milliseconds: 300));
+Future<void> _tapProjectTab(
+  WidgetTester tester,
+  String label, {
+  bool settle = true,
+}) async {
+  if (settle) {
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+  }
   if (find.text(label).evaluate().isEmpty &&
       find.text('Mac').evaluate().isNotEmpty) {
     await tester.tap(find.text('Mac').first);
-    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    if (settle) {
+      await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    } else {
+      await tester.pump();
+    }
   }
   final finder = find.text(label);
   if (finder.evaluate().isNotEmpty) {
     await tester.tap(finder);
-    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    if (settle) {
+      await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    } else {
+      await tester.pump();
+    }
     return;
   }
 
-  await _openPhoneProjectPicker(tester);
+  await _openPhoneProjectPicker(tester, settle: settle);
   await tester.tap(find.text(label));
-  await tester.pumpAndSettle(const Duration(milliseconds: 300));
+  if (settle) {
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+  } else {
+    await tester.pump();
+  }
 }
 
 Map<String, Object?> _hostInfoPayload({
