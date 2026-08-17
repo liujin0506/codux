@@ -303,6 +303,7 @@ RemoteTerminalPane _pane({
   ValueChanged<String>? onSendKey,
   bool keyboardVisible = false,
   bool connected = true,
+  bool? showTerminal,
   bool reconnecting = false,
   VoidCallback? onConnect,
   VoidCallback? onUpload,
@@ -311,7 +312,7 @@ RemoteTerminalPane _pane({
 }) {
   return RemoteTerminalPane(
     connected: connected,
-    showTerminal: true,
+    showTerminal: showTerminal ?? connected,
     hasDevice: true,
     status: '',
     workspaceMode: WorkspaceMode.terminal,

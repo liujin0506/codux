@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.16] - 2026-08-17
+
+### Fixed
+- Updated mobile widget tests for the in-terminal reconnect flow and disconnected tool-pane hint behavior.
+
 ## [2.0.15] - 2026-08-17
 
 ### Fixed

@@ -1700,7 +1700,7 @@ void main() {
     },
   );
 
-  testWidgets('transport failure leaves terminal page for device list', (
+  testWidgets('transport failure keeps terminal page and shows reconnect hint', (
     WidgetTester tester,
   ) async {
     CoduxLog.setLevelName('debug');
@@ -1763,11 +1763,12 @@ void main() {
     fake.emitState('failed:network');
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
 
-    expect(find.byKey(const ValueKey('remote-terminal-body')), findsNothing);
-    expect(find.text('Mac'), findsWidgets);
+    expect(find.byKey(const ValueKey('remote-terminal-body')), findsOneWidget);
+    expect(find.text('Tap to reconnect'), findsOneWidget);
+    expect(find.text('Reconnect'), findsOneWidget);
   });
 
-  testWidgets('none transport path leaves terminal page for device list', (
+  testWidgets('none transport path keeps terminal page and shows reconnect hint', (
     WidgetTester tester,
   ) async {
     final device = await _fakeDevice();
@@ -1828,8 +1829,9 @@ void main() {
     fake.emitState('path:path=none');
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
 
-    expect(find.byKey(const ValueKey('remote-terminal-body')), findsNothing);
-    expect(find.text('Mac'), findsWidgets);
+    expect(find.byKey(const ValueKey('remote-terminal-body')), findsOneWidget);
+    expect(find.text('Tap to reconnect'), findsOneWidget);
+    expect(find.text('Reconnect'), findsOneWidget);
   });
 
   testWidgets(
