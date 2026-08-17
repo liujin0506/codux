@@ -4,6 +4,12 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.18] - 2026-08-17
+
+### Fixed
+
+- Stalled fake transport reconnects in mobile disconnect widget tests so auto-reconnect does not complete before assertions run.
+
 ## [2.0.17] - 2026-08-17
 
 ### Fixed
