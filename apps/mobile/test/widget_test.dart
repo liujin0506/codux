@@ -1764,8 +1764,8 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
 
     expect(find.byKey(const ValueKey('remote-terminal-body')), findsOneWidget);
-    expect(find.text('Tap to reconnect'), findsOneWidget);
-    expect(find.text('Reconnect'), findsOneWidget);
+    expect(find.text('Reconnecting'), findsOneWidget);
+    expect(find.text('Reconnect now'), findsOneWidget);
   });
 
   testWidgets('none transport path keeps terminal page and shows reconnect hint', (
@@ -1830,8 +1830,8 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
 
     expect(find.byKey(const ValueKey('remote-terminal-body')), findsOneWidget);
-    expect(find.text('Tap to reconnect'), findsOneWidget);
-    expect(find.text('Reconnect'), findsOneWidget);
+    expect(find.text('Reconnecting'), findsOneWidget);
+    expect(find.text('Reconnect now'), findsOneWidget);
   });
 
   testWidgets(

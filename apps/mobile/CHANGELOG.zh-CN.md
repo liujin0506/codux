@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+## [2.0.17] - 2026-08-17
+
+### 修复
+
+- 修正 mobile 重连 widget 测试，匹配自动重连 UI 文案（`Reconnecting` / `Reconnect now`）。
+- 为 `ConnectHint` 重连图标包裹 `Material`，避免在无 `Scaffold` 环境下点击失效。
+
 ## [2.0.16] - 2026-08-17
 
 ### 修复

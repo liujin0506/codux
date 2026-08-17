@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.17] - 2026-08-17
+
+### Fixed
+- Fixed mobile reconnect widget tests to expect the auto-reconnecting UI copy (`Reconnecting` / `Reconnect now`).
+- Wrapped the reconnect icon in `ConnectHint` with a `Material` ancestor so taps work outside a `Scaffold`.
+
 ## [2.0.16] - 2026-08-17
 
 ### Fixed

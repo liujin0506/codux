@@ -40,12 +40,15 @@ class ConnectHint extends StatelessWidget {
                 ),
               )
             else
-              InkWell(
-                onTap: hasDevice ? onConnect : null,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                child: Container(
-                  padding: const EdgeInsets.all(AppSpacing.l),
-                  child: Icon(Icons.refresh_rounded, size: 40, color: accent),
+              Material(
+                type: MaterialType.transparency,
+                child: InkWell(
+                  onTap: hasDevice ? onConnect : null,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  child: Container(
+                    padding: const EdgeInsets.all(AppSpacing.l),
+                    child: Icon(Icons.refresh_rounded, size: 40, color: accent),
+                  ),
                 ),
               ),
             const SizedBox(height: AppSpacing.m),
