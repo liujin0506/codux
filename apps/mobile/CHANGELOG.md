@@ -4,6 +4,12 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.14] - 2026-08-17
+
+### Fixed
+
+- Fixed the mobile release analyze failure in the terminal tool FAB styling patch.
+
 ## [2.0.13] - 2026-08-17
 
 ### Fixed
