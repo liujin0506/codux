@@ -2579,7 +2579,7 @@ Future<void> _openPhoneProjectPicker(
   await tester.tap(
     find.byWidgetPredicate(
       (widget) =>
-          widget is PopupMenuItem<String> && widget.value == 'projects',
+          widget is PopupMenuItem<String> && widget.value == 'switcher',
     ),
   );
   if (settle) {

@@ -32,7 +32,13 @@ void main() {
       ),
     );
 
-    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('terminal-switcher-terminal-split-2')),
+        matching: find.byIcon(Icons.check_rounded),
+      ),
+      findsOneWidget,
+    );
 
     final addIcon = tester.widget<Icon>(
       find.descendant(
@@ -50,6 +56,37 @@ void main() {
     );
 
     expect(addIcon.color, isNot(activeIcon.color));
+  });
+
+  testWidgets('project strip selects a different project', (tester) async {
+    ProjectInfo? selected;
+    await tester.pumpWidget(
+      _wrap(
+        _switcher(
+          terminals: const [
+            TerminalInfo(
+              id: 'term-1',
+              title: 'One',
+              projectId: 'project-1',
+            ),
+          ],
+          activeTerminalId: 'term-1',
+          projects: const [
+            ProjectInfo(id: 'project-1', name: 'Alpha', path: '/tmp/a'),
+            ProjectInfo(id: 'project-2', name: 'Beta', path: '/tmp/b'),
+          ],
+          onSelectProject: (project) => selected = project,
+        ),
+      ),
+    );
+
+    expect(find.text('Alpha'), findsOneWidget);
+    expect(find.text('Beta'), findsOneWidget);
+
+    await tester.tap(find.text('Beta'));
+    await tester.pump();
+
+    expect(selected?.id, 'project-2');
   });
 
   testWidgets('sessions tab lists history after worktrees', (tester) async {
@@ -115,13 +152,18 @@ TerminalSwitcherScreen _switcher({
   required List<TerminalInfo> terminals,
   required String? activeTerminalId,
   bool creating = false,
+  List<ProjectInfo> projects = const [
+    ProjectInfo(id: 'project-1', name: 'Project 1', path: '/tmp/p1'),
+  ],
   List<AISessionRecord> aiSessions = const [],
   VoidCallback? onOpenSessions,
   ValueChanged<AISessionRecord>? onOpenSession,
+  ValueChanged<ProjectInfo>? onSelectProject,
 }) {
   return TerminalSwitcherScreen(
     topInset: 0,
     bottomInset: 0,
+    projects: projects,
     terminals: terminals,
     worktrees: const [],
     activeTerminalId: activeTerminalId,
@@ -132,6 +174,8 @@ TerminalSwitcherScreen _switcher({
     creating: creating,
     creatingWorktree: false,
     onBack: () {},
+    onSelectProject: onSelectProject ?? (_) {},
+    onAddProject: () {},
     onSelectTerminal: (_) {},
     onCreateTerminal: () {},
     onCloseTerminal: (_) {},

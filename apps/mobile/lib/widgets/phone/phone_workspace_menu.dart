@@ -57,8 +57,6 @@ class PhoneWorkspaceMenu extends StatelessWidget {
               onShowGit();
             case 'files':
               onShowFiles();
-            case 'projects':
-              onSwitchProject();
             case 'switcher':
               onOpenSwitcher();
             case 'rebuild':
@@ -97,14 +95,6 @@ class PhoneWorkspaceMenu extends StatelessWidget {
             ),
           ),
           const PopupMenuDivider(height: 8),
-          PopupMenuItem<String>(
-            value: 'projects',
-            height: 40,
-            child: _MenuRow(
-              icon: Icons.folder_copy_outlined,
-              label: prefs.t('workspace.projects'),
-            ),
-          ),
           PopupMenuItem<String>(
             value: 'switcher',
             height: 40,
