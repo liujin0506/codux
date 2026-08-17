@@ -4,6 +4,12 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.21] - 2026-08-17
+
+### Fixed
+
+- Removed an unused import that caused the mobile release analyze step to fail.
+
 ## [2.0.20] - 2026-08-17
 
 ### Changed
