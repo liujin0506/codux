@@ -2542,6 +2542,7 @@ bool _isTerminalBaselineSubscribe(Map<String, dynamic> envelope) {
 }
 
 Future<void> _openPhoneProjectPicker(WidgetTester tester) async {
+  await tester.pumpAndSettle(const Duration(milliseconds: 300));
   await tester.tap(find.byIcon(Icons.more_vert));
   await tester.pumpAndSettle();
   await tester.tap(
