@@ -2543,6 +2543,11 @@ bool _isTerminalBaselineSubscribe(Map<String, dynamic> envelope) {
 
 Future<void> _openPhoneProjectPicker(WidgetTester tester) async {
   await tester.pumpAndSettle(const Duration(milliseconds: 300));
+  if (find.byIcon(Icons.more_vert).evaluate().isEmpty &&
+      find.text('Mac').evaluate().isNotEmpty) {
+    await tester.tap(find.text('Mac').first);
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+  }
   await tester.tap(find.byIcon(Icons.more_vert));
   await tester.pumpAndSettle();
   await tester.tap(
@@ -2555,6 +2560,12 @@ Future<void> _openPhoneProjectPicker(WidgetTester tester) async {
 }
 
 Future<void> _openTerminalSwitcher(WidgetTester tester) async {
+  await tester.pumpAndSettle(const Duration(milliseconds: 300));
+  if (find.byIcon(Icons.unfold_more_rounded).evaluate().isEmpty &&
+      find.text('Mac').evaluate().isNotEmpty) {
+    await tester.tap(find.text('Mac').first);
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+  }
   final headerSwitcher = find.byIcon(Icons.unfold_more_rounded);
   if (headerSwitcher.evaluate().isNotEmpty) {
     await tester.tap(headerSwitcher);
