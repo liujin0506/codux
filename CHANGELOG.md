@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.23] - 2026-08-17
+
+### Fixed
+- Phone project switching now refreshes the UI after runtime state updates.
+- Selecting a different project on the phone switcher returns to the terminal immediately.
+
 ## [2.0.22] - 2026-08-17
 
 ### Fixed
