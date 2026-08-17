@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.24] - 2026-08-17
+
+### Fixed
+- Switching to a project that has no terminal yet no longer snaps back to the previous project when the host sends its next project list.
+
 ## [2.0.23] - 2026-08-17
 
 ### Fixed

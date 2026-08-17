@@ -1395,6 +1395,41 @@ fn runtime_model_latest_project_selection_wins_over_stale_host_list() {
 }
 
 #[test]
+fn runtime_model_keeps_acknowledged_project_when_host_list_reports_another() {
+    let mut runtime = RemoteRuntimeModel::new();
+    runtime.apply_project_list(projects(), Some("project-1".to_string()), None, true, true);
+    // project-2 has no terminal yet, so the switch leaves no active session.
+    runtime.user_select_project(projects()[1].clone(), true);
+    runtime.mark_project_select_sent("project-2");
+    runtime.project_selected(Some("project-2".to_string()), None);
+
+    // A later broadcast still carries the host's own project scope.
+    runtime.apply_project_list(projects(), Some("project-1".to_string()), None, true, true);
+
+    assert_eq!(
+        runtime.snapshot().selected_project_id.as_deref(),
+        Some("project-2")
+    );
+}
+
+#[test]
+fn runtime_model_keeps_acknowledged_project_when_host_list_omits_selection() {
+    let mut runtime = RemoteRuntimeModel::new();
+    runtime.apply_project_list(projects(), Some("project-1".to_string()), None, true, true);
+    runtime.user_select_project(projects()[1].clone(), true);
+    runtime.mark_project_select_sent("project-2");
+    runtime.project_selected(Some("project-2".to_string()), None);
+
+    // Agent hosts never report a selected project in their list payload.
+    runtime.apply_project_list(projects(), None, None, true, true);
+
+    assert_eq!(
+        runtime.snapshot().selected_project_id.as_deref(),
+        Some("project-2")
+    );
+}
+
+#[test]
 fn runtime_model_terminal_list_does_not_ack_pending_project_select() {
     let mut runtime = RemoteRuntimeModel::new();
     runtime.apply_project_list(projects(), Some("project-1".to_string()), None, true, false);

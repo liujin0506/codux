@@ -376,12 +376,20 @@ impl RemoteRuntimeModel {
             .pending_project_select_id
             .as_deref()
             .is_some_and(|pending| remote_selected_project_id.as_deref() == Some(pending));
+        // An acknowledged user switch is authoritative until a terminal binds.
+        // Without it a project with no terminal yet has no active session, so a
+        // later list snapshot -- the host's own scope, or no scope at all from
+        // an agent -- would silently pull the selection back.
+        let holds_acknowledged_selection = self
+            .project_select_acknowledged_id
+            .as_deref()
+            .is_some_and(|acknowledged| previous_selected.as_deref() == Some(acknowledged));
         let selected = selected_project_from_list(
             &projects,
             self.pending_project_select_id.as_deref(),
             remote_selected_project_id.as_deref(),
             previous_selected.as_deref(),
-            self.active_session_id.is_some(),
+            self.active_session_id.is_some() || holds_acknowledged_selection,
         );
         let project_changed = selected != previous_selected;
         if project_changed {

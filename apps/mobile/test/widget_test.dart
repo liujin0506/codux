@@ -918,6 +918,100 @@ void main() {
   );
 
   testWidgets(
+    'switching to a project without terminals survives a stale host project list',
+    (WidgetTester tester) async {
+      CoduxLog.setLevelName('debug');
+      CoduxLog.clear();
+      final device = await _fakeDevice();
+      // The host keeps reporting its own scope, which is what a desktop
+      // broadcast without a device id and every agent list payload look like.
+      void emitProjectList(_FakeRemoteTransport transport) {
+        transport.emitEncrypted(
+          const RelayEnvelope(
+            type: 'project.list',
+            payload: {
+              'selectedProjectId': 'project-1',
+              'projects': [
+                {'id': 'project-1', 'name': 'Project 1', 'path': '/tmp/p1'},
+                {'id': 'project-2', 'name': 'Project 2', 'path': '/tmp/p2'},
+              ],
+            },
+          ),
+        );
+      }
+
+      final fake = _FakeRemoteTransport(
+        device: device,
+        onSent: (transport, envelope) {
+          final type = '${envelope['type'] ?? ''}';
+          if (type == 'host.info' || type == 'project.list') {
+            emitProjectList(transport);
+            // Only project-1 has a terminal, so selecting project-2 leaves no
+            // active session to anchor the selection.
+            transport.emitEncrypted(
+              const RelayEnvelope(
+                type: 'terminal.list',
+                payload: {
+                  'terminals': [
+                    {
+                      'id': 'session-1',
+                      'title': 'One',
+                      'projectId': 'project-1',
+                    },
+                  ],
+                },
+              ),
+            );
+            transport.emitEncrypted(
+              RelayEnvelope(type: 'host.info', payload: _hostInfoPayload()),
+            );
+            return;
+          }
+          if (type == 'project.select') {
+            final payload = envelope['payload'];
+            final projectId = payload is Map
+                ? '${payload['projectId'] ?? ''}'
+                : '';
+            transport.emitEncrypted(
+              RelayEnvelope(
+                type: 'project.selected',
+                payload: {'projectId': projectId},
+              ),
+            );
+            emitProjectList(transport);
+          }
+        },
+      );
+
+      await tester.pumpWidget(
+        CoduxFlutterApp(
+          initialDevices: [device],
+          transportFactory: (_) => fake,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mac'));
+      await tester.pumpAndSettle(const Duration(milliseconds: 300));
+
+      await _tapProjectTab(tester, 'Project 2');
+      await tester.pumpAndSettle(const Duration(milliseconds: 300));
+
+      final log = CoduxLog.snapshotText();
+      expect(log, contains('user select project=project-2 previous=project-1'));
+      final switchOffset = log.indexOf(
+        'user select project=project-2 previous=project-1',
+      );
+      expect(switchOffset, isNonNegative);
+      final afterSwitch = log.substring(switchOffset);
+      expect(afterSwitch, contains('project.list count=2 selected=project-2'));
+      expect(
+        afterSwitch,
+        isNot(contains('project.list count=2 selected=project-1')),
+      );
+    },
+  );
+
+  testWidgets(
     'stale project selected ack is ignored during fast project switching',
     (WidgetTester tester) async {
       CoduxLog.setLevelName('debug');
