@@ -4,6 +4,13 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.25] - 2026-08-17
+
+### Fixed
+
+- Opening a file on the phone now pushes the editor immediately with a loading state, instead of waiting behind the file-list route.
+- Desktop and agent AI usage stats now follow the selected worktree, matching the session list (projects without worktrees keep the previous project-wide totals).
+
 ## [2.0.24] - 2026-08-17
 
 ### Fixed

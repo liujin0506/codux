@@ -23,11 +23,7 @@ impl RemoteHostRuntime {
             .filter(|value| !value.trim().is_empty())
             .unwrap_or(&project.id)
             .to_string();
-        let request = AIHistoryProjectRequest {
-            id: project.id.clone(),
-            name: project.name.clone(),
-            path: project.path.clone(),
-        };
+        let request = self.ai_history_request_for_scope(&project, &current_session_scope_id);
         if envelope
             .payload
             .get("refresh")
@@ -43,13 +39,15 @@ impl RemoteHostRuntime {
                 // Register the requesting device as a watcher of this project so
                 // we re-push fresh stats when the live AI runtime changes (and,
                 // for a cold-on-request index, once the refresh completes).
+                // Keyed by project even for a worktree scope, so every scope of
+                // one project shares a watcher bucket.
                 if let Some(device_id) = envelope
                     .device_id
                     .as_deref()
                     .filter(|value| !value.trim().is_empty())
                 {
                     self.register_ai_stats_watcher(
-                        &state.project_id,
+                        &project.id,
                         device_id,
                         &current_session_scope_id,
                     );
@@ -79,6 +77,56 @@ impl RemoteHostRuntime {
             }
             Err(error) => self.send_error(envelope, &error),
         }
+    }
+
+    /// Resolve the AI-history request for a device's selected scope. History is
+    /// indexed per worktree cwd (same as the desktop sidebar), so a selected
+    /// worktree must read that worktree's path instead of the project root --
+    /// otherwise usage totals stay project-wide while the session list is
+    /// already worktree-scoped. The project id doubles as the default worktree's
+    /// id, and that scope keeps reading the project record.
+    pub(super) fn ai_history_request_for_scope(
+        &self,
+        project: &crate::project_store::ProjectRecord,
+        scope_id: &str,
+    ) -> AIHistoryProjectRequest {
+        let scope_id = scope_id.trim();
+        let worktree = if scope_id.is_empty() || scope_id == project.id {
+            None
+        } else {
+            ProjectStore::new(self.support_dir.clone())
+                .snapshot()
+                .worktrees
+                .into_iter()
+                .find(|worktree| worktree.project_id == project.id && worktree.id == scope_id)
+        };
+        match worktree {
+            Some(worktree) => AIHistoryProjectRequest {
+                id: worktree.id,
+                name: worktree.name,
+                path: worktree.path,
+            },
+            None => AIHistoryProjectRequest {
+                id: project.id.clone(),
+                name: project.name.clone(),
+                path: project.path.clone(),
+            },
+        }
+    }
+
+    /// Map an indexed scope back to the project its watchers are keyed under.
+    /// A worktree-scoped index reports the worktree id, not the project id.
+    pub(super) fn ai_stats_watcher_project_id(&self, scope_id: &str) -> String {
+        let snapshot = ProjectStore::new(self.support_dir.clone()).snapshot();
+        if snapshot.projects.iter().any(|project| project.id == scope_id) {
+            return scope_id.to_string();
+        }
+        snapshot
+            .worktrees
+            .iter()
+            .find(|worktree| worktree.id == scope_id)
+            .map(|worktree| worktree.project_id.clone())
+            .unwrap_or_else(|| scope_id.to_string())
     }
 
     /// Record that `device_id` is watching `project_id`'s `ai.stats` (a device
@@ -152,7 +200,8 @@ impl RemoteHostRuntime {
             Ok(watchers) => watchers.clone(),
             Err(_) => return,
         };
-        self.push_ai_stats_for_project(&state.project_id, &snapshot);
+        let project_id = self.ai_stats_watcher_project_id(&state.project_id);
+        self.push_ai_stats_for_project(&project_id, &snapshot);
     }
 
     /// Build and send `ai.stats` to each device watching `project_id`, using each
@@ -176,14 +225,6 @@ impl RemoteHostRuntime {
         else {
             return;
         };
-        let request = AIHistoryProjectRequest {
-            id: project.id.clone(),
-            name: project.name.clone(),
-            path: project.path.clone(),
-        };
-        let Ok(state) = self.ai_history.project_state(request) else {
-            return;
-        };
         // One version per push for this project; every watcher shares it. Keyed
         // by project so a stale stats frame for a previously-selected project
         // can't clobber the current one after a fast project switch.
@@ -193,10 +234,16 @@ impl RemoteHostRuntime {
             None,
         );
         for (device_id, scope_id) in devices {
+            // Each device reads its own scope, so a worktree watcher gets that
+            // worktree's totals rather than the whole project's.
+            let request = self.ai_history_request_for_scope(&project, scope_id);
+            let Ok(state) = self.ai_history.project_state(request) else {
+                continue;
+            };
             let payload = match self.remote_ai_stats_payload(
                 project.id.clone(),
                 project.name.clone(),
-                state.clone(),
+                state,
                 scope_id,
             ) {
                 Ok(payload) => payload,

@@ -204,11 +204,10 @@ class _CoduxHomePageState extends State<CoduxHomePage>
               filePickerLoading: c._filePickerLoading,
               showVoiceOverlay: c._showVoiceOverlay,
               voiceService: c._voiceService,
-              // On the pad the editor renders inline in the center pane, so the
-              // bottom-sheet overlay is suppressed there to avoid a double editor.
-              editingFilePath: media.size.width >= _padLayoutMinWidth
-                  ? null
-                  : c._editingFilePath,
+              // The pad renders the editor inline in the center pane; the phone
+              // pushes it as its own route on top of the file list. Either way
+              // the Home-level overlay is suppressed to avoid a double editor.
+              editingFilePath: null,
               fileEditorController: c._fileEditorController,
               fileEditorLoading: c._fileEditorLoading,
               fileEditorSaving: c._fileEditorSaving,

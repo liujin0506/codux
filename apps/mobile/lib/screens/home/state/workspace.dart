@@ -499,6 +499,48 @@ extension _HomePageWorkspace on HomeController {
     _send(_projectFileController.readEnvelope(entry));
   }
 
+  /// Phone: open the editor as its own route stacked on top of the file list
+  /// so it appears immediately (showing the file name + a loading spinner)
+  /// instead of the Home-level overlay, which the pushed file list route hides.
+  Future<void> _openPhoneFileEditor(RemoteFileEntry entry) async {
+    if (entry.isDirectory) return;
+    _requestFileRead(entry);
+    await _pushPhoneToolRoute((routeContext) {
+      return ListenableBuilder(
+        listenable: this,
+        builder: (context, _) {
+          return Material(
+            color: AppColors.bgBase,
+            child: SafeArea(
+              bottom: false,
+              child: FileEditorView(
+                path: _editingFilePath ?? entry.path,
+                controller: _fileEditorController,
+                loading: _fileEditorLoading,
+                saving: _fileEditorSaving,
+                editing: _fileEditorEditing,
+                editable: _fileEditorEditable,
+                onClose: () => Navigator.of(routeContext).pop(),
+                onEdit: _beginEditingFile,
+                onSave: _saveEditingFile,
+                onCancelEdit: _cancelEditingFile,
+                closeIcon: Icons.arrow_back_ios_new,
+              ),
+            ),
+          );
+        },
+      );
+    });
+    if (mounted) {
+      _applyState(() {
+        _editingFilePath = null;
+        _fileEditorLoading = false;
+        _fileEditorSaving = false;
+        _fileEditorEditing = false;
+      });
+    }
+  }
+
   void _applyFileListState(RemoteFileListState state) {
     if (state.isProjectFiles) {
       _applyState(() {
@@ -707,7 +749,7 @@ extension _HomePageWorkspace on HomeController {
               entries: _projectFileEntries,
               loading: _projectFilesLoading,
               onOpenPath: _requestProjectFiles,
-              onOpenFile: _requestFileRead,
+              onOpenFile: _openPhoneFileEditor,
               onRefresh: () => _requestProjectFiles(_projectFilesPath),
               onOpenHome: _openSelectedProjectHome,
               onOpenRoot: _openProjectRoot,

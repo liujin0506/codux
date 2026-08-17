@@ -94,6 +94,52 @@ fn ai_stats_rejects_unknown_project_instead_of_using_first_project() {
 }
 
 #[test]
+fn ai_stats_reads_the_selected_worktree_scope_not_the_project_root() {
+    let support_dir = temp_support_dir("codux-remote-ai-stats-worktree-scope");
+    let (_project_a, project_b) = write_two_project_state(&support_dir);
+    let worktree_b_path = support_dir.join("worktree-b-checkout");
+    fs::create_dir_all(&worktree_b_path).expect("create worktree dir");
+    let mut state: Value =
+        serde_json::from_str(&fs::read_to_string(support_dir.join("state.json")).expect("read"))
+            .expect("parse state");
+    state["worktrees"][0]["path"] = json!(worktree_b_path.to_string_lossy());
+    fs::write(
+        support_dir.join("state.json"),
+        serde_json::to_string_pretty(&state).expect("serialize state"),
+    )
+    .expect("write state");
+    let runtime = RemoteHostRuntime::new(support_dir.clone());
+    let project = ProjectStore::new(support_dir.clone())
+        .projects_snapshot()
+        .into_iter()
+        .find(|project| project.id == "project-b")
+        .expect("project-b");
+
+    // A worktree scope must read that worktree's cwd, the same index the
+    // session list uses; otherwise usage totals stay project-wide.
+    let scoped = runtime.ai_history_request_for_scope(&project, "worktree-b");
+    assert_eq!(scoped.id, "worktree-b");
+    assert_eq!(scoped.path, worktree_b_path.to_string_lossy());
+
+    // The project id doubles as the default scope and keeps the project root.
+    let default_scope = runtime.ai_history_request_for_scope(&project, "project-b");
+    assert_eq!(default_scope.id, "project-b");
+    assert_eq!(default_scope.path, project_b.to_string_lossy());
+
+    // Watchers stay keyed by project, so a worktree-scoped index still finds them.
+    assert_eq!(
+        runtime.ai_stats_watcher_project_id("worktree-b"),
+        "project-b"
+    );
+    assert_eq!(
+        runtime.ai_stats_watcher_project_id("project-b"),
+        "project-b"
+    );
+
+    fs::remove_dir_all(support_dir).ok();
+}
+
+#[test]
 fn ai_session_error_reply_preserves_request_id() {
     let support_dir = temp_support_dir("codux-remote-ai-session-error");
     let runtime = RemoteHostRuntime::new(support_dir.clone());

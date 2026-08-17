@@ -910,11 +910,12 @@ fn make_handler(
                             .and_then(Value::as_bool)
                             .unwrap_or(false)
                         {
-                            let request = codux_ai_history::normalized::AIHistoryProjectRequest {
-                                id: project.id.clone(),
-                                name: project.name.clone(),
-                                path: project.path.clone(),
-                            };
+                            let request = crate::ai_stats::ai_history_request_for_scope(
+                                &project.id,
+                                &project.name,
+                                &project.path,
+                                &current_session_scope_id,
+                            );
                             if let Err(error) = indexer.refresh_project(request) {
                                 Some((REMOTE_ERROR, json!({ "message": error })))
                             } else {
@@ -1335,12 +1336,16 @@ fn spawn_ai_stats_poller(
                     && !state.is_loading
                     && !state.queued
                 {
+                    // A worktree-scoped index reports the worktree id; map it
+                    // back to the project the watchers are keyed under.
+                    let project_id =
+                        crate::ai_stats::ai_stats_watcher_project_id(&state.project_id);
                     push_ai_stats_for_project(
                         &slot,
                         &indexer,
                         provider.as_ref(),
                         &watchers,
-                        &state.project_id,
+                        &project_id,
                     );
                 }
             }

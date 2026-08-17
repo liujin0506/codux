@@ -147,6 +147,8 @@ fn remote_pairing_payload_contains_iroh_transport_candidates() {
         host_id: "host-1".to_string(),
         host_token: "token".to_string(),
         cached_devices: Vec::new(),
+        mobile_ai_button: false,
+        mobile_ai_commands: Vec::new(),
     };
     let pairing = RemotePairingInfo {
         pairing_id: "pair-1".to_string(),
