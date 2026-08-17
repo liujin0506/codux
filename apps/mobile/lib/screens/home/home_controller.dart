@@ -195,6 +195,9 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
   DateTime? _connectionGraceUntil;
   DateTime? _lastTransportRefreshAt;
   PendingWorktreeSwitch? _pendingWorktreeSwitch;
+  // When a phone project switch has no terminal yet, keep the switcher open
+  // until the host creates/broadcasts one instead of exposing an empty pane.
+  String? _pendingPhoneProjectSwitcherCloseId;
   int? _latencyMs;
   Timer? _latencyProbeTimer;
   int _latencyProbeCounter = 0;

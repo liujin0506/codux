@@ -4,6 +4,12 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.26] - 2026-08-18
+
+### Fixed
+
+- Mobile project switching now keeps the project/terminal switcher open when the target project has no terminal, instead of revealing a blank terminal pane; the switcher closes once a terminal becomes available.
+
 ## [2.0.25] - 2026-08-17
 
 ### Fixed

@@ -469,6 +469,7 @@ extension _HomePageConnection on HomeController {
 
   void _resetTerminalUiChrome() {
     _showTerminalSwitcher = false;
+    _pendingPhoneProjectSwitcherCloseId = null;
     _keyboardRequested = false;
     _keyboardRequestSerial += 1;
     _keyboardShownSinceRequest = false;

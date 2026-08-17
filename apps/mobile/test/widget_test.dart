@@ -1008,6 +1008,12 @@ void main() {
         afterSwitch,
         isNot(contains('project.list count=2 selected=project-1')),
       );
+      // A project without a terminal must leave the switcher open so the
+      // user can create one instead of landing on an empty terminal pane.
+      expect(
+        find.byKey(const ValueKey('terminal-switcher-add')),
+        findsOneWidget,
+      );
     },
   );
 

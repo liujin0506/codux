@@ -12,6 +12,9 @@ extension _HomePageWorkspace on HomeController {
   }
 
   void _createCurrentProjectTerminal() {
+    // An explicit create action means the user is already using the switcher;
+    // keep it open so the newly-created terminal remains visible in the list.
+    _pendingPhoneProjectSwitcherCloseId = null;
     _terminalActions.createTerminalForSelectedProject(_createTerminal);
   }
 
@@ -35,11 +38,13 @@ extension _HomePageWorkspace on HomeController {
 
   void _closeTerminalSwitcher() {
     _pendingWorktreeSwitch = null;
+    _pendingPhoneProjectSwitcherCloseId = null;
     _terminalActions.closeTerminalSwitcher(_popCupertinoPage);
   }
 
   void _hideTerminalSwitcher() {
     _showTerminalSwitcher = false;
+    _pendingPhoneProjectSwitcherCloseId = null;
   }
 
   void _selectTerminalFromSwitcher(TerminalInfo terminal) {
@@ -52,8 +57,29 @@ extension _HomePageWorkspace on HomeController {
     _onProjectSelected(project);
     _requestTerminalList(resetRetry: true);
     if (projectChanged && !_isPadLayout) {
-      _closeTerminalSwitcher();
+      if (_sessionId != null && _currentTerminal() != null) {
+        _closeTerminalSwitcher();
+      } else {
+        // A project can legitimately have no terminal (for example on an
+        // agent host). Keep the switcher visible so the user can create one;
+        // closing here would reveal a blank terminal pane with no action.
+        _pendingPhoneProjectSwitcherCloseId = project.id;
+      }
     }
+  }
+
+  void _closePhoneProjectSwitcherWhenTerminalReady() {
+    final pendingProjectId = _pendingPhoneProjectSwitcherCloseId;
+    if (pendingProjectId == null || _isPadLayout || !_showTerminalSwitcher) {
+      return;
+    }
+    if (_selectedProjectId != pendingProjectId ||
+        _sessionId == null ||
+        _currentTerminal() == null) {
+      return;
+    }
+    _pendingPhoneProjectSwitcherCloseId = null;
+    _closeTerminalSwitcher();
   }
 
   void _selectWorktree(RemoteWorktreeInfo worktree) {

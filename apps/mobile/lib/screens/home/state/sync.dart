@@ -319,6 +319,7 @@ extension _HomePageSync on HomeController {
 
   void _applyRuntimePlan(RemoteRuntimePlan plan, {String reason = ''}) {
     _runtimeCoordinator.applyRuntimePlan(plan, reason: reason);
+    _closePhoneProjectSwitcherWhenTerminalReady();
     if (plan.hasEffect) {
       _applyState(() {});
     }
