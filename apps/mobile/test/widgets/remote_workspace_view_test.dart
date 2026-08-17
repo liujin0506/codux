@@ -40,7 +40,8 @@ void main() {
       ),
     );
 
-    expect(find.text('Project'), findsWidgets);
+    expect(find.text('Current project'), findsOneWidget);
+    expect(find.text('2'), findsWidgets);
   });
 
   testWidgets('phone tool screen shows file panel', (tester) async {
@@ -100,7 +101,7 @@ void main() {
               isRepository: true,
               changedFiles: [
                 RemoteGitFileStatus(
-                  path: 'lib/main.dart',
+                  path: 'main.dart',
                   indexStatus: 'modified',
                   worktreeStatus: 'modified',
                 ),

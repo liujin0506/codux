@@ -63,6 +63,7 @@ import '../../widgets/components/ai_stats_panel.dart';
 import '../../widgets/components/project_files_panel.dart';
 import '../../widgets/components/remote_terminal_pane.dart';
 import '../../widgets/pad/pad_tool_panels.dart';
+import '../../widgets/pad/pad_workspace_main_pane.dart';
 import '../../widgets/phone/phone_tool_screens.dart';
 import '../../widgets/components/terminal_switcher_screen.dart';
 import '../../widgets/components/worktree_action_dialog.dart';
