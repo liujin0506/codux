@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../i18n.dart';
 import '../../models/remote_models.dart';
 import '../../theme/app_theme.dart';
+import '../pad/pad_project_picker_modal.dart';
 import '../pad/pad_workspace_shared.dart';
 import 'swipe_list_tile.dart';
 
@@ -13,6 +14,7 @@ class TerminalSwitcherScreen extends StatefulWidget {
     super.key,
     required this.topInset,
     required this.bottomInset,
+    required this.projects,
     required this.terminals,
     required this.worktrees,
     required this.activeTerminalId,
@@ -23,6 +25,8 @@ class TerminalSwitcherScreen extends StatefulWidget {
     required this.creating,
     required this.creatingWorktree,
     required this.onBack,
+    required this.onSelectProject,
+    required this.onAddProject,
     required this.onSelectTerminal,
     required this.onCreateTerminal,
     required this.onCloseTerminal,
@@ -43,6 +47,7 @@ class TerminalSwitcherScreen extends StatefulWidget {
 
   final double topInset;
   final double bottomInset;
+  final List<ProjectInfo> projects;
   final List<TerminalInfo> terminals;
   final List<RemoteWorktreeInfo> worktrees;
   final String? activeTerminalId;
@@ -53,6 +58,8 @@ class TerminalSwitcherScreen extends StatefulWidget {
   final bool creating;
   final bool creatingWorktree;
   final VoidCallback onBack;
+  final ValueChanged<ProjectInfo> onSelectProject;
+  final VoidCallback onAddProject;
   final ValueChanged<TerminalInfo> onSelectTerminal;
   final VoidCallback onCreateTerminal;
   final ValueChanged<TerminalInfo> onCloseTerminal;
@@ -107,7 +114,7 @@ class _TerminalSwitcherScreenState extends State<TerminalSwitcherScreen> {
                 const SizedBox(width: AppSpacing.m),
                 Expanded(
                   child: Text(
-                    prefs.t('switcher.title'),
+                    prefs.t('workspace.switcher'),
                     style: TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 20,
@@ -116,6 +123,13 @@ class _TerminalSwitcherScreenState extends State<TerminalSwitcherScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: AppSpacing.l),
+            _ProjectStrip(
+              projects: widget.projects,
+              selectedProjectId: widget.selectedProjectId,
+              onSelect: widget.onSelectProject,
+              onAdd: widget.onAddProject,
             ),
             const SizedBox(height: AppSpacing.l),
             _SectionTabs(
@@ -180,6 +194,142 @@ class _TerminalSwitcherScreenState extends State<TerminalSwitcherScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectStrip extends StatelessWidget {
+  const _ProjectStrip({
+    required this.projects,
+    required this.selectedProjectId,
+    required this.onSelect,
+    required this.onAdd,
+  });
+
+  final List<ProjectInfo> projects;
+  final String? selectedProjectId;
+  final ValueChanged<ProjectInfo> onSelect;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = AppPreferences.of(context);
+    final accent = Theme.of(context).colorScheme.secondary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          prefs.t('workspace.projects'),
+          style: TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s),
+        SizedBox(
+          height: 42,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: projects.length + 1,
+            separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.s),
+            itemBuilder: (context, index) {
+              if (index == projects.length) {
+                return _ProjectChip(
+                  label: prefs.t('project.add'),
+                  initials: '+',
+                  active: false,
+                  accent: accent,
+                  onTap: onAdd,
+                );
+              }
+              final project = projects[index];
+              final active = project.id == selectedProjectId;
+              return _ProjectChip(
+                label: project.name,
+                initials: projectInitials(project.name),
+                active: active,
+                accent: accent,
+                onTap: () => onSelect(project),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProjectChip extends StatelessWidget {
+  const _ProjectChip({
+    required this.label,
+    required this.initials,
+    required this.active,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final String label;
+  final String initials;
+  final bool active;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: active ? accent.withValues(alpha: 0.16) : AppColors.bgSurface,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: active
+                      ? accent.withValues(alpha: 0.22)
+                      : AppColors.bgBase,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  initials,
+                  style: TextStyle(
+                    color: active ? accent : AppColors.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.s),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 160),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: active ? AppColors.textPrimary : AppColors.textSubtle,
+                    fontSize: 13,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (active) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.check_rounded, size: 16, color: accent),
+              ],
+            ],
+          ),
         ),
       ),
     );

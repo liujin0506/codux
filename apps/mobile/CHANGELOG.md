@@ -4,6 +4,13 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.20] - 2026-08-17
+
+### Changed
+
+- Merged phone project and terminal switching into one switcher screen with a project strip above the terminal list.
+- Unified the phone overflow menu to a single “Switch project/terminal” entry.
+
 ## [2.0.19] - 2026-08-17
 
 ### Fixed

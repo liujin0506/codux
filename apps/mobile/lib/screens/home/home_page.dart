@@ -343,6 +343,7 @@ class _CoduxHomePageState extends State<CoduxHomePage>
     return TerminalSwitcherScreen(
       topInset: topInset,
       bottomInset: bottomInset,
+      projects: c._projects,
       terminals: c._currentProjectTerminals(),
       worktrees: c._worktrees,
       activeTerminalId: c._sessionId,
@@ -353,6 +354,8 @@ class _CoduxHomePageState extends State<CoduxHomePage>
       creating: c._creatingTerminalProjectId == c._selectedProjectId,
       creatingWorktree: c._creatingWorktree,
       onBack: c._closeTerminalSwitcher,
+      onSelectProject: c._selectProjectFromSwitcher,
+      onAddProject: c._requestProjectAdd,
       onSelectTerminal: c._selectTerminalFromSwitcher,
       onCreateTerminal: c._createCurrentProjectTerminal,
       onCloseTerminal: c._closeTerminal,

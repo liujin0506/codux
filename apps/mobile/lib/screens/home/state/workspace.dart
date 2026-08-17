@@ -47,6 +47,11 @@ extension _HomePageWorkspace on HomeController {
     _closeTerminalSwitcher();
   }
 
+  void _selectProjectFromSwitcher(ProjectInfo project) {
+    _onProjectSelected(project);
+    _requestTerminalList(resetRetry: true);
+  }
+
   void _selectWorktree(RemoteWorktreeInfo worktree) {
     _worktreeActions.selectWorktree(worktree);
   }
@@ -619,15 +624,7 @@ extension _HomePageWorkspace on HomeController {
 
   void _openPhoneProjectPicker() {
     if (_isPadLayout || !mounted) return;
-    unawaited(
-      showPadProjectPicker(
-        context,
-        projects: _projects,
-        selectedProjectId: _selectedProjectId,
-        onSelectProject: _onProjectSelected,
-        onAddProject: _requestProjectAdd,
-      ),
-    );
+    unawaited(_openTerminalSwitcher());
   }
 
   Future<void> _openPhoneStats() async {
