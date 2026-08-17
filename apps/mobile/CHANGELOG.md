@@ -4,6 +4,12 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.19] - 2026-08-17
+
+### Fixed
+
+- Fixed mobile disconnect widget tests to assert zh-CN reconnect copy and stall fake transport auto-reconnect during assertions.
+
 ## [2.0.18] - 2026-08-17
 
 ### Fixed
