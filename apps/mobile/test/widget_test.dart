@@ -14,6 +14,7 @@ import 'package:codux_flutter/services/remote_protocol_service.dart';
 import 'package:codux_flutter/services/remote_transport.dart';
 import 'package:codux_flutter/theme/app_theme.dart';
 import 'package:codux_flutter/widgets/components/device_home_screen.dart';
+import 'package:codux_flutter/widgets/components/terminal_switcher_screen.dart';
 import 'package:uuid/uuid.dart';
 
 void main() {
@@ -2554,12 +2555,19 @@ bool _isTerminalBaselineSubscribe(Map<String, dynamic> envelope) {
   return payload is Map && payload['baseline'] == true;
 }
 
+bool _isTerminalSwitcherOpen() {
+  return find.byType(TerminalSwitcherScreen).evaluate().isNotEmpty;
+}
+
 Future<void> _openPhoneProjectPicker(
   WidgetTester tester, {
   bool settle = true,
 }) async {
   if (settle) {
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
+  }
+  if (_isTerminalSwitcherOpen()) {
+    return;
   }
   if (find.byIcon(Icons.more_vert).evaluate().isEmpty &&
       find.text('Mac').evaluate().isNotEmpty) {
@@ -2591,6 +2599,9 @@ Future<void> _openPhoneProjectPicker(
 
 Future<void> _openTerminalSwitcher(WidgetTester tester) async {
   await tester.pumpAndSettle(const Duration(milliseconds: 300));
+  if (_isTerminalSwitcherOpen()) {
+    return;
+  }
   if (find.byIcon(Icons.unfold_more_rounded).evaluate().isEmpty &&
       find.text('Mac').evaluate().isNotEmpty) {
     await tester.tap(find.text('Mac').first);
