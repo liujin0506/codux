@@ -4,6 +4,12 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.15] - 2026-08-17
+
+### Fixed
+
+- Fixed the remaining mobile compile failures in the terminal tool FAB styling patch by moving decoration constants to file scope.
+
 ## [2.0.14] - 2026-08-17
 
 ### Fixed
