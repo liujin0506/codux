@@ -55,6 +55,12 @@ jobs:
         shell: bash
         run: apps/mobile/plugin/codux_protocol_ffi/scripts/build-rust.sh aarch64-apple-darwin
 
+      - name: Stage protocol FFI for Flutter tests
+        shell: bash
+        run: |
+          mkdir -p target/release
+          cp target/aarch64-apple-darwin/release/libcodux_protocol_ffi.dylib target/release/
+
       - name: Flutter pub get
         working-directory: apps/mobile
         run: flutter pub get

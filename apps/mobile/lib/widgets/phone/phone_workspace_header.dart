@@ -58,7 +58,7 @@ class PhoneWorkspaceHeader extends StatelessWidget {
       child: Container(
         height: barHeight + topInset,
         padding: EdgeInsets.only(top: topInset),
-        decoration: const BoxDecoration(color: AppColors.bgBase),
+        decoration: BoxDecoration(color: AppColors.bgBase),
         child: Row(
           children: [
             SizedBox(
@@ -182,7 +182,7 @@ class PhoneToolHeader extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
