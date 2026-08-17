@@ -403,7 +403,16 @@ function signTauriUpdaterArtifact(filePath) {
 }
 
 function isReleaseBuild() {
-  return Boolean(process.env.GITHUB_ACTIONS || process.env.RELEASE_REQUIRE_TAURI_SIGNATURE === "true");
+  if (process.env.RELEASE_REQUIRE_TAURI_SIGNATURE === "true") {
+    return true;
+  }
+  // The packaging tests run packageWindows() for real inside GitHub Actions,
+  // where no release secrets are present. GITHUB_ACTIONS alone would make the
+  // updater signature mandatory there and fail the test job.
+  if (process.env.CODUX_PACKAGE_GPUI_TEST_MODE === "true") {
+    return false;
+  }
+  return Boolean(process.env.GITHUB_ACTIONS);
 }
 
 function windowsNsisScript(packageDir, installerPath) {
@@ -604,6 +613,10 @@ export function __testWindowsNsisScript(packageDir, installerPath) {
 
 export function __testStageRuntimeAssets(destination) {
   stageRuntimeAssets(destination);
+}
+
+export function __testIsReleaseBuild() {
+  return isReleaseBuild();
 }
 
 export function __testPackageWindows() {
