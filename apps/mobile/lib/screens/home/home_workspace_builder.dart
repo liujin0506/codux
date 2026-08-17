@@ -73,6 +73,7 @@ class HomeWorkspaceBuilder {
     required TerminalOpenCallback onCloseTerminal,
     required VoidCallback onRebuildTerminal,
     required VoidCallback onOpenTerminalSwitcher,
+    required VoidCallback onSwitchProject,
     required ValueChanged<String> onRequestProjectFiles,
     required ValueChanged<RemoteFileEntry> onOpenProjectFile,
     required VoidCallback onOpenProjectHome,
@@ -175,6 +176,7 @@ class HomeWorkspaceBuilder {
       onAddProject: onAddProject,
       onRemoveProject: onRemoveProject,
       onOpenTerminalSwitcher: onOpenTerminalSwitcher,
+      onSwitchProject: onSwitchProject,
       onRebuildTerminal: onRebuildTerminal,
     );
   }

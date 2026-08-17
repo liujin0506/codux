@@ -16,6 +16,7 @@ class PhoneWorkspaceHeader extends StatelessWidget {
     required this.terminalTitle,
     required this.onBack,
     required this.onOpenSwitcher,
+    required this.onSwitchProject,
     required this.onShowStats,
     required this.onShowFiles,
     required this.onShowGit,
@@ -35,6 +36,7 @@ class PhoneWorkspaceHeader extends StatelessWidget {
   final String? terminalTitle;
   final VoidCallback onBack;
   final VoidCallback onOpenSwitcher;
+  final VoidCallback onSwitchProject;
   final VoidCallback onShowStats;
   final VoidCallback onShowFiles;
   final VoidCallback onShowGit;
@@ -134,6 +136,7 @@ class PhoneWorkspaceHeader extends StatelessWidget {
               onShowStats: onShowStats,
               onShowGit: onShowGit,
               onShowFiles: onShowFiles,
+              onSwitchProject: onSwitchProject,
               onOpenSwitcher: onOpenSwitcher,
               onRebuildTerminal: onRebuildTerminal,
               onEditProject: onEditProject,

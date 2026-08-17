@@ -21,6 +21,7 @@ class RemoteWorkspaceView extends StatelessWidget {
     required this.onAddProject,
     required this.onRemoveProject,
     required this.onOpenTerminalSwitcher,
+    required this.onSwitchProject,
     required this.onRebuildTerminal,
   });
 
@@ -38,6 +39,7 @@ class RemoteWorkspaceView extends StatelessWidget {
   final VoidCallback onAddProject;
   final VoidCallback onRemoveProject;
   final VoidCallback onOpenTerminalSwitcher;
+  final VoidCallback onSwitchProject;
   final VoidCallback onRebuildTerminal;
 
   @override
@@ -52,6 +54,7 @@ class RemoteWorkspaceView extends StatelessWidget {
           terminalTitle: terminalTitle,
           onBack: onBack,
           onOpenSwitcher: onOpenTerminalSwitcher,
+          onSwitchProject: onSwitchProject,
           onShowStats: onShowStats,
           onShowFiles: onShowFiles,
           onShowGit: onShowGit,

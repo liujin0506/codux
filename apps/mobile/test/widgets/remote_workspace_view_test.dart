@@ -149,6 +149,7 @@ RemoteWorkspaceView _terminalWorkspace() {
     onAddProject: () {},
     onRemoveProject: () {},
     onOpenTerminalSwitcher: () {},
+    onSwitchProject: () {},
     onRebuildTerminal: () {},
   );
 }

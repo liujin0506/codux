@@ -9,6 +9,7 @@ class PhoneWorkspaceMenu extends StatelessWidget {
     required this.onShowStats,
     required this.onShowGit,
     required this.onShowFiles,
+    required this.onSwitchProject,
     required this.onOpenSwitcher,
     required this.onEditProject,
     required this.onAddProject,
@@ -19,6 +20,7 @@ class PhoneWorkspaceMenu extends StatelessWidget {
   final VoidCallback onShowStats;
   final VoidCallback onShowGit;
   final VoidCallback onShowFiles;
+  final VoidCallback onSwitchProject;
   final VoidCallback onOpenSwitcher;
   final VoidCallback onEditProject;
   final VoidCallback onAddProject;
@@ -55,6 +57,8 @@ class PhoneWorkspaceMenu extends StatelessWidget {
               onShowGit();
             case 'files':
               onShowFiles();
+            case 'projects':
+              onSwitchProject();
             case 'switcher':
               onOpenSwitcher();
             case 'rebuild':
@@ -93,6 +97,14 @@ class PhoneWorkspaceMenu extends StatelessWidget {
             ),
           ),
           const PopupMenuDivider(height: 8),
+          PopupMenuItem<String>(
+            value: 'projects',
+            height: 40,
+            child: _MenuRow(
+              icon: Icons.folder_copy_outlined,
+              label: prefs.t('workspace.projects'),
+            ),
+          ),
           PopupMenuItem<String>(
             value: 'switcher',
             height: 40,

@@ -617,6 +617,19 @@ extension _HomePageWorkspace on HomeController {
     _focusTerminalViewSoon();
   }
 
+  void _openPhoneProjectPicker() {
+    if (_isPadLayout || !mounted) return;
+    unawaited(
+      showPadProjectPicker(
+        context,
+        projects: _projects,
+        selectedProjectId: _selectedProjectId,
+        onSelectProject: _onProjectSelected,
+        onAddProject: _requestProjectAdd,
+      ),
+    );
+  }
+
   Future<void> _openPhoneStats() async {
     if (_isPadLayout) {
       _toggleWorkspaceTool(WorkspaceMode.stats, _requestAIStats);

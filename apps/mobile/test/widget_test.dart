@@ -2548,23 +2548,24 @@ Future<void> _tapProjectTab(WidgetTester tester, String label) async {
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
   }
   final finder = find.text(label);
-  if (finder.evaluate().isEmpty) {
+  if (finder.evaluate().isNotEmpty) {
+    await tester.tap(finder);
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    return;
   }
-  if (finder.evaluate().isEmpty) {
-    try {
-      await tester.scrollUntilVisible(
-        finder,
-        120,
-        scrollable: find.byType(Scrollable).first,
-        duration: const Duration(milliseconds: 16),
-      );
-    } catch (_) {
-      // Fall through to the final tap so the test failure keeps the standard
-      // finder diagnostics.
-    }
-  }
-  await tester.tap(finder);
+
+  // Phone layout: overflow menu -> Projects -> pick project.
+  await tester.tap(find.byIcon(Icons.more_vert));
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.byWidgetPredicate(
+      (widget) =>
+          widget is PopupMenuItem<String> && widget.value == 'projects',
+    ),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(label));
+  await tester.pumpAndSettle(const Duration(milliseconds: 300));
 }
 
 Map<String, Object?> _hostInfoPayload({

@@ -62,6 +62,7 @@ import '../../widgets/components/device_home_screen.dart';
 import '../../widgets/components/ai_stats_panel.dart';
 import '../../widgets/components/project_files_panel.dart';
 import '../../widgets/components/remote_terminal_pane.dart';
+import '../../widgets/pad/pad_project_picker_modal.dart';
 import '../../widgets/pad/pad_tool_panels.dart';
 import '../../widgets/pad/pad_workspace_main_pane.dart';
 import '../../widgets/phone/phone_tool_screens.dart';
@@ -510,6 +511,7 @@ class _CoduxHomePageState extends State<CoduxHomePage>
       onCloseTerminal: c._closeTerminal,
       onRebuildTerminal: c._rebuildCurrentTerminal,
       onOpenTerminalSwitcher: c._openTerminalSwitcher,
+      onSwitchProject: c._openPhoneProjectPicker,
       onRequestProjectFiles: c._requestProjectFiles,
       onOpenProjectFile: c._requestFileRead,
       onOpenProjectHome: c._openSelectedProjectHome,
