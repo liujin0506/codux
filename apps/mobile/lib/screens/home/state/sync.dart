@@ -319,6 +319,9 @@ extension _HomePageSync on HomeController {
 
   void _applyRuntimePlan(RemoteRuntimePlan plan, {String reason = ''}) {
     _runtimeCoordinator.applyRuntimePlan(plan, reason: reason);
+    if (plan.hasEffect) {
+      _applyState(() {});
+    }
   }
 
   void _bindActiveTerminalAfterProtocolReady({required String reason}) {

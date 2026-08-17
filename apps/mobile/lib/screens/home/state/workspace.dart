@@ -48,8 +48,12 @@ extension _HomePageWorkspace on HomeController {
   }
 
   void _selectProjectFromSwitcher(ProjectInfo project) {
+    final projectChanged = _selectedProjectId != project.id;
     _onProjectSelected(project);
     _requestTerminalList(resetRetry: true);
+    if (projectChanged && !_isPadLayout) {
+      _closeTerminalSwitcher();
+    }
   }
 
   void _selectWorktree(RemoteWorktreeInfo worktree) {
