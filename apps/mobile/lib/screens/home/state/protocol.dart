@@ -62,7 +62,7 @@ extension _HomePageProtocol on HomeController {
             _transportReady = false;
             _remoteSyncController.resetProtocolReady();
             _hostResponsive = false;
-            _leaveTerminalUi();
+            _resetTerminalUiChrome();
             _resetRemoteSyncState();
             _status = messageText;
             _terminalBufferRetry.reset();

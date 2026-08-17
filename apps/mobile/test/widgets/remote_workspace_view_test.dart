@@ -18,6 +18,62 @@ void main() {
     expect(find.text('bash'), findsOneWidget);
   });
 
+  testWidgets('phone tool route can read app preferences', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(accent: AccentChoices.cyan.color),
+        builder: (context, child) {
+          return AppPreferences(
+            accent: AccentChoices.cyan,
+            locale: LocaleChoices.english,
+            themeMode: ThemeMode.dark,
+            child: child ?? const SizedBox.shrink(),
+          );
+        },
+        home: Builder(
+          builder: (homeContext) {
+            return Scaffold(
+              body: Center(
+                child: FilledButton(
+                  onPressed: () {
+                    Navigator.of(homeContext).push<void>(
+                      MaterialPageRoute(
+                        builder: (routeContext) => PhoneToolScreen(
+                          topInset: 0,
+                          title: 'Stats',
+                          onBack: () => Navigator.of(routeContext).pop(),
+                          child: AIStatsPanel(
+                            stats: const AIStatsInfo(
+                              projectName: 'Project',
+                              todayTokens: 1,
+                              totalTokens: 2,
+                              currentSessionTokens: 3,
+                              requestCount: 4,
+                            ),
+                            loading: false,
+                            onRefresh: () {},
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Open stats'),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Open stats'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Current project'), findsOneWidget);
+    expect(find.text('Stats'), findsOneWidget);
+  });
+
   testWidgets('phone tool screen shows stats panel', (tester) async {
     await tester.pumpWidget(
       _wrap(

@@ -10,23 +10,35 @@ const buildId = process.env.RELEASE_BUILD_ID || `${targetPlatformLabel()}-${targ
 const target = process.env.CARGO_BUILD_TARGET || "";
 const profile = process.env.CARGO_PROFILE || "release";
 const stageRoot = process.env.RELEASE_STAGE_DIR || "release-artifacts";
+const version = requiredEnv("RELEASE_VERSION");
 const platform = targetPlatformLabel();
 const arch = targetArchLabel();
 const extension = platform === "windows" ? ".exe" : "";
 const outputDir = path.join(root, stageRoot, buildId);
-const assetName = `codux-${platform}-${arch}${extension}`;
+const versionedName = `codux-agent-${version}-${platform}-${arch}${extension}`;
+const legacyName = `codux-${platform}-${arch}${extension}`;
 
 fs.rmSync(outputDir, { recursive: true, force: true });
 fs.mkdirSync(outputDir, { recursive: true });
 
 const binaryPath = releaseBinaryPath(extension);
-const assetPath = path.join(outputDir, assetName);
-fs.copyFileSync(binaryPath, assetPath);
-if (platform !== "windows") {
-  fs.chmodSync(assetPath, 0o755);
+for (const assetName of [versionedName, legacyName]) {
+  const assetPath = path.join(outputDir, assetName);
+  fs.copyFileSync(binaryPath, assetPath);
+  if (platform !== "windows") {
+    fs.chmodSync(assetPath, 0o755);
+  }
 }
 
-console.log(`Packaged ${assetName}`);
+console.log(`Packaged ${versionedName} (+ ${legacyName})`);
+
+function requiredEnv(name) {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} is required`);
+  }
+  return value;
+}
 
 function releaseBinaryPath(binaryExtension) {
   const segments = [root, "target"];

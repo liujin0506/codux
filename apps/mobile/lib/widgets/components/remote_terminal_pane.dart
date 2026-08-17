@@ -36,6 +36,7 @@ class RemoteTerminalPane extends StatefulWidget {
     required this.repaintSignal,
     required this.outputController,
     required this.terminalFontSize,
+    required this.reconnecting,
     required this.onConnect,
     required this.onInput,
     required this.onResize,
@@ -73,6 +74,7 @@ class RemoteTerminalPane extends StatefulWidget {
   final TerminalRepaintSignal repaintSignal;
   final RemoteTerminalOutputController outputController;
   final double terminalFontSize;
+  final bool reconnecting;
   final VoidCallback onConnect;
   final ValueChanged<String> onInput;
   final void Function(int cols, int rows) onResize;
@@ -259,6 +261,7 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
                                       ).t('app.notConnected')
                                     : widget.status,
                                 hasDevice: widget.hasDevice,
+                                reconnecting: widget.reconnecting,
                                 onConnect: widget.onConnect,
                               ),
                             if (widget.showTerminal &&
@@ -303,6 +306,7 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
                     !widget.handedAway)
                   TerminalToolFab(
                     bottomOffset:
+                        toolbarBottom +
                         (showTerminalToolbar ? terminalToolbarHeight : 0) +
                         AppSpacing.m,
                     leftInset: edgeInset,

@@ -68,14 +68,7 @@ pub fn run(current: &str, beta: bool) -> Result<(), String> {
 
     let was_running = runstate::is_running();
     println!("Downloading {}…", asset.name);
-    let bytes = client
-        .get(&asset.browser_download_url)
-        .send()
-        .map_err(|error| format!("failed to reach GitHub: {error}"))?
-        .error_for_status()
-        .map_err(|error| format!("download failed: {error}"))?
-        .bytes()
-        .map_err(|error| error.to_string())?;
+    let bytes = download_asset(&client, &release.assets, latest, &asset.name)?;
     if bytes.is_empty() {
         return Err("downloaded an empty file".to_string());
     }
@@ -212,23 +205,84 @@ fn release_tag_is_beta(tag_name: &str) -> bool {
 
 /// Choose the release asset for this OS + architecture.
 fn pick_asset<'a>(assets: &'a [Asset], version: &str) -> Result<&'a Asset, String> {
-    let os = std::env::consts::OS;
-    let arch = std::env::consts::ARCH; // x86_64 / aarch64
-    let extension = if os == "windows" { ".exe" } else { "" };
-    let expected = format!("codux-agent-{version}-{os}-{arch}{extension}");
-    let legacy = format!("codux-{os}-{arch}{extension}");
-    assets
-        .iter()
-        .find(|asset| asset.name == expected)
-        .or_else(|| assets.iter().find(|asset| asset.name == legacy))
+    asset_candidates(assets, version)
+        .into_iter()
+        .next()
         .ok_or_else(|| {
+            let expected = versioned_agent_asset_name(version);
+            let legacy = legacy_agent_asset_name();
             let available = assets
                 .iter()
                 .map(|asset| asset.name.as_str())
                 .collect::<Vec<_>>()
                 .join(", ");
-            format!("no release asset for {expected} (available: {available})")
+            format!("no release asset for {expected} or {legacy} (available: {available})")
         })
+}
+
+fn download_asset(
+    client: &reqwest::blocking::Client,
+    assets: &[Asset],
+    version: &str,
+    preferred_name: &str,
+) -> Result<Vec<u8>, String> {
+    let mut candidates = asset_candidates(assets, version);
+    if candidates.is_empty() {
+        return Err(format!("no release asset candidates for v{version}"));
+    }
+    if let Some(index) = candidates
+        .iter()
+        .position(|asset| asset.name == preferred_name)
+    {
+        let preferred = candidates.remove(index);
+        candidates.insert(0, preferred);
+    }
+
+    let mut last_error = String::new();
+    for asset in candidates {
+        match client.get(&asset.browser_download_url).send() {
+            Ok(response) => {
+                if response.status() == reqwest::StatusCode::NOT_FOUND {
+                    last_error = format!("{}: not found", asset.name);
+                    continue;
+                }
+                match response.error_for_status() {
+                    Ok(response) => match response.bytes() {
+                        Ok(bytes) if bytes.is_empty() => {
+                            last_error = format!("{}: downloaded an empty file", asset.name);
+                        }
+                        Ok(bytes) => return Ok(bytes.to_vec()),
+                        Err(error) => last_error = format!("{}: {error}", asset.name),
+                    },
+                    Err(error) => last_error = format!("{}: {error}", asset.name),
+                }
+            }
+            Err(error) => last_error = format!("{}: failed to reach GitHub: {error}", asset.name),
+        }
+    }
+    Err(format!("download failed: {last_error}"))
+}
+
+fn asset_candidates<'a>(assets: &'a [Asset], version: &str) -> Vec<&'a Asset> {
+    [versioned_agent_asset_name(version), legacy_agent_asset_name()]
+        .into_iter()
+        .filter_map(|name| assets.iter().find(|asset| asset.name == name))
+        .collect()
+}
+
+fn versioned_agent_asset_name(version: &str) -> String {
+    let os = std::env::consts::OS;
+    let extension = if os == "windows" { ".exe" } else { "" };
+    format!(
+        "codux-agent-{version}-{os}-{}{extension}",
+        std::env::consts::ARCH
+    )
+}
+
+fn legacy_agent_asset_name() -> String {
+    let os = std::env::consts::OS;
+    let extension = if os == "windows" { ".exe" } else { "" };
+    format!("codux-{os}-{}{extension}", std::env::consts::ARCH)
 }
 
 /// Atomically replace the running executable with `bytes`.
@@ -276,8 +330,9 @@ fn is_newer(a: &str, b: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        Asset, Channel, Release, is_newer, pick_asset, release_from_manifest_version,
-        release_tag_is_beta, select_beta_release,
+        Asset, Channel, Release, asset_candidates, is_newer, pick_asset,
+        release_from_manifest_version, release_tag_is_beta, select_beta_release,
+        versioned_agent_asset_name, legacy_agent_asset_name,
     };
 
     #[test]
@@ -306,6 +361,20 @@ mod tests {
         let assets = vec![asset(&legacy)];
 
         assert_eq!(pick_asset(&assets, "1.9.1").unwrap().name, legacy);
+    }
+
+    #[test]
+    fn asset_candidates_prefer_versioned_asset_name() {
+        let version = "2.0.12";
+        let versioned = current_agent_asset_name(version);
+        let legacy = current_legacy_agent_asset_name();
+        let assets = vec![asset(&legacy), asset(&versioned)];
+
+        let candidates = asset_candidates(&assets, version);
+
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].name, versioned);
+        assert_eq!(candidates[1].name, legacy);
     }
 
     #[test]
@@ -381,18 +450,11 @@ mod tests {
     }
 
     fn current_agent_asset_name(version: &str) -> String {
-        let os = std::env::consts::OS;
-        let extension = if os == "windows" { ".exe" } else { "" };
-        format!(
-            "codux-agent-{version}-{os}-{}{extension}",
-            std::env::consts::ARCH
-        )
+        versioned_agent_asset_name(version)
     }
 
     fn current_legacy_agent_asset_name() -> String {
-        let os = std::env::consts::OS;
-        let extension = if os == "windows" { ".exe" } else { "" };
-        format!("codux-{os}-{}{extension}", std::env::consts::ARCH)
+        legacy_agent_asset_name()
     }
 
     fn asset(name: &str) -> Asset {

@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+## [2.0.13] - 2026-08-17
+
+### 修复
+- 修复手机端 AI 统计、文件和 Git 全屏页灰屏：`AppPreferences` 现覆盖所有 Navigator 路由。
+- 提升终端悬浮工具球在黑色终端上的可见性，并在键盘弹出时随 IME 上移。
+- 连接断开后留在终端页，显示重连提示，不再自动退回设备列表。
+- 对齐 headless agent 的 `codux update` 与 GitHub Release 资源命名，并在缺少版本化文件名时回退到 `codux-<os>-<arch>`。
+
 ## [2.0.12] - 2026-08-17
 
 ### 新增

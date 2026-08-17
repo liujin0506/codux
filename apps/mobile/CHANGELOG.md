@@ -4,6 +4,14 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.13] - 2026-08-17
+
+### Fixed
+
+- Fixed gray phone tool screens for AI stats, files, and Git by making app preferences available to Navigator routes.
+- Improved the mobile terminal tool FAB contrast on dark backgrounds and moved it above the keyboard when the IME is open.
+- Kept the mobile terminal page open after disconnects and added an in-terminal reconnect prompt instead of returning to the device list.
+
 ## [2.0.12] - 2026-08-17
 
 ### Added

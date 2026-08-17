@@ -29,8 +29,12 @@ class TerminalToolFab extends StatefulWidget {
   final MobileAiToolCapability aiTool;
   final bool uploadLoading;
 
-  static const _panelFill = Color(0xB3161616);
-  static const _panelFillActive = Color(0xCC161616);
+  static const _fabBorder = Color(0x40FFFFFF);
+  static const _fabShadow = BoxShadow(
+    color: Color(0x73000000),
+    blurRadius: 10,
+    offset: Offset(0, 3),
+  );
 
   @override
   State<TerminalToolFab> createState() => _TerminalToolFabState();
@@ -193,29 +197,37 @@ class _TerminalToolFabState extends State<TerminalToolFab>
               ),
             ),
           ),
-          Material(
-            color: _expanded
-                ? TerminalToolFab._panelFillActive
-                : TerminalToolFab._panelFill,
-            elevation: 0,
-            shape: const CircleBorder(),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: _toggle,
-              child: Semantics(
-                button: true,
-                label: prefs.t('terminal.tools'),
-                expanded: _expanded,
-                child: SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: AnimatedRotation(
-                    turns: _expanded ? 0.125 : 0,
-                    duration: const Duration(milliseconds: 180),
-                    child: Icon(
-                      _expanded ? Icons.close_rounded : Icons.apps_rounded,
-                      color: _expanded ? accent : AppColors.terminalText,
-                      size: 22,
+          DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _expanded
+                  ? AppColors.terminalChrome
+                  : AppColors.terminalElevated,
+              border: Border.all(color: _fabBorder),
+              boxShadow: const [_fabShadow],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              elevation: 0,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: _toggle,
+                child: Semantics(
+                  button: true,
+                  label: prefs.t('terminal.tools'),
+                  expanded: _expanded,
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: AnimatedRotation(
+                      turns: _expanded ? 0.125 : 0,
+                      duration: const Duration(milliseconds: 180),
+                      child: Icon(
+                        _expanded ? Icons.close_rounded : Icons.apps_rounded,
+                        color: accent,
+                        size: 22,
+                      ),
                     ),
                   ),
                 ),
@@ -262,38 +274,46 @@ class _TerminalToolFabItem extends StatelessWidget {
     final labelColor = enabled
         ? (action.labelColor ?? AppColors.terminalText)
         : AppColors.terminalTextDim;
-    return Material(
-      color: TerminalToolFab._panelFill,
-      elevation: 0,
-      borderRadius: BorderRadius.circular(AppRadius.lg),
-      child: InkWell(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.terminalElevated,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        onTap: action.onTap,
-        child: Opacity(
-          opacity: enabled ? 1 : 0.45,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.m,
-              vertical: AppSpacing.s,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  action.icon,
-                  size: 20,
-                  color: iconColor,
-                ),
-                const SizedBox(width: AppSpacing.s),
-                Text(
-                  action.label,
-                  style: TextStyle(
-                    color: labelColor,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+        border: Border.all(color: TerminalToolFab._fabBorder),
+        boxShadow: const [TerminalToolFab._fabShadow],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        elevation: 0,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          onTap: action.onTap,
+          child: Opacity(
+            opacity: enabled ? 1 : 0.45,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.m,
+                vertical: AppSpacing.s,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    action.icon,
+                    size: 20,
+                    color: iconColor,
                   ),
-                ),
-              ],
+                  const SizedBox(width: AppSpacing.s),
+                  Text(
+                    action.label,
+                    style: TextStyle(
+                      color: labelColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
