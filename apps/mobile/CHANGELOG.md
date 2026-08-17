@@ -4,6 +4,13 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.12] - 2026-08-17
+
+### Added
+
+- Redesigned the narrow-phone workspace around a single header row and overflow menu; AI stats, files, and Git now open as full-screen routes while the terminal stays mounted underneath.
+- Added Git status and diff browsing on narrow phones, plus project switching from the overflow menu.
+
 ## [2.0.9] - 2026-08-16
 
 ### Added

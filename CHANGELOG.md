@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.12] - 2026-08-17
+
+### Added
+- Redesigned the narrow-phone workspace around a single header row and overflow menu; AI stats, files, and Git now open as full-screen routes while the terminal stays mounted underneath.
+- Added Git status and diff browsing on narrow phones, plus project switching from the overflow menu.
+
+### Fixed
+- Restored the Windows/Linux desktop build and unblocked the packaging test workflow.
+
 ## [2.0.11] - 2026-08-16
 
 ### Fixed
