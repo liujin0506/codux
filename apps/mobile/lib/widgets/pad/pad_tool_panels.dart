@@ -150,6 +150,7 @@ class PadGitToolPanel extends StatefulWidget {
     required this.onAction,
     required this.onRefresh,
     required this.onOpenFile,
+    this.panelWidth = PadMetrics.rightColumnWidth,
   });
 
   final RemoteGitStatusInfo? gitStatus;
@@ -158,6 +159,9 @@ class PadGitToolPanel extends StatefulWidget {
 
   /// Open a changed file's diff (switches the center to the review view).
   final ValueChanged<String> onOpenFile;
+
+  /// When null the panel expands to the parent width (phone git tab).
+  final double? panelWidth;
 
   @override
   State<PadGitToolPanel> createState() => _PadGitToolPanelState();
@@ -624,7 +628,7 @@ class _PadGitToolPanelState extends State<PadGitToolPanel> {
         : padParentPath(currentPath);
 
     return PadPanelSurface(
-      width: PadMetrics.rightColumnWidth,
+      width: widget.panelWidth,
       child: Column(
         children: [
           _buildGitHeader(context),

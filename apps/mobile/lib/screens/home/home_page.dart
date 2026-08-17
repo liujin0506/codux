@@ -59,8 +59,11 @@ import '../../theme/app_theme.dart';
 import '../../services/worktree_utils.dart';
 import '../../widgets/components/codux_home_shell.dart';
 import '../../widgets/components/device_home_screen.dart';
+import '../../widgets/components/ai_stats_panel.dart';
 import '../../widgets/components/project_files_panel.dart';
 import '../../widgets/components/remote_terminal_pane.dart';
+import '../../widgets/pad/pad_tool_panels.dart';
+import '../../widgets/phone/phone_tool_screens.dart';
 import '../../widgets/components/terminal_switcher_screen.dart';
 import '../../widgets/components/worktree_action_dialog.dart';
 import '../../widgets/components/terminal_upload_source_sheet.dart';
@@ -372,10 +375,12 @@ class _CoduxHomePageState extends State<CoduxHomePage>
     // (stats/ssh/git), so the terminal toolbar must stay visible. Report an
     // effective 'terminal' mode whenever the terminal body is actually centered.
     final isPadLayout = MediaQuery.of(context).size.width >= _padLayoutMinWidth;
+    // Phone tool screens are full-screen routes; the workspace body is always
+    // the terminal. Pad keeps the terminal centered while tools sit in the side column.
     final terminalCentered = isPadLayout
         ? (c._workspaceMode != WorkspaceMode.review &&
               c._editingFilePath == null)
-        : (c._workspaceMode == WorkspaceMode.terminal);
+        : true;
     final terminalBody = RemoteTerminalPane(
       connected: c._isConnected,
       showTerminal: c._hasShownTerminal,
@@ -458,12 +463,15 @@ class _CoduxHomePageState extends State<CoduxHomePage>
       onShowTerminal: c._showTerminalMode,
       onShowStats: () =>
           c._toggleWorkspaceTool(WorkspaceMode.stats, c._requestAIStats),
+      onOpenStats: c._openPhoneStats,
       onShowFiles: c._showFilesMode,
+      onOpenFiles: c._openPhoneFiles,
       onShowReview: c._showReviewMode,
       onShowSsh: () =>
           c._toggleWorkspaceTool(WorkspaceMode.ssh, c._showSshMode),
       onShowGit: () =>
           c._toggleWorkspaceTool(WorkspaceMode.git, c._showGitMode),
+      onOpenGit: c._openPhoneGit,
       onGitAction: (op, args) => c._gitAction(op, args: args),
       onRefreshGit: c._requestGitStatus,
       onSshUpsert: c._sshUpsert,

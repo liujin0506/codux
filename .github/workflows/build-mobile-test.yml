@@ -1,0 +1,64 @@
+name: Build Mobile Test
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+      - 'crates/codux-protocol-ffi/**'
+      - '.github/workflows/build-mobile-test.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/mobile/**'
+      - 'crates/codux-protocol-ffi/**'
+      - '.github/workflows/build-mobile-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  MACOSX_DEPLOYMENT_TARGET: "14.0"
+
+jobs:
+  test:
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-mobile-test-${{ runner.os }}-aarch64-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            rust-mobile-test-${{ runner.os }}-aarch64-
+
+      - name: Build protocol FFI
+        shell: bash
+        run: apps/mobile/plugin/codux_protocol_ffi/scripts/build-rust.sh aarch64-apple-darwin
+
+      - name: Flutter pub get
+        working-directory: apps/mobile
+        run: flutter pub get
+
+      - name: Flutter test
+        working-directory: apps/mobile
+        run: flutter test

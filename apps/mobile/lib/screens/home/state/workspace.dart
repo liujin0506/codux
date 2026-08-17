@@ -359,6 +359,10 @@ extension _HomePageWorkspace on HomeController {
   /// Open a changed file's diff in the center review view. Used by both the
   /// review list and the git panel (which switches over to review on tap).
   void _openReviewFile(String path) {
+    if (!_isPadLayout) {
+      unawaited(_openPhoneGitDiff(path));
+      return;
+    }
     if (_workspaceMode != WorkspaceMode.review) {
       _applyState(() => _workspaceMode = WorkspaceMode.review);
     }
@@ -401,6 +405,9 @@ extension _HomePageWorkspace on HomeController {
   }
 
   void _showGitMode() {
+    if (!_isPadLayout && _workspaceMode == WorkspaceMode.terminal) {
+      _releaseTerminalViewport();
+    }
     _applyState(() => _workspaceMode = WorkspaceMode.git);
     _requestGitStatus();
   }
@@ -590,6 +597,183 @@ extension _HomePageWorkspace on HomeController {
       }
       _claimTerminalViewport();
       _flushPendingTerminalResize(force: true);
+    });
+  }
+
+  bool get _isPadLayout =>
+      MediaQuery.sizeOf(context).width >= _padLayoutMinWidth;
+
+  Future<void> _pushPhoneToolRoute(
+    Widget Function(BuildContext routeContext) builder,
+  ) async {
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: builder),
+    );
+  }
+
+  void _restorePhoneTerminalAfterTool() {
+    if (!mounted || _isPadLayout) return;
+    _focusTerminalViewSoon();
+  }
+
+  Future<void> _openPhoneStats() async {
+    if (_isPadLayout) {
+      _toggleWorkspaceTool(WorkspaceMode.stats, _requestAIStats);
+      return;
+    }
+    final project = _selectedProject;
+    if (project == null) {
+      _showToast(_t('project.selectFirst'));
+      return;
+    }
+    _releaseTerminalViewport();
+    _applyState(() => _aiStatsLoading = true);
+    _workspaceModeActions.refreshAIStats();
+    await _pushPhoneToolRoute((routeContext) {
+      return ListenableBuilder(
+        listenable: this,
+        builder: (context, _) {
+          final prefs = AppPreferences.of(context);
+          return PhoneToolScreen(
+            topInset: MediaQuery.paddingOf(routeContext).top,
+            title: prefs.t('workspace.stats'),
+            onBack: () => Navigator.of(routeContext).pop(),
+            onRefresh: () {
+              _applyState(() => _aiStatsLoading = true);
+              _workspaceModeActions.refreshAIStats();
+            },
+            child: AIStatsPanel(
+              stats: _currentAIStats,
+              loading: _aiStatsLoading,
+              onRefresh: () {
+                _applyState(() => _aiStatsLoading = true);
+                _workspaceModeActions.refreshAIStats();
+              },
+            ),
+          );
+        },
+      );
+    });
+    _restorePhoneTerminalAfterTool();
+  }
+
+  Future<void> _openPhoneFiles() async {
+    if (_isPadLayout) {
+      _showFilesMode();
+      return;
+    }
+    final project = _selectedProject;
+    if (project == null) {
+      _showToast(_t('project.selectFirst'));
+      return;
+    }
+    _releaseTerminalViewport();
+    final targetPath = _projectFileController.pathForProject(
+      project,
+      currentPath: _projectFilesPath,
+    );
+    _workspaceModeActions.requestProjectFiles(
+      _t('project.currentNoDir'),
+      path: targetPath,
+    );
+    await _pushPhoneToolRoute((routeContext) {
+      return ListenableBuilder(
+        listenable: this,
+        builder: (context, _) {
+          final prefs = AppPreferences.of(context);
+          return PhoneToolScreen(
+            topInset: MediaQuery.paddingOf(routeContext).top,
+            title: prefs.t('workspace.files'),
+            onBack: () => Navigator.of(routeContext).pop(),
+            onRefresh: () => _requestProjectFiles(_projectFilesPath),
+            child: ProjectFilesPanel(
+              path: _projectFilesPath,
+              parent: _projectFilesParent,
+              entries: _projectFileEntries,
+              loading: _projectFilesLoading,
+              onOpenPath: _requestProjectFiles,
+              onOpenFile: _requestFileRead,
+              onRefresh: () => _requestProjectFiles(_projectFilesPath),
+              onOpenHome: _openSelectedProjectHome,
+              onOpenRoot: _openProjectRoot,
+              onOpenVolumes: _openProjectVolumes,
+              onRename: _renameProjectFile,
+              onCopyPath: _copyProjectFilePath,
+              onDelete: _deleteProjectFile,
+            ),
+          );
+        },
+      );
+    });
+    _restorePhoneTerminalAfterTool();
+  }
+
+  Future<void> _openPhoneGit() async {
+    if (_isPadLayout) {
+      _showGitMode();
+      return;
+    }
+    if (_workspaceMode == WorkspaceMode.terminal) {
+      _releaseTerminalViewport();
+    }
+    _requestGitStatus();
+    final projectName = _selectedProject?.name.trim();
+    await _pushPhoneToolRoute((routeContext) {
+      return ListenableBuilder(
+        listenable: this,
+        builder: (context, _) {
+          final prefs = AppPreferences.of(context);
+          final title = projectName?.isNotEmpty == true
+              ? '${prefs.t('workspace.git')} · $projectName'
+              : prefs.t('workspace.git');
+          return PhoneToolScreen(
+            topInset: MediaQuery.paddingOf(routeContext).top,
+            title: title,
+            onBack: () => Navigator.of(routeContext).pop(),
+            onRefresh: _requestGitStatus,
+            child: PadGitToolPanel(
+              gitStatus: _remoteRuntime.selectedGitStatus,
+              onAction: (op, args) => _gitAction(op, args: args),
+              onRefresh: _requestGitStatus,
+              onOpenFile: _openReviewFile,
+              panelWidth: null,
+            ),
+          );
+        },
+      );
+    });
+    _restorePhoneTerminalAfterTool();
+  }
+
+  Future<void> _openPhoneGitDiff(String path) async {
+    if (_isPadLayout) {
+      if (_workspaceMode != WorkspaceMode.review) {
+        _applyState(() => _workspaceMode = WorkspaceMode.review);
+      }
+      _requestGitDiff(path);
+      return;
+    }
+    _applyState(() {
+      _gitDiffPath = path;
+      _gitDiff = null;
+    });
+    _workspaceModeActions.requestGitDiff(path);
+    await _pushPhoneToolRoute((routeContext) {
+      return ListenableBuilder(
+        listenable: this,
+        builder: (context, _) {
+          return PhoneToolScreen(
+            topInset: MediaQuery.paddingOf(routeContext).top,
+            title: path,
+            onBack: () => Navigator.of(routeContext).pop(),
+            child: PadDiffView(
+              diff: _gitDiff,
+              path: _gitDiffPath,
+            ),
+          );
+        },
+      );
     });
   }
 }

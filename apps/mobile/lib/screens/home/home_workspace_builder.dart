@@ -34,9 +34,12 @@ class HomeWorkspaceBuilder {
     required VoidCallback onShowTerminal,
     required VoidCallback onShowStats,
     required VoidCallback onShowFiles,
+    required VoidCallback onOpenStats,
+    required VoidCallback onOpenFiles,
     required VoidCallback onShowReview,
     required VoidCallback onShowSsh,
     required VoidCallback onShowGit,
+    required VoidCallback onOpenGit,
     required void Function(String op, Map<String, dynamic> args) onGitAction,
     required VoidCallback onRefreshGit,
     required void Function(Map<String, dynamic> fields) onSshUpsert,
@@ -159,44 +162,41 @@ class HomeWorkspaceBuilder {
 
     return RemoteWorkspaceView(
       topInset: topInset,
-      workspaceMode: workspaceMode,
       connected: connected,
       latencyMs: latencyMs,
-      projects: projects,
-      selectedProjectId: selectedProjectId,
-      projectListLoaded: projectListLoaded,
-      terminals: shellData.terminals,
-      activeTerminalId: activeTerminalId,
-      hasCurrentTerminal: hasCurrentTerminal,
-      aiStats: shellData.aiStats,
-      aiStatsLoading: shellData.aiStatsLoading,
-      projectFilesPath: shellData.projectFilesPath,
-      projectFilesParent: shellData.projectFilesParent,
-      projectFileEntries: shellData.projectFileEntries,
-      projectFilesLoading: shellData.projectFilesLoading,
+      projectName: _projectName(projects, selectedProjectId),
+      terminalTitle: _terminalTitle(shellData.terminals, activeTerminalId),
       terminalBody: terminalBody,
-      onShowTerminal: onShowTerminal,
-      onShowStats: onShowStats,
-      onShowFiles: onShowFiles,
+      onShowStats: onOpenStats,
+      onShowFiles: onOpenFiles,
+      onShowGit: onOpenGit,
       onBack: onBack,
       onEditProject: onEditProject,
       onAddProject: onAddProject,
       onRemoveProject: onRemoveProject,
-      onSelectProject: onSelectProject,
-      onSelectTerminal: onSelectTerminal,
-      onRefreshLists: onRefreshLists,
-      onCreateTerminal: onCreateTerminal,
-      onCloseCurrentTerminal: onCloseCurrentTerminal,
-      onRebuildTerminal: onRebuildTerminal,
       onOpenTerminalSwitcher: onOpenTerminalSwitcher,
-      onRequestProjectFiles: onRequestProjectFiles,
-      onOpenProjectFile: onOpenProjectFile,
-      onOpenProjectHome: onOpenProjectHome,
-      onOpenProjectRoot: onOpenProjectRoot,
-      onOpenProjectVolumes: onOpenProjectVolumes,
-      onRenameProjectFile: onRenameProjectFile,
-      onCopyProjectFilePath: onCopyProjectFilePath,
-      onDeleteProjectFile: onDeleteProjectFile,
+      onRebuildTerminal: onRebuildTerminal,
     );
+  }
+
+  String? _projectName(List<ProjectInfo> projects, String? selectedProjectId) {
+    if (selectedProjectId == null) return null;
+    for (final project in projects) {
+      if (project.id == selectedProjectId) {
+        return project.name;
+      }
+    }
+    return null;
+  }
+
+  String? _terminalTitle(List<TerminalInfo> terminals, String? activeTerminalId) {
+    if (activeTerminalId == null) return null;
+    for (final terminal in terminals) {
+      if (terminal.id == activeTerminalId) {
+        final title = terminal.title.trim();
+        return title.isEmpty ? null : title;
+      }
+    }
+    return null;
   }
 }
