@@ -54,7 +54,10 @@ function walk(dir) {
 }
 
 function isAgentAsset(name) {
-  return /^codux-(macos|linux|windows)-(aarch64|x86_64)(?:\.exe)?$/.test(name);
+  if (/^codux-(macos|linux|windows)-(aarch64|x86_64)(?:\.exe)?$/.test(name)) {
+    return true;
+  }
+  return /^codux-agent-.+-(macos|linux|windows)-(aarch64|x86_64)(?:\.exe)?$/.test(name);
 }
 
 function assertReleaseExists() {

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.13] - 2026-08-17
+
+### Fixed
+- Fixed gray phone tool screens for AI stats, files, and Git by making app preferences available to Navigator routes.
+- Improved the mobile terminal tool FAB contrast on dark backgrounds and moved it above the keyboard when the IME is open.
+- Kept the mobile terminal page open after disconnects and added an in-terminal reconnect prompt instead of returning to the device list.
+- Aligned headless agent `codux update` downloads with GitHub release asset names, including a fallback to legacy `codux-<os>-<arch>` binaries.
+
 ## [2.0.12] - 2026-08-17
 
 ### Added

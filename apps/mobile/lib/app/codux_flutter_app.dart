@@ -77,17 +77,20 @@ class _CoduxFlutterAppState extends State<CoduxFlutterApp>
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
       ],
-      home: AppPreferences(
-        accent: _accent,
-        locale: _locale,
-        themeMode: _themeMode,
-        child: CoduxHomePage(
-          onChangeAccent: _setAccent,
-          onChangeLocale: _setLocale,
-          onChangeThemeMode: _setThemeMode,
-          initialDevices: widget.initialDevices,
-          transportFactory: widget.transportFactory,
-        ),
+      builder: (context, child) {
+        return AppPreferences(
+          accent: _accent,
+          locale: _locale,
+          themeMode: _themeMode,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+      home: CoduxHomePage(
+        onChangeAccent: _setAccent,
+        onChangeLocale: _setLocale,
+        onChangeThemeMode: _setThemeMode,
+        initialDevices: widget.initialDevices,
+        transportFactory: widget.transportFactory,
       ),
     );
   }

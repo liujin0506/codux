@@ -6,6 +6,8 @@ import 'package:codux_flutter/models/workspace_mode.dart';
 import 'package:codux_flutter/widgets/components/remote_terminal_pane.dart';
 import 'package:codux_flutter/services/remote_capabilities.dart';
 import 'package:codux_flutter/widgets/components/self_drawn_terminal_view.dart';
+import 'package:codux_flutter/widgets/components/connect_hint.dart';
+import 'package:codux_flutter/widgets/components/terminal_tool_fab.dart';
 import 'package:codux_flutter/widgets/components/toolbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -114,6 +116,68 @@ void main() {
       ),
       80,
     );
+  });
+
+  testWidgets('terminal tool fab lifts with the keyboard inset', (tester) async {
+    Future<double> fabDistanceFromBottom(double keyboardInset) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildAppTheme(),
+          home: MediaQuery(
+            data: MediaQueryData(
+              viewInsets: EdgeInsets.only(bottom: keyboardInset),
+              size: const Size(360, 720),
+            ),
+            child: AppPreferences(
+              accent: AccentChoices.cyan,
+              locale: LocaleChoices.english,
+              themeMode: ThemeMode.dark,
+              child: SizedBox(width: 360, height: 720, child: _pane()),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final paneBottom = tester.getBottomLeft(find.byType(RemoteTerminalPane)).dy;
+      final fabBottom = tester.getBottomLeft(find.byType(TerminalToolFab)).dy;
+      return paneBottom - fabBottom;
+    }
+
+    final restingOffset = await fabDistanceFromBottom(0);
+    final keyboardOffset = await fabDistanceFromBottom(300);
+
+    expect(keyboardOffset, greaterThan(restingOffset + 250));
+  });
+
+  testWidgets('disconnected terminal pane shows reconnect hint', (tester) async {
+    var reconnectTapped = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: AppPreferences(
+          accent: AccentChoices.cyan,
+          locale: LocaleChoices.english,
+          themeMode: ThemeMode.dark,
+          child: SizedBox(
+            width: 360,
+            height: 720,
+            child: _pane(
+              connected: false,
+              onConnect: () => reconnectTapped = true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Tap to reconnect'), findsOneWidget);
+    expect(find.text('Reconnect'), findsOneWidget);
+
+    await tester.tap(find.text('Reconnect'));
+    await tester.pump();
+    expect(reconnectTapped, isTrue);
   });
 
   testWidgets('terminal tool fab exposes upload and voice actions', (
@@ -239,12 +303,15 @@ void main() {
 RemoteTerminalPane _pane({
   ValueChanged<String>? onSendKey,
   bool keyboardVisible = false,
+  bool connected = true,
+  bool reconnecting = false,
+  VoidCallback? onConnect,
   VoidCallback? onUpload,
   VoidCallback? onVoice,
   MobileAiToolCapability aiTool = MobileAiToolCapability.fallback,
 }) {
   return RemoteTerminalPane(
-    connected: true,
+    connected: connected,
     showTerminal: true,
     hasDevice: true,
     status: '',
@@ -264,7 +331,8 @@ RemoteTerminalPane _pane({
     repaintSignal: TerminalRepaintSignal(),
     outputController: RemoteTerminalOutputController(),
     terminalFontSize: 16,
-    onConnect: () {},
+    reconnecting: reconnecting,
+    onConnect: onConnect ?? () {},
     onInput: (_) {},
     onResize: (_, _) {},
     onSelectionChanged: (_) {},

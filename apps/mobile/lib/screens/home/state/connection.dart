@@ -366,7 +366,7 @@ extension _HomePageConnection on HomeController {
     _remoteRuntimeEpoch += 1;
     _disconnectTransport(
       status: _t('connection.failedRetry'),
-      closeTerminal: true,
+      closeTerminal: false,
       notifyHost: false,
     );
     if (_appSuspended || !_appInForeground) {
@@ -467,14 +467,18 @@ extension _HomePageConnection on HomeController {
     _projectSelectAckTimers.clear();
   }
 
-  void _leaveTerminalUi() {
-    _showTerminal = false;
-    _workspaceMode = WorkspaceMode.terminal;
+  void _resetTerminalUiChrome() {
     _showTerminalSwitcher = false;
     _keyboardRequested = false;
     _keyboardRequestSerial += 1;
     _keyboardShownSinceRequest = false;
     _keyboardVisible = false;
+  }
+
+  void _leaveTerminalUi() {
+    _showTerminal = false;
+    _workspaceMode = WorkspaceMode.terminal;
+    _resetTerminalUiChrome();
   }
 
   void _disconnectTransport({

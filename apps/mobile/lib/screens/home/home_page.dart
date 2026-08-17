@@ -385,7 +385,11 @@ class _CoduxHomePageState extends State<CoduxHomePage>
         : true;
     final terminalBody = RemoteTerminalPane(
       connected: c._isConnected,
-      showTerminal: c._hasShownTerminal,
+      showTerminal: c._hasShownTerminal && c._isConnected,
+      reconnecting:
+          c._connectInFlight ||
+          c._backgroundConnect ||
+          c._status == c._t('app.reconnecting'),
       hasDevice: c._activeDevice != null,
       status: c._status,
       workspaceMode: terminalCentered

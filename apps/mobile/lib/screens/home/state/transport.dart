@@ -182,7 +182,7 @@ extension _HomePageTransport on HomeController {
       _transportReady = false;
       _hostResponsive = false;
       _status = _t('app.reconnecting');
-      _leaveTerminalUi();
+      _resetTerminalUiChrome();
       _terminalBufferRetry.reset();
       _cancelTerminalBaselineRearm();
       _setTerminalBufferLoading(false);
