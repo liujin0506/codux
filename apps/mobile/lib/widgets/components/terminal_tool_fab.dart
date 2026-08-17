@@ -203,8 +203,8 @@ class _TerminalToolFabState extends State<TerminalToolFab>
               color: _expanded
                   ? AppColors.terminalChrome
                   : AppColors.terminalElevated,
-              border: Border.all(color: _fabBorder),
-              boxShadow: const [_fabShadow],
+              border: Border.all(color: TerminalToolFab._fabBorder),
+              boxShadow: const [TerminalToolFab._fabShadow],
             ),
             child: Material(
               color: Colors.transparent,

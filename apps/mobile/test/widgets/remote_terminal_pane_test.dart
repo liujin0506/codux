@@ -6,7 +6,6 @@ import 'package:codux_flutter/models/workspace_mode.dart';
 import 'package:codux_flutter/widgets/components/remote_terminal_pane.dart';
 import 'package:codux_flutter/services/remote_capabilities.dart';
 import 'package:codux_flutter/widgets/components/self_drawn_terminal_view.dart';
-import 'package:codux_flutter/widgets/components/connect_hint.dart';
 import 'package:codux_flutter/widgets/components/terminal_tool_fab.dart';
 import 'package:codux_flutter/widgets/components/toolbar.dart';
 import 'package:flutter/material.dart';
