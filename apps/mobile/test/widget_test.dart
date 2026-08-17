@@ -595,7 +595,7 @@ void main() {
       await tester.tap(find.text('Mac').first);
       await tester.pumpAndSettle(const Duration(milliseconds: 300));
     }
-    await tester.tap(find.byIcon(Icons.grid_view_rounded));
+    await _openTerminalSwitcher(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('terminal-switcher-add')));
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
@@ -984,7 +984,8 @@ void main() {
       await tester.pumpAndSettle(const Duration(milliseconds: 300));
       sent.clear();
 
-      await _tapProjectTab(tester, 'Project 2');
+      await _openPhoneProjectPicker(tester);
+      await tester.tap(find.text('Project 2'));
       await tester.pump(const Duration(milliseconds: 80));
       await tester.tap(find.text('Project 3'));
       await tester.pump(const Duration(milliseconds: 80));
@@ -2540,6 +2541,36 @@ bool _isTerminalBaselineSubscribe(Map<String, dynamic> envelope) {
   return payload is Map && payload['baseline'] == true;
 }
 
+Future<void> _openPhoneProjectPicker(WidgetTester tester) async {
+  await tester.tap(find.byIcon(Icons.more_vert));
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.byWidgetPredicate(
+      (widget) =>
+          widget is PopupMenuItem<String> && widget.value == 'projects',
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openTerminalSwitcher(WidgetTester tester) async {
+  final headerSwitcher = find.byIcon(Icons.unfold_more_rounded);
+  if (headerSwitcher.evaluate().isNotEmpty) {
+    await tester.tap(headerSwitcher);
+    await tester.pumpAndSettle();
+    return;
+  }
+  await tester.tap(find.byIcon(Icons.more_vert));
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.byWidgetPredicate(
+      (widget) =>
+          widget is PopupMenuItem<String> && widget.value == 'switcher',
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 Future<void> _tapProjectTab(WidgetTester tester, String label) async {
   await tester.pumpAndSettle(const Duration(milliseconds: 300));
   if (find.text(label).evaluate().isEmpty &&
@@ -2554,16 +2585,7 @@ Future<void> _tapProjectTab(WidgetTester tester, String label) async {
     return;
   }
 
-  // Phone layout: overflow menu -> Projects -> pick project.
-  await tester.tap(find.byIcon(Icons.more_vert));
-  await tester.pumpAndSettle();
-  await tester.tap(
-    find.byWidgetPredicate(
-      (widget) =>
-          widget is PopupMenuItem<String> && widget.value == 'projects',
-    ),
-  );
-  await tester.pumpAndSettle();
+  await _openPhoneProjectPicker(tester);
   await tester.tap(find.text(label));
   await tester.pumpAndSettle(const Duration(milliseconds: 300));
 }
