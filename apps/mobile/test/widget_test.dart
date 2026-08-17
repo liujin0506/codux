@@ -1708,6 +1708,7 @@ void main() {
     final device = await _fakeDevice();
     final fake = _FakeRemoteTransport(
       device: device,
+      stallAfterInitialConnect: true,
       onSent: (transport, envelope) {
         final type = '${envelope['type'] ?? ''}';
         if (type == 'host.info') {
@@ -1761,7 +1762,7 @@ void main() {
     expect(find.byKey(const ValueKey('remote-terminal-body')), findsOneWidget);
 
     fake.emitState('failed:network');
-    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    await tester.pump();
 
     expect(find.byKey(const ValueKey('remote-terminal-body')), findsOneWidget);
     expect(find.text('Reconnecting'), findsOneWidget);
@@ -1774,6 +1775,7 @@ void main() {
     final device = await _fakeDevice();
     final fake = _FakeRemoteTransport(
       device: device,
+      stallAfterInitialConnect: true,
       onSent: (transport, envelope) {
         final type = '${envelope['type'] ?? ''}';
         if (type == 'host.info') {
@@ -1827,7 +1829,7 @@ void main() {
     expect(find.byKey(const ValueKey('remote-terminal-body')), findsOneWidget);
 
     fake.emitState('path:path=none');
-    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    await tester.pump();
 
     expect(find.byKey(const ValueKey('remote-terminal-body')), findsOneWidget);
     expect(find.text('Reconnecting'), findsOneWidget);
@@ -2367,6 +2369,7 @@ final class _FakeRemoteTransport implements RemoteTransport {
     this.onBeforeSend,
     this.onConnect,
     this.connectFuture,
+    this.stallAfterInitialConnect = false,
   });
 
   final StoredDevice device;
@@ -2375,6 +2378,8 @@ final class _FakeRemoteTransport implements RemoteTransport {
   final _FakeSendDecision? onBeforeSend;
   final _FakeConnectHandler? onConnect;
   final Future<void>? connectFuture;
+  final bool stallAfterInitialConnect;
+  int _connectCount = 0;
   RemoteTransportStateHandler? _onState;
   RemoteTransportEnvelopeHandler? _onEnvelope;
 
@@ -2391,7 +2396,11 @@ final class _FakeRemoteTransport implements RemoteTransport {
   @override
   Future<void> connect(StoredDevice device) async {
     onConnect?.call(device);
+    _connectCount += 1;
     _onState?.call('connecting');
+    if (stallAfterInitialConnect && _connectCount > 1) {
+      return;
+    }
     final future = connectFuture;
     if (future != null) await future;
     _onState?.call('connected:path=$initialPath');
