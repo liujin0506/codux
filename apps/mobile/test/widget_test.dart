@@ -984,9 +984,10 @@ void main() {
       await tester.pumpAndSettle(const Duration(milliseconds: 300));
       sent.clear();
 
-      await _tapProjectTab(tester, 'Project 2', settle: false);
+      await _tapProjectTab(tester, 'Project 2');
       await tester.pump(const Duration(milliseconds: 80));
-      await _tapProjectTab(tester, 'Project 3', settle: false);
+      await _openPhoneProjectPicker(tester);
+      await tester.tap(find.text('Project 3'));
       await tester.pump(const Duration(milliseconds: 80));
       fake.emitEncrypted(
         const RelayEnvelope(
