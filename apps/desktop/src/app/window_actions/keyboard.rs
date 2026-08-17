@@ -190,6 +190,10 @@ impl CoduxApp {
 
         #[cfg(not(target_os = "macos"))]
         {
+            // Scoped to this branch: macOS never builds it, and app.rs does not
+            // re-export these from gpui.
+            use gpui::{Keystroke, Modifiers};
+
             let Some(terminal) = self.focused_or_active_terminal_view(window, cx) else {
                 return false;
             };
