@@ -4,6 +4,12 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.22] - 2026-08-17
+
+### Fixed
+
+- Updated widget tests to detect when the merged terminal switcher is already open before trying to open it again.
+
 ## [2.0.21] - 2026-08-17
 
 ### Fixed
