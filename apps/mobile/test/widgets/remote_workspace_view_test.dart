@@ -10,7 +10,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('shows terminal body with project context header', (tester) async {
+  testWidgets('shows terminal body with project context header', (
+    tester,
+  ) async {
     await tester.pumpWidget(_wrap(_terminalWorkspace()));
 
     expect(find.text('Terminal body'), findsOneWidget);
@@ -203,7 +205,6 @@ RemoteWorkspaceView _terminalWorkspace() {
     onBack: () {},
     onEditProject: () {},
     onAddProject: () {},
-    onRemoveProject: () {},
     onOpenTerminalSwitcher: () {},
     onSwitchProject: () {},
     onRebuildTerminal: () {},

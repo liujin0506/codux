@@ -174,7 +174,6 @@ class HomeWorkspaceBuilder {
       onBack: onBack,
       onEditProject: onEditProject,
       onAddProject: onAddProject,
-      onRemoveProject: onRemoveProject,
       onOpenTerminalSwitcher: onOpenTerminalSwitcher,
       onSwitchProject: onSwitchProject,
       onRebuildTerminal: onRebuildTerminal,
@@ -191,7 +190,10 @@ class HomeWorkspaceBuilder {
     return null;
   }
 
-  String? _terminalTitle(List<TerminalInfo> terminals, String? activeTerminalId) {
+  String? _terminalTitle(
+    List<TerminalInfo> terminals,
+    String? activeTerminalId,
+  ) {
     if (activeTerminalId == null) return null;
     for (final terminal in terminals) {
       if (terminal.id == activeTerminalId) {

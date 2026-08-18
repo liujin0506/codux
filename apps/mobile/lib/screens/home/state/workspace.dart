@@ -60,9 +60,8 @@ extension _HomePageWorkspace on HomeController {
       if (_sessionId != null && _currentTerminal() != null) {
         _closeTerminalSwitcher();
       } else {
-        // A project can legitimately have no terminal (for example on an
-        // agent host). Keep the switcher visible so the user can create one;
-        // closing here would reveal a blank terminal pane with no action.
+        // Keep the switcher visible until the automatic default terminal is
+        // confirmed. This avoids briefly revealing an empty terminal pane.
         _pendingPhoneProjectSwitcherCloseId = project.id;
       }
     }
@@ -205,8 +204,8 @@ extension _HomePageWorkspace on HomeController {
     _projectPathController.text = draft.path;
   }
 
-  void _requestProjectRemove() {
-    final project = _selectedProject;
+  void _requestProjectRemove([ProjectInfo? target]) {
+    final project = target ?? _selectedProject;
     if (project == null) {
       _showSnack(_t('project.selectFirst'));
       return;

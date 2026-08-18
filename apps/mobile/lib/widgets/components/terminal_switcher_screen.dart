@@ -27,6 +27,7 @@ class TerminalSwitcherScreen extends StatefulWidget {
     required this.onBack,
     required this.onSelectProject,
     required this.onAddProject,
+    required this.onRemoveProject,
     required this.onSelectTerminal,
     required this.onCreateTerminal,
     required this.onCloseTerminal,
@@ -60,6 +61,7 @@ class TerminalSwitcherScreen extends StatefulWidget {
   final VoidCallback onBack;
   final ValueChanged<ProjectInfo> onSelectProject;
   final VoidCallback onAddProject;
+  final ValueChanged<ProjectInfo> onRemoveProject;
   final ValueChanged<TerminalInfo> onSelectTerminal;
   final VoidCallback onCreateTerminal;
   final ValueChanged<TerminalInfo> onCloseTerminal;
@@ -130,6 +132,7 @@ class _TerminalSwitcherScreenState extends State<TerminalSwitcherScreen> {
               selectedProjectId: widget.selectedProjectId,
               onSelect: widget.onSelectProject,
               onAdd: widget.onAddProject,
+              onRemove: widget.onRemoveProject,
             ),
             const SizedBox(height: AppSpacing.l),
             _SectionTabs(
@@ -162,34 +165,34 @@ class _TerminalSwitcherScreenState extends State<TerminalSwitcherScreen> {
                   await Future<void>.delayed(const Duration(milliseconds: 600));
                 },
                 child: switch (_section) {
-                TerminalSwitcherSection.terminals => _TerminalList(
-                  terminals: widget.terminals,
-                  activeTerminalId: widget.activeTerminalId,
-                  addLabel: prefs.t('switcher.newTerminal'),
-                  itemPrefix: prefs.t('switcher.terminal'),
-                  creating: widget.creating,
-                  onAdd: widget.onCreateTerminal,
-                  onSelect: widget.onSelectTerminal,
-                  onClose: widget.onCloseTerminal,
-                ),
-                TerminalSwitcherSection.worktrees => _WorktreeList(
-                  accent: accent,
-                  loading: widget.loadingWorktrees,
-                  creating: widget.creatingWorktree,
-                  worktrees: scopedWorktrees,
-                  selectedId: widget.selectedWorktreeId,
-                  switchingId: widget.switchingWorktreeId,
-                  onSelect: widget.onSelectWorktree,
-                  onCreate: widget.onCreateWorktree,
-                  onMerge: widget.onMergeWorktree,
-                  onDelete: widget.onDeleteWorktree,
-                ),
-                TerminalSwitcherSection.sessions => _SessionList(
-                  sessions: widget.aiSessions,
-                  onOpen: widget.onOpenSession,
-                  onRename: widget.onRenameSession,
-                  onDelete: widget.onDeleteSession,
-                ),
+                  TerminalSwitcherSection.terminals => _TerminalList(
+                    terminals: widget.terminals,
+                    activeTerminalId: widget.activeTerminalId,
+                    addLabel: prefs.t('switcher.newTerminal'),
+                    itemPrefix: prefs.t('switcher.terminal'),
+                    creating: widget.creating,
+                    onAdd: widget.onCreateTerminal,
+                    onSelect: widget.onSelectTerminal,
+                    onClose: widget.onCloseTerminal,
+                  ),
+                  TerminalSwitcherSection.worktrees => _WorktreeList(
+                    accent: accent,
+                    loading: widget.loadingWorktrees,
+                    creating: widget.creatingWorktree,
+                    worktrees: scopedWorktrees,
+                    selectedId: widget.selectedWorktreeId,
+                    switchingId: widget.switchingWorktreeId,
+                    onSelect: widget.onSelectWorktree,
+                    onCreate: widget.onCreateWorktree,
+                    onMerge: widget.onMergeWorktree,
+                    onDelete: widget.onDeleteWorktree,
+                  ),
+                  TerminalSwitcherSection.sessions => _SessionList(
+                    sessions: widget.aiSessions,
+                    onOpen: widget.onOpenSession,
+                    onRename: widget.onRenameSession,
+                    onDelete: widget.onDeleteSession,
+                  ),
                 },
               ),
             ),
@@ -206,12 +209,14 @@ class _ProjectStrip extends StatelessWidget {
     required this.selectedProjectId,
     required this.onSelect,
     required this.onAdd,
+    required this.onRemove,
   });
 
   final List<ProjectInfo> projects;
   final String? selectedProjectId;
   final ValueChanged<ProjectInfo> onSelect;
   final VoidCallback onAdd;
+  final ValueChanged<ProjectInfo> onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -249,11 +254,13 @@ class _ProjectStrip extends StatelessWidget {
               final project = projects[index];
               final active = project.id == selectedProjectId;
               return _ProjectChip(
+                projectId: project.id,
                 label: project.name,
                 initials: projectInitials(project.name),
                 active: active,
                 accent: accent,
                 onTap: () => onSelect(project),
+                onDelete: () => onRemove(project),
               );
             },
           ),
@@ -265,21 +272,26 @@ class _ProjectStrip extends StatelessWidget {
 
 class _ProjectChip extends StatelessWidget {
   const _ProjectChip({
+    this.projectId,
     required this.label,
     required this.initials,
     required this.active,
     required this.accent,
     required this.onTap,
+    this.onDelete,
   });
 
+  final String? projectId;
   final String label;
   final String initials;
   final bool active;
   final Color accent;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
+    final prefs = AppPreferences.of(context);
     return Material(
       color: active ? accent.withValues(alpha: 0.16) : AppColors.bgSurface,
       borderRadius: BorderRadius.circular(AppRadius.md),
@@ -318,7 +330,9 @@ class _ProjectChip extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: active ? AppColors.textPrimary : AppColors.textSubtle,
+                    color: active
+                        ? AppColors.textPrimary
+                        : AppColors.textSubtle,
                     fontSize: 13,
                     fontWeight: active ? FontWeight.w700 : FontWeight.w600,
                   ),
@@ -327,6 +341,27 @@ class _ProjectChip extends StatelessWidget {
               if (active) ...[
                 const SizedBox(width: 4),
                 Icon(Icons.check_rounded, size: 16, color: accent),
+              ],
+              if (onDelete != null) ...[
+                const SizedBox(width: 2),
+                IconButton(
+                  key: projectId == null
+                      ? null
+                      : ValueKey('terminal-switcher-project-delete-$projectId'),
+                  tooltip: prefs.t('project.remove'),
+                  onPressed: onDelete,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 24,
+                    height: 24,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    size: 16,
+                    color: active ? accent : AppColors.textMuted,
+                  ),
+                ),
               ],
             ],
           ),

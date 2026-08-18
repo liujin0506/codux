@@ -354,6 +354,7 @@ class _CoduxHomePageState extends State<CoduxHomePage>
       onBack: c._closeTerminalSwitcher,
       onSelectProject: c._selectProjectFromSwitcher,
       onAddProject: c._requestProjectAdd,
+      onRemoveProject: (project) => c._requestProjectRemove(project),
       onSelectTerminal: c._selectTerminalFromSwitcher,
       onCreateTerminal: c._createCurrentProjectTerminal,
       onCloseTerminal: c._closeTerminal,

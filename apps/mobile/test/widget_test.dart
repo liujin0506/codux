@@ -1017,11 +1017,256 @@ void main() {
         afterSwitch,
         isNot(contains('project.list count=2 selected=project-1')),
       );
-      // A project without a terminal must leave the switcher open so the
-      // user can create one instead of landing on an empty terminal pane.
+      // Until the host sends the post-selection terminal list, keep the
+      // switcher open instead of revealing a blank terminal pane.
       expect(
         find.byKey(const ValueKey('terminal-switcher-add')),
         findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('removing the current project clears its active terminal', (
+    WidgetTester tester,
+  ) async {
+    CoduxLog.setLevelName('debug');
+    CoduxLog.clear();
+    final sent = <Map<String, dynamic>>[];
+    final device = await _fakeDevice();
+    var removed = false;
+
+    void emitProjects(_FakeRemoteTransport transport) {
+      transport.emitEncrypted(
+        RelayEnvelope(
+          type: 'project.list',
+          payload: {
+            'selectedProjectId': removed ? 'project-2' : 'project-1',
+            'projects': removed
+                ? const [
+                    {'id': 'project-2', 'name': 'Project 2', 'path': '/tmp/p2'},
+                  ]
+                : const [
+                    {'id': 'project-1', 'name': 'Project 1', 'path': '/tmp/p1'},
+                    {'id': 'project-2', 'name': 'Project 2', 'path': '/tmp/p2'},
+                  ],
+          },
+        ),
+      );
+    }
+
+    void emitTerminals(_FakeRemoteTransport transport) {
+      transport.emitEncrypted(
+        RelayEnvelope(
+          type: 'terminal.list',
+          payload: {
+            'terminals': [
+              {
+                'id': removed ? 'session-2' : 'session-1',
+                'title': removed ? 'Two' : 'One',
+                'projectId': removed ? 'project-2' : 'project-1',
+              },
+            ],
+          },
+        ),
+      );
+    }
+
+    final fake = _FakeRemoteTransport(
+      device: device,
+      onSent: (transport, envelope) {
+        sent.add(envelope);
+        final type = '${envelope['type'] ?? ''}';
+        if (type == 'host.info' || type == 'project.list') {
+          emitProjects(transport);
+          emitTerminals(transport);
+          transport.emitEncrypted(
+            RelayEnvelope(type: 'host.info', payload: _hostInfoPayload()),
+          );
+          return;
+        }
+        if (type == 'terminal.list') {
+          emitTerminals(transport);
+          return;
+        }
+        if (type == RemoteMessageType.projectRemove) {
+          removed = true;
+          transport.emitEncrypted(
+            RelayEnvelope(
+              type: RemoteMessageType.projectUpdated,
+              payload: const {'action': 'remove', 'projectId': 'project-1'},
+            ),
+          );
+        }
+      },
+    );
+
+    await tester.pumpWidget(
+      CoduxFlutterApp(initialDevices: [device], transportFactory: (_) => fake),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mac'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    await _openTerminalSwitcher(tester);
+
+    await tester.tap(
+      find.byKey(const ValueKey('terminal-switcher-project-delete-project-1')),
+    );
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+
+    expect(
+      sent.where((envelope) => envelope['type'] == 'project.remove'),
+      hasLength(1),
+    );
+    expect(removed, isTrue);
+    expect(
+      find.byKey(const ValueKey('terminal-switcher-project-delete-project-1')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('terminal-switcher-project-delete-project-2')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('terminal-switcher-terminal-session-1')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('terminal-switcher-terminal-session-2')),
+      findsOneWidget,
+    );
+    expect(CoduxLog.snapshotText(), contains('plan reason=project-removed'));
+  });
+
+  testWidgets(
+    'switching to an empty project creates one default terminal once',
+    (WidgetTester tester) async {
+      CoduxLog.setLevelName('debug');
+      CoduxLog.clear();
+      final sent = <Map<String, dynamic>>[];
+      final device = await _fakeDevice();
+      var selectedProjectId = 'project-1';
+      String? createdTerminalId;
+
+      void emitProjects(_FakeRemoteTransport transport) {
+        transport.emitEncrypted(
+          RelayEnvelope(
+            type: 'project.list',
+            payload: {
+              'selectedProjectId': 'project-1',
+              'projects': const [
+                {'id': 'project-1', 'name': 'Project 1', 'path': '/tmp/p1'},
+                {'id': 'project-2', 'name': 'Project 2', 'path': '/tmp/p2'},
+              ],
+            },
+          ),
+        );
+      }
+
+      void emitTerminals(_FakeRemoteTransport transport) {
+        final terminals = <Map<String, dynamic>>[];
+        if (selectedProjectId == 'project-1') {
+          terminals.add(const {
+            'id': 'session-1',
+            'title': 'One',
+            'projectId': 'project-1',
+          });
+        } else if (createdTerminalId != null) {
+          terminals.add({
+            'id': createdTerminalId,
+            'title': 'Default',
+            'projectId': 'project-2',
+          });
+        }
+        transport.emitEncrypted(
+          RelayEnvelope(
+            type: 'terminal.list',
+            payload: {'terminals': terminals},
+          ),
+        );
+      }
+
+      final fake = _FakeRemoteTransport(
+        device: device,
+        onSent: (transport, envelope) {
+          sent.add(envelope);
+          final type = '${envelope['type'] ?? ''}';
+          if (type == 'host.info' || type == 'project.list') {
+            emitProjects(transport);
+            emitTerminals(transport);
+            transport.emitEncrypted(
+              RelayEnvelope(type: 'host.info', payload: _hostInfoPayload()),
+            );
+            return;
+          }
+          if (type == 'terminal.list') {
+            emitTerminals(transport);
+            return;
+          }
+          if (type == 'project.select') {
+            final payload = envelope['payload'];
+            selectedProjectId = payload is Map
+                ? '${payload['projectId'] ?? ''}'
+                : '';
+            transport.emitEncrypted(
+              RelayEnvelope(
+                type: 'project.selected',
+                payload: {'projectId': selectedProjectId},
+              ),
+            );
+            emitProjects(transport);
+            return;
+          }
+          if (type == RemoteMessageType.terminalCreate) {
+            final payload = Map<String, dynamic>.from(
+              envelope['payload'] as Map,
+            );
+            createdTerminalId = '${payload['terminalId'] ?? ''}';
+            transport.emitEncrypted(
+              RelayEnvelope(
+                type: RemoteMessageType.terminalCreated,
+                sessionId: createdTerminalId,
+                payload: {
+                  'id': createdTerminalId,
+                  'title': 'Default',
+                  'projectId': 'project-2',
+                },
+              ),
+            );
+          }
+        },
+      );
+
+      await tester.pumpWidget(
+        CoduxFlutterApp(
+          initialDevices: [device],
+          transportFactory: (_) => fake,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mac'));
+      await tester.pumpAndSettle(const Duration(milliseconds: 300));
+
+      await _tapProjectTab(tester, 'Project 2');
+      await tester.pumpAndSettle(const Duration(milliseconds: 300));
+
+      final creates = sent
+          .where(
+            (envelope) => envelope['type'] == RemoteMessageType.terminalCreate,
+          )
+          .toList();
+      expect(creates, hasLength(1));
+      expect((creates.single['payload'] as Map)['projectId'], 'project-2');
+      expect(createdTerminalId, isNotNull);
+
+      // A second authoritative list containing the new terminal must not
+      // trigger another default create.
+      emitTerminals(fake);
+      await tester.pump();
+      expect(
+        sent.where(
+          (envelope) => envelope['type'] == RemoteMessageType.terminalCreate,
+        ),
+        hasLength(1),
       );
     },
   );

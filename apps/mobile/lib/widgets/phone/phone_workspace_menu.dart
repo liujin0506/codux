@@ -13,7 +13,6 @@ class PhoneWorkspaceMenu extends StatelessWidget {
     required this.onOpenSwitcher,
     required this.onEditProject,
     required this.onAddProject,
-    required this.onRemoveProject,
     this.onRebuildTerminal,
   });
 
@@ -24,7 +23,6 @@ class PhoneWorkspaceMenu extends StatelessWidget {
   final VoidCallback onOpenSwitcher;
   final VoidCallback onEditProject;
   final VoidCallback onAddProject;
-  final VoidCallback onRemoveProject;
   final VoidCallback? onRebuildTerminal;
 
   @override
@@ -44,11 +42,7 @@ class PhoneWorkspaceMenu extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadius.md),
           side: BorderSide(color: AppColors.border, width: 0.5),
         ),
-        icon: Icon(
-          Icons.more_vert,
-          size: 22,
-          color: AppColors.textPrimary,
-        ),
+        icon: Icon(Icons.more_vert, size: 22, color: AppColors.textPrimary),
         onSelected: (value) {
           switch (value) {
             case 'stats':
@@ -65,8 +59,6 @@ class PhoneWorkspaceMenu extends StatelessWidget {
               onEditProject();
             case 'add':
               onAddProject();
-            case 'remove':
-              onRemoveProject();
           }
         },
         itemBuilder: (context) => [
@@ -129,15 +121,6 @@ class PhoneWorkspaceMenu extends StatelessWidget {
               label: prefs.t('project.add'),
             ),
           ),
-          PopupMenuItem<String>(
-            value: 'remove',
-            height: 40,
-            child: _MenuRow(
-              icon: Icons.delete_outline,
-              label: prefs.t('project.remove'),
-              danger: true,
-            ),
-          ),
         ],
       ),
     );
@@ -145,19 +128,14 @@ class PhoneWorkspaceMenu extends StatelessWidget {
 }
 
 class _MenuRow extends StatelessWidget {
-  const _MenuRow({
-    required this.icon,
-    required this.label,
-    this.danger = false,
-  });
+  const _MenuRow({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
-  final bool danger;
 
   @override
   Widget build(BuildContext context) {
-    final color = danger ? AppColors.danger : AppColors.textPrimary;
+    final color = AppColors.textPrimary;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

@@ -22,7 +22,6 @@ class PhoneWorkspaceHeader extends StatelessWidget {
     required this.onShowGit,
     required this.onEditProject,
     required this.onAddProject,
-    required this.onRemoveProject,
     this.latencyMs,
     this.onRebuildTerminal,
   });
@@ -42,17 +41,15 @@ class PhoneWorkspaceHeader extends StatelessWidget {
   final VoidCallback onShowGit;
   final VoidCallback onEditProject;
   final VoidCallback onAddProject;
-  final VoidCallback onRemoveProject;
   final VoidCallback? onRebuildTerminal;
 
   @override
   Widget build(BuildContext context) {
     final prefs = AppPreferences.of(context);
     final accent = Theme.of(context).colorScheme.secondary;
-    final projectLabel =
-        projectName?.trim().isNotEmpty == true
-            ? projectName!.trim()
-            : prefs.t('project.selectFirst');
+    final projectLabel = projectName?.trim().isNotEmpty == true
+        ? projectName!.trim()
+        : prefs.t('project.selectFirst');
     final terminalLabel = terminalTitle?.trim();
 
     return Material(
@@ -128,10 +125,7 @@ class PhoneWorkspaceHeader extends StatelessWidget {
                 ),
               ),
             ),
-            _HeaderLatencyText(
-              latencyMs: latencyMs,
-              connected: connected,
-            ),
+            _HeaderLatencyText(latencyMs: latencyMs, connected: connected),
             PhoneWorkspaceMenu(
               onShowStats: onShowStats,
               onShowGit: onShowGit,
@@ -141,7 +135,6 @@ class PhoneWorkspaceHeader extends StatelessWidget {
               onRebuildTerminal: onRebuildTerminal,
               onEditProject: onEditProject,
               onAddProject: onAddProject,
-              onRemoveProject: onRemoveProject,
             ),
           ],
         ),

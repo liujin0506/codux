@@ -403,4 +403,25 @@ extension _HomePageSync on HomeController {
     );
     _applyRuntimePlan(plan, reason: 'missing-terminal');
   }
+
+  void _createDefaultTerminalWhenMissing() {
+    if (!_showTerminal ||
+        !_transportReady ||
+        !_remoteProtocolReady ||
+        !_terminalListLoaded) {
+      return;
+    }
+    final projectId = _selectedProjectId;
+    if (projectId == null ||
+        !_projects.any((project) => project.id == projectId) ||
+        _creatingTerminalProjectId == projectId ||
+        _remoteRuntime.pendingProjectSelect(includeSent: true) != null) {
+      return;
+    }
+    if (_currentProjectTerminals().any(_isAccessibleTerminal)) return;
+    CoduxLog.info(
+      '[codux-flutter-terminal] no terminal for selected project; creating default project=$projectId',
+    );
+    _createTerminal(projectId);
+  }
 }

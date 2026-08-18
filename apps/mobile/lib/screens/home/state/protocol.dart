@@ -147,8 +147,7 @@ extension _HomePageProtocol on HomeController {
         case final type when type == RemoteMessageType.fileList:
           _handleFileList(message);
         case final type when type == RemoteMessageType.projectUpdated:
-          _refreshLists();
-          _showToast(_t('project.updated'));
+          _handleProjectUpdated(message);
         case final type when type == RemoteMessageType.aiStats:
           final payload = message.payload;
           if (payload is Map &&
@@ -203,6 +202,37 @@ extension _HomePageProtocol on HomeController {
     } catch (error) {
       CoduxLog.error('[codux-flutter-remote] receive failed: $error');
     }
+  }
+
+  void _handleProjectUpdated(RelayEnvelope message) {
+    final payload = message.payload;
+    final action = payload is Map
+        ? payload['action']?.toString().trim().toLowerCase()
+        : null;
+    final projectId = payload is Map
+        ? (payload['projectId'] ?? payload['id'])?.toString().trim()
+        : null;
+    if (action == 'remove' && projectId != null && projectId.isNotEmpty) {
+      // The host sends the mutation acknowledgement before (or alongside) the
+      // refreshed project list. Reconcile the local runtime immediately so a
+      // removed current project cannot keep its stale terminal/session bound.
+      _clearProjectSelectAck(projectId);
+      final remaining = _projects
+          .where((project) => project.id != projectId)
+          .toList(growable: false);
+      final plan = _remoteRuntime.applyProjectList(
+        projects: remaining,
+        remoteSelectedProjectId: null,
+        remoteSelectedWorktreeId: null,
+        terminalVisible: _terminalDataVisible,
+        terminalListLoaded: _terminalListLoaded,
+      );
+      _pendingPhoneProjectSwitcherCloseId = null;
+      _applyRuntimePlan(plan, reason: 'project-removed');
+      unawaited(_cacheProjects(remaining));
+    }
+    _refreshLists();
+    _showToast(_t('project.updated'));
   }
 
   void _handleProjectSelected(RelayEnvelope message) {
@@ -314,6 +344,7 @@ extension _HomePageProtocol on HomeController {
       _clearProjectSelectAck(_selectedProjectId!);
     }
     _applyRuntimePlan(plan, reason: 'missing-terminal');
+    _createDefaultTerminalWhenMissing();
   }
 
   void _handleTerminalCreated(RelayEnvelope message) {

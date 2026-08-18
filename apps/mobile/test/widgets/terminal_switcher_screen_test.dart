@@ -48,9 +48,7 @@ void main() {
     );
     final activeIcon = tester.widget<Icon>(
       find.descendant(
-        of: find.byKey(
-          const ValueKey('terminal-switcher-terminal-split-2'),
-        ),
+        of: find.byKey(const ValueKey('terminal-switcher-terminal-split-2')),
         matching: find.byIcon(Icons.terminal_rounded),
       ),
     );
@@ -64,11 +62,7 @@ void main() {
       _wrap(
         _switcher(
           terminals: const [
-            TerminalInfo(
-              id: 'term-1',
-              title: 'One',
-              projectId: 'project-1',
-            ),
+            TerminalInfo(id: 'term-1', title: 'One', projectId: 'project-1'),
           ],
           activeTerminalId: 'term-1',
           projects: const [
@@ -89,6 +83,29 @@ void main() {
     expect(selected?.id, 'project-2');
   });
 
+  testWidgets('project strip can remove a project', (tester) async {
+    ProjectInfo? removed;
+    await tester.pumpWidget(
+      _wrap(
+        _switcher(
+          terminals: const [],
+          activeTerminalId: null,
+          onRemoveProject: (project) => removed = project,
+          projects: const [
+            ProjectInfo(id: 'project-1', name: 'Alpha', path: '/tmp/a'),
+          ],
+        ),
+      ),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('terminal-switcher-project-delete-project-1')),
+    );
+    await tester.pump();
+
+    expect(removed?.id, 'project-1');
+  });
+
   testWidgets('sessions tab lists history after worktrees', (tester) async {
     var opened = 0;
     var requested = 0;
@@ -96,11 +113,7 @@ void main() {
       _wrap(
         _switcher(
           terminals: const [
-            TerminalInfo(
-              id: 'term-1',
-              title: 'One',
-              projectId: 'project-1',
-            ),
+            TerminalInfo(id: 'term-1', title: 'One', projectId: 'project-1'),
           ],
           activeTerminalId: 'term-1',
           aiSessions: const [
@@ -159,6 +172,7 @@ TerminalSwitcherScreen _switcher({
   VoidCallback? onOpenSessions,
   ValueChanged<AISessionRecord>? onOpenSession,
   ValueChanged<ProjectInfo>? onSelectProject,
+  ValueChanged<ProjectInfo>? onRemoveProject,
 }) {
   return TerminalSwitcherScreen(
     topInset: 0,
@@ -176,6 +190,7 @@ TerminalSwitcherScreen _switcher({
     onBack: () {},
     onSelectProject: onSelectProject ?? (_) {},
     onAddProject: () {},
+    onRemoveProject: onRemoveProject ?? (_) {},
     onSelectTerminal: (_) {},
     onCreateTerminal: () {},
     onCloseTerminal: (_) {},
