@@ -385,11 +385,13 @@ extension _HomePageConnection on HomeController {
     _remoteRuntime.reset();
     _resetRemoteSubscriptions();
     _terminalBaselineResyncRequestedAt.clear();
+    _resetRemoteViewportRequests();
     _viewportOwnerRefreshAfterBaseline.clear();
     _terminalOutputAckSeqBySession.clear();
     _terminalOutputAckAtBySession.clear();
     _terminalViewportController.resetSizes();
     _terminalViewportInteractive = false;
+    _resetStoredWorkspaceRestoreProgress();
     _syncRuntimeViewState();
   }
 
@@ -403,6 +405,7 @@ extension _HomePageConnection on HomeController {
     _remoteRuntime.reset(keepProjects: keepProjects);
     _resetRemoteSubscriptions();
     _terminalBaselineResyncRequestedAt.clear();
+    _resetRemoteViewportRequests();
     _viewportOwnerRefreshAfterBaseline.clear();
     _terminalOutputAckSeqBySession.clear();
     _terminalOutputAckAtBySession.clear();
@@ -412,6 +415,7 @@ extension _HomePageConnection on HomeController {
     // reject the fresh snapshots.
     _remoteStateVersions.reset();
     _terminalViewportInteractive = false;
+    _resetStoredWorkspaceRestoreProgress();
     _syncRuntimeViewState();
   }
 
@@ -423,6 +427,7 @@ extension _HomePageConnection on HomeController {
     _remoteSyncController.resetProtocolReady();
     _resetRemoteSubscriptions();
     _terminalBaselineResyncRequestedAt.clear();
+    _resetRemoteViewportRequests();
     _viewportOwnerRefreshAfterBaseline.clear();
     _terminalOutputAckSeqBySession.clear();
     _terminalOutputAckAtBySession.clear();
@@ -438,6 +443,7 @@ extension _HomePageConnection on HomeController {
     _receiveChain = Future<void>.value();
     _hostResponsive = false;
     _remoteRuntime.reset(keepProjects: true);
+    _resetStoredWorkspaceRestoreProgress();
     _syncRuntimeViewState();
     _setTerminalBufferLoading(false);
     _clearTerminal();
@@ -502,6 +508,7 @@ extension _HomePageConnection on HomeController {
     final terminalCreateCancelled = _remoteRuntime.cancelTerminalCreate();
     if (resetRuntime) {
       _terminalOutputController.resetAll();
+      _resetRemoteViewportRequests();
       _terminalRepaint.tick();
       _resetRemoteSubscriptions();
       _terminalBaselineResyncRequestedAt.clear();
@@ -575,6 +582,7 @@ extension _HomePageConnection on HomeController {
       }
       return;
     }
+    _prepareStoredWorkspaceSelection(target);
     _shouldReconnect = true;
     _backgroundConnect = background;
     _connectInFlight = true;
@@ -601,6 +609,7 @@ extension _HomePageConnection on HomeController {
     );
     _cancelHostResponseProbe();
     _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _clearLatencyProbe();
     unawaited(_closeActiveTransport());
     _transportConnected = false;
@@ -681,16 +690,21 @@ extension _HomePageConnection on HomeController {
     if (!_shouldReconnect) return;
     _reconnectTimer?.cancel();
     _reconnectAttempt += 1;
+    // A reconnect has already paid the network-loss detection cost. Start the
+    // warm endpoint again quickly, then back off if the peer is genuinely down.
     final delay = Duration(
-      milliseconds: (800 * (1 << (_reconnectAttempt - 1).clamp(0, 5))).clamp(
-        800,
+      milliseconds: (250 * (1 << (_reconnectAttempt - 1).clamp(0, 5))).clamp(
+        250,
         30000,
       ),
     );
     CoduxLog.info(
       '[codux-flutter-remote] reconnect scheduled host=${target.hostId} device=${target.deviceId} attempt=$_reconnectAttempt delayMs=${delay.inMilliseconds}',
     );
-    _reconnectTimer = Timer(delay, () => _connect(target, true));
+    _reconnectTimer = Timer(delay, () {
+      _reconnectTimer = null;
+      _connect(target, true);
+    });
   }
 
   void _sendInitialTransportRequests({bool force = false}) {

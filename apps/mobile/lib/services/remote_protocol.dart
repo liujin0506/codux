@@ -109,6 +109,12 @@ abstract final class RemoteMessageType {
   static final terminalViewportState = codux_protocol_ffi.messageType(
     'terminalViewportState',
   );
+  static final terminalViewportScroll = codux_protocol_ffi.messageType(
+    'terminalViewportScroll',
+  );
+  static final terminalViewportScrolled = codux_protocol_ffi.messageType(
+    'terminalViewportScrolled',
+  );
   static final terminalUploaded = codux_protocol_ffi.messageType(
     'terminalUploaded',
   );
@@ -187,6 +193,38 @@ RelayEnvelope remoteResourceUnsubscribeEnvelope({
       projectId: projectId,
       sessionId: sessionId,
     ),
+  );
+}
+
+/// Request a host-rendered terminal viewport. The host keeps the authoritative
+/// scrollback at the PTY's current grid size and returns a screen keyframe, so
+/// the mobile renderer never has to replay ANSI captured at another width.
+RelayEnvelope remoteTerminalViewportScrollEnvelope({
+  required String sessionId,
+  required String requestId,
+  int? displayOffset,
+  int? lines,
+  bool toBottom = false,
+}) {
+  final payload = <String, Object>{
+    'viewportRequestId': requestId,
+    // 0 means the host's configured retained screen history rather than an
+    // artificial small cap. No overscan keeps the returned grid exactly the
+    // mobile viewport dimensions.
+    'maxLines': 0,
+    'overscanRows': 0,
+  };
+  if (displayOffset != null) {
+    payload['displayOffset'] = displayOffset.clamp(0, 1 << 30);
+  } else if (toBottom) {
+    payload['toBottom'] = true;
+  } else if (lines != null && lines != 0) {
+    payload['lines'] = lines;
+  }
+  return RelayEnvelope(
+    type: RemoteMessageType.terminalViewportScroll,
+    sessionId: sessionId,
+    payload: payload,
   );
 }
 

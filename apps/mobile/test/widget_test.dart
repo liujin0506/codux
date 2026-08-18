@@ -521,6 +521,15 @@ void main() {
         ),
         isNotEmpty,
       );
+
+      // A lost transport must not leave the stale handoff placeholder in
+      // front of the reconnect UI. The placeholder's claim action cannot be
+      // delivered until the transport is back.
+      fake.emitState('path:path=none');
+      await tester.pump();
+      expect(find.byKey(takeOverKey), findsNothing);
+      expect(find.text('重连中'), findsOneWidget);
+      expect(find.text('立即重连'), findsOneWidget);
     },
   );
 
@@ -1801,143 +1810,163 @@ void main() {
     },
   );
 
-  testWidgets('transport failure keeps terminal page and shows reconnect hint', (
-    WidgetTester tester,
-  ) async {
-    CoduxLog.setLevelName('debug');
-    CoduxLog.clear();
-    final device = await _fakeDevice();
-    final fake = _FakeRemoteTransport(
-      device: device,
-      stallAfterInitialConnect: true,
-      onSent: (transport, envelope) {
-        final type = '${envelope['type'] ?? ''}';
-        if (type == 'host.info') {
-          transport.emitEncrypted(
-            const RelayEnvelope(
-              type: 'project.list',
-              payload: {
-                'selectedProjectId': 'project-1',
-                'projects': [
-                  {'id': 'project-1', 'name': 'Project 1', 'path': '/tmp/p1'},
-                ],
-              },
-            ),
-          );
-          transport.emitEncrypted(
-            const RelayEnvelope(
-              type: 'terminal.list',
-              payload: {
-                'terminals': [
-                  {
-                    'id': 'session-1',
-                    'title': 'Terminal',
-                    'projectId': 'project-1',
-                  },
-                ],
-              },
-            ),
-          );
-          transport.emitEncrypted(
-            RelayEnvelope(type: 'host.info', payload: _hostInfoPayload()),
-          );
+  testWidgets(
+    'transport failure keeps terminal page and shows reconnect hint',
+    (WidgetTester tester) async {
+      CoduxLog.setLevelName('debug');
+      CoduxLog.clear();
+      final device = await _fakeDevice();
+      final fake = _FakeRemoteTransport(
+        device: device,
+        stallAfterInitialConnect: true,
+        onSent: (transport, envelope) {
+          final type = '${envelope['type'] ?? ''}';
+          if (type == 'host.info') {
+            transport.emitEncrypted(
+              const RelayEnvelope(
+                type: 'project.list',
+                payload: {
+                  'selectedProjectId': 'project-1',
+                  'projects': [
+                    {'id': 'project-1', 'name': 'Project 1', 'path': '/tmp/p1'},
+                  ],
+                },
+              ),
+            );
+            transport.emitEncrypted(
+              const RelayEnvelope(
+                type: 'terminal.list',
+                payload: {
+                  'terminals': [
+                    {
+                      'id': 'session-1',
+                      'title': 'Terminal',
+                      'projectId': 'project-1',
+                    },
+                  ],
+                },
+              ),
+            );
+            transport.emitEncrypted(
+              RelayEnvelope(type: 'host.info', payload: _hostInfoPayload()),
+            );
+          }
+        },
+      );
+
+      await tester.pumpWidget(
+        CoduxFlutterApp(
+          initialDevices: [device],
+          transportFactory: (_) => fake,
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (var attempt = 0; attempt < 2; attempt += 1) {
+        if (find
+            .byKey(const ValueKey('remote-terminal-body'))
+            .evaluate()
+            .isNotEmpty) {
+          break;
         }
-      },
-    );
-
-    await tester.pumpWidget(
-      CoduxFlutterApp(initialDevices: [device], transportFactory: (_) => fake),
-    );
-    await tester.pumpAndSettle();
-    for (var attempt = 0; attempt < 2; attempt += 1) {
-      if (find
-          .byKey(const ValueKey('remote-terminal-body'))
-          .evaluate()
-          .isNotEmpty) {
-        break;
+        await tester.tap(find.text('Mac').first);
+        await tester.pumpAndSettle(const Duration(milliseconds: 300));
       }
-      await tester.tap(find.text('Mac').first);
-      await tester.pumpAndSettle(const Duration(milliseconds: 300));
-    }
 
-    expect(find.byKey(const ValueKey('remote-terminal-body')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('remote-terminal-body')),
+        findsOneWidget,
+      );
 
-    fake.emitState('failed:network');
-    await tester.pump();
+      fake.emitState('failed:network');
+      await tester.pump();
 
-    expect(find.byKey(const ValueKey('remote-terminal-body')), findsOneWidget);
-    expect(find.text('重连中'), findsOneWidget);
-    expect(find.text('立即重连'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 1));
-  });
+      expect(
+        find.byKey(const ValueKey('remote-terminal-body')),
+        findsOneWidget,
+      );
+      expect(find.text('重连中'), findsOneWidget);
+      expect(find.text('立即重连'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+    },
+  );
 
-  testWidgets('none transport path keeps terminal page and shows reconnect hint', (
-    WidgetTester tester,
-  ) async {
-    final device = await _fakeDevice();
-    final fake = _FakeRemoteTransport(
-      device: device,
-      stallAfterInitialConnect: true,
-      onSent: (transport, envelope) {
-        final type = '${envelope['type'] ?? ''}';
-        if (type == 'host.info') {
-          transport.emitEncrypted(
-            const RelayEnvelope(
-              type: 'project.list',
-              payload: {
-                'selectedProjectId': 'project-1',
-                'projects': [
-                  {'id': 'project-1', 'name': 'Project 1', 'path': '/tmp/p1'},
-                ],
-              },
-            ),
-          );
-          transport.emitEncrypted(
-            const RelayEnvelope(
-              type: 'terminal.list',
-              payload: {
-                'terminals': [
-                  {
-                    'id': 'session-1',
-                    'title': 'Terminal',
-                    'projectId': 'project-1',
-                  },
-                ],
-              },
-            ),
-          );
-          transport.emitEncrypted(
-            RelayEnvelope(type: 'host.info', payload: _hostInfoPayload()),
-          );
+  testWidgets(
+    'none transport path keeps terminal page and shows reconnect hint',
+    (WidgetTester tester) async {
+      final device = await _fakeDevice();
+      final fake = _FakeRemoteTransport(
+        device: device,
+        stallAfterInitialConnect: true,
+        onSent: (transport, envelope) {
+          final type = '${envelope['type'] ?? ''}';
+          if (type == 'host.info') {
+            transport.emitEncrypted(
+              const RelayEnvelope(
+                type: 'project.list',
+                payload: {
+                  'selectedProjectId': 'project-1',
+                  'projects': [
+                    {'id': 'project-1', 'name': 'Project 1', 'path': '/tmp/p1'},
+                  ],
+                },
+              ),
+            );
+            transport.emitEncrypted(
+              const RelayEnvelope(
+                type: 'terminal.list',
+                payload: {
+                  'terminals': [
+                    {
+                      'id': 'session-1',
+                      'title': 'Terminal',
+                      'projectId': 'project-1',
+                    },
+                  ],
+                },
+              ),
+            );
+            transport.emitEncrypted(
+              RelayEnvelope(type: 'host.info', payload: _hostInfoPayload()),
+            );
+          }
+        },
+      );
+
+      await tester.pumpWidget(
+        CoduxFlutterApp(
+          initialDevices: [device],
+          transportFactory: (_) => fake,
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (var attempt = 0; attempt < 2; attempt += 1) {
+        if (find
+            .byKey(const ValueKey('remote-terminal-body'))
+            .evaluate()
+            .isNotEmpty) {
+          break;
         }
-      },
-    );
-
-    await tester.pumpWidget(
-      CoduxFlutterApp(initialDevices: [device], transportFactory: (_) => fake),
-    );
-    await tester.pumpAndSettle();
-    for (var attempt = 0; attempt < 2; attempt += 1) {
-      if (find
-          .byKey(const ValueKey('remote-terminal-body'))
-          .evaluate()
-          .isNotEmpty) {
-        break;
+        await tester.tap(find.text('Mac').first);
+        await tester.pumpAndSettle(const Duration(milliseconds: 300));
       }
-      await tester.tap(find.text('Mac').first);
-      await tester.pumpAndSettle(const Duration(milliseconds: 300));
-    }
 
-    expect(find.byKey(const ValueKey('remote-terminal-body')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('remote-terminal-body')),
+        findsOneWidget,
+      );
 
-    fake.emitState('path:path=none');
-    await tester.pump();
+      fake.emitState('path:path=none');
+      await tester.pump();
 
-    expect(find.byKey(const ValueKey('remote-terminal-body')), findsOneWidget);
-    expect(find.text('重连中'), findsOneWidget);
-    expect(find.text('立即重连'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 1));
-  });
+      expect(
+        find.byKey(const ValueKey('remote-terminal-body')),
+        findsOneWidget,
+      );
+      expect(find.text('重连中'), findsOneWidget);
+      expect(find.text('立即重连'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+    },
+  );
 
   testWidgets(
     'pending project select ack timeout retries project select and refreshes terminal list',
@@ -2686,8 +2715,7 @@ Future<void> _openPhoneProjectPicker(
   }
   await tester.tap(
     find.byWidgetPredicate(
-      (widget) =>
-          widget is PopupMenuItem<String> && widget.value == 'switcher',
+      (widget) => widget is PopupMenuItem<String> && widget.value == 'switcher',
     ),
   );
   if (settle) {
@@ -2717,8 +2745,7 @@ Future<void> _openTerminalSwitcher(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(
     find.byWidgetPredicate(
-      (widget) =>
-          widget is PopupMenuItem<String> && widget.value == 'switcher',
+      (widget) => widget is PopupMenuItem<String> && widget.value == 'switcher',
     ),
   );
   await tester.pumpAndSettle();

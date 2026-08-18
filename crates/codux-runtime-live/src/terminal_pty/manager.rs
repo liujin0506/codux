@@ -448,6 +448,15 @@ impl TerminalManager {
         Ok(self.session(session_id)?.snapshot_tail(max_chars))
     }
 
+    pub fn snapshot_window(
+        &self,
+        session_id: &str,
+        offset: usize,
+        max_chars: usize,
+    ) -> Result<(String, usize, usize, usize, bool)> {
+        Ok(self.session(session_id)?.snapshot_window(offset, max_chars))
+    }
+
     pub fn baseline_snapshot(
         &self,
         session_id: &str,

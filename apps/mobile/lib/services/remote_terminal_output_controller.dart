@@ -101,6 +101,9 @@ class RemoteTerminalOutputController {
 
   bool hasCachedOutput(String sessionId) => _router.hasCachedOutput(sessionId);
 
+  bool hasRemoteViewport(String sessionId) =>
+      _router.hasRemoteViewport(sessionId);
+
   int bufferOffset(String sessionId) => _router.bufferOffset(sessionId);
 
   /// True when a live output gap was observed for [sessionId] and no baseline

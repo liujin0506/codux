@@ -53,6 +53,141 @@ extension _HomePageBootstrap on HomeController {
     }
   }
 
+  String _workspaceSelectionHostKey(StoredDevice device) {
+    final hostId = device.hostId.trim();
+    if (hostId.isNotEmpty) return hostId;
+    return device.deviceId.trim();
+  }
+
+  void _prepareStoredWorkspaceSelection(StoredDevice device) {
+    final hostKey = _workspaceSelectionHostKey(device);
+    if (hostKey.isEmpty || _storedWorkspaceSelectionHostId == hostKey) {
+      return;
+    }
+    _storedWorkspaceSelectionHostId = hostKey;
+    _storedWorkspaceSelection = const StoredWorkspaceSelection();
+    _storedWorkspaceSelectionLoaded = false;
+    _workspaceSelectionRestoreSuppressed = false;
+    _workspaceProjectSelectionRestored = false;
+    _restoredWorktreeSelectionProjects.clear();
+    unawaited(_loadStoredWorkspaceSelection(device, hostKey));
+  }
+
+  void _resetStoredWorkspaceRestoreProgress() {
+    _workspaceSelectionRestoreSuppressed = false;
+    _workspaceProjectSelectionRestored = false;
+    _restoredWorktreeSelectionProjects.clear();
+  }
+
+  Future<void> _loadStoredWorkspaceSelection(
+    StoredDevice device,
+    String hostKey,
+  ) async {
+    StoredWorkspaceSelection selection;
+    try {
+      selection = await _storage.loadWorkspaceSelection(device);
+    } catch (error) {
+      CoduxLog.warn(
+        '[codux-flutter-workspace] selection restore load failed: $error',
+      );
+      selection = const StoredWorkspaceSelection();
+    }
+    if (!mounted || _storedWorkspaceSelectionHostId != hostKey) return;
+    _storedWorkspaceSelection = selection;
+    _storedWorkspaceSelectionLoaded = true;
+    CoduxLog.debug(
+      '[codux-flutter-workspace] selection loaded host=$hostKey project=${selection.projectId ?? ''} worktrees=${selection.worktreeIdsByProject.length}',
+    );
+    _tryRestoreStoredWorkspaceSelection();
+  }
+
+  void _rememberWorkspaceSelection({bool userInitiated = true}) {
+    final device = _activeDevice;
+    final projectId = _selectedProjectId?.trim();
+    if (device == null || projectId == null || projectId.isEmpty) return;
+    if (userInitiated && !_restoringWorkspaceSelection) {
+      _workspaceSelectionRestoreSuppressed = true;
+    }
+    final worktreeId = _selectedWorktreeId?.trim();
+    final worktreeIds = Map<String, String>.from(
+      _storedWorkspaceSelection.worktreeIdsByProject,
+    );
+    if (worktreeId == null || worktreeId.isEmpty) {
+      worktreeIds.remove(projectId);
+    } else {
+      worktreeIds[projectId] = worktreeId;
+    }
+    _storedWorkspaceSelection = StoredWorkspaceSelection(
+      projectId: projectId,
+      worktreeIdsByProject: worktreeIds,
+    );
+    unawaited(
+      _storage.saveWorkspaceSelection(
+        device,
+        projectId: projectId,
+        worktreeId: worktreeId,
+      ),
+    );
+  }
+
+  void _tryRestoreStoredWorkspaceSelection() {
+    if (!_storedWorkspaceSelectionLoaded ||
+        !_projectListLoaded ||
+        _workspaceSelectionRestoreSuppressed) {
+      return;
+    }
+    if (!_workspaceProjectSelectionRestored) {
+      _workspaceProjectSelectionRestored = true;
+      final savedProjectId = _storedWorkspaceSelection.projectId;
+      ProjectInfo? savedProject;
+      if (savedProjectId != null) {
+        for (final project in _projects) {
+          if (project.id == savedProjectId) {
+            savedProject = project;
+            break;
+          }
+        }
+      }
+      if (savedProject != null && _selectedProjectId != savedProject.id) {
+        _restoringWorkspaceSelection = true;
+        try {
+          _onProjectSelected(savedProject);
+        } finally {
+          _restoringWorkspaceSelection = false;
+        }
+        return;
+      }
+    }
+
+    final projectId = _selectedProjectId;
+    if (projectId == null ||
+        _restoredWorktreeSelectionProjects.contains(projectId) ||
+        !_remoteRuntime.hasWorktreesForProject(projectId)) {
+      return;
+    }
+    _restoredWorktreeSelectionProjects.add(projectId);
+    final savedWorktreeId = _storedWorkspaceSelection.worktreeIdForProject(
+      projectId,
+    );
+    if (savedWorktreeId == null || _selectedWorktreeId == savedWorktreeId) {
+      return;
+    }
+    RemoteWorktreeInfo? savedWorktree;
+    for (final worktree in _worktreesForProject(projectId)) {
+      if (worktree.id == savedWorktreeId) {
+        savedWorktree = worktree;
+        break;
+      }
+    }
+    if (savedWorktree == null) return;
+    _restoringWorkspaceSelection = true;
+    try {
+      _selectWorktree(savedWorktree);
+    } finally {
+      _restoringWorkspaceSelection = false;
+    }
+  }
+
   void _scheduleStartupConnect(StoredDevice device) {
     Timer(const Duration(milliseconds: 150), () {
       if (!mounted || _disposing || !_appInForeground) return;
@@ -276,5 +411,4 @@ extension _HomePageBootstrap on HomeController {
     });
     _sendDeviceInfo(force: true);
   }
-
 }

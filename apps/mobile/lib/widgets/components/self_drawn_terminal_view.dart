@@ -56,6 +56,7 @@ class SelfDrawnTerminalView extends StatefulWidget {
     this.onCursorMetrics,
     this.onSelectionChanged,
     this.onRequestKeyboard,
+    this.onRemoteViewportScroll,
     this.keyboardRequested = false,
     this.keyboardRequestSerial = 0,
   });
@@ -81,6 +82,11 @@ class SelfDrawnTerminalView extends StatefulWidget {
 
   /// Called when the user taps the terminal body, to bring up the keyboard.
   final VoidCallback? onRequestKeyboard;
+
+  /// Requests a host-rendered viewport when local scrollback is exhausted. The
+  /// callback receives the gesture delta and measured cell height so the owner
+  /// can coalesce requests and page by terminal rows.
+  final void Function(double pixels, double cellHeight)? onRemoteViewportScroll;
 
   final bool keyboardRequested;
   final int keyboardRequestSerial;
@@ -502,12 +508,29 @@ class _SelfDrawnTerminalViewState extends State<SelfDrawnTerminalView>
         return;
       }
     }
+
+    // Once a host viewport keyframe is active, the host owns scrollback. Keep
+    // app-owned mouse/alternate-screen scrolling above, but route ordinary
+    // terminal scroll gestures to the host so its authoritative grid can page
+    // history without ANSI reflow on the phone.
+    if (widget.controller.hasRemoteViewport(sessionId)) {
+      widget.onRemoteViewportScroll?.call(pixels, _cellHeight);
+      return;
+    }
     widget.controller.scrollScreenPixels(
       sessionId,
       pixels: pixels,
       cellHeight: _cellHeight,
     );
     _refresh(force: true);
+    final after = _snapshot;
+    if (pixels > 0 &&
+        widget.onRemoteViewportScroll != null &&
+        after != null &&
+        !widget.controller.hasRemoteViewport(sessionId) &&
+        after.displayOffset + after.rows >= after.totalLines) {
+      widget.onRemoteViewportScroll!.call(pixels, _cellHeight);
+    }
   }
 
   void _forwardScroll(

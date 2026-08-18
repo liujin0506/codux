@@ -4,6 +4,13 @@ Important changes to this project are documented here.
 
 ## [Unreleased]
 
+## [2.0.27] - 2026-08-18
+
+### Fixed
+
+- The phone now restores the last selected project and worktree after reopening or reconnecting instead of defaulting to the first worktree.
+- Improved first-connect and reconnect behavior over relays, and restored more terminal history after a disconnect.
+
 ## [2.0.26] - 2026-08-18
 
 ### Fixed

@@ -177,8 +177,8 @@ class RustControllerTransport implements RemoteTransport {
     // Must outlast the Rust side's worst-case cold start, or a slow-but-
     // progressing connect gets killed here and retried from scratch (a fresh
     // endpoint that pays the relay-registration cost all over again). The Rust
-    // controller waits up to 12s for endpoint.online() THEN up to 18s for the
-    // dial, so keep the outer FFI boundary above that 30s budget. A genuinely
+    // controller waits up to 12s for endpoint.online() THEN up to 12s for the
+    // dial, so keep the outer FFI boundary above that 24s budget. A genuinely
     // dead peer still surfaces a Rust-side error before this cap.
     await connected.future.timeout(
       const Duration(seconds: 32),
@@ -278,9 +278,14 @@ class RustControllerTransport implements RemoteTransport {
       }
     }
     if (!identical(_handle, handle) || handle.isClosed) return;
+    // While the native connect future is still pending, keep checking at the
+    // busy cadence. The old idle fallback (100ms) was fine for a live transport
+    // but added an avoidable tail to every cold relay dial and reconnect. Once
+    // connected, return to the idle cadence so a quiet link does not keep the
+    // Flutter isolate busy.
     final delay = drained == _remoteTransportPollBatchSize
         ? Duration.zero
-        : drained > 0
+        : drained > 0 || (connected != null && !connected.isCompleted)
         ? _remoteTransportBusyPollDelay
         : _remoteTransportIdlePollDelay;
     _schedulePoll(delay, connected: connected);

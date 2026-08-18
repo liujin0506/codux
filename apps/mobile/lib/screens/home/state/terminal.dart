@@ -145,6 +145,127 @@ extension _HomePageTerminal on HomeController {
     _applyTerminalOutputEffects(effects);
   }
 
+  /// Apply a host-rendered viewport keyframe and complete the one outstanding
+  /// page request. The Rust output router consumes this message directly so a
+  /// full-screen TUI is restored from the host's cells rather than replayed at
+  /// the phone's previous width.
+  void _handleTerminalViewportScrolled(RelayEnvelope message) {
+    final payload = message.payload is Map
+        ? Map<String, dynamic>.from(message.payload as Map)
+        : const <String, dynamic>{};
+    final sessionId = (message.sessionId ?? payload['sessionId'])
+        ?.toString()
+        .trim();
+    if (sessionId == null || sessionId.isEmpty) return;
+    final requestId = payload['viewportRequestId']?.toString().trim();
+    String? expectedSession;
+    if (requestId != null && requestId.isNotEmpty) {
+      expectedSession = _terminalRemoteViewportRequestsInFlight.remove(
+        requestId,
+      );
+      if (expectedSession == null) return;
+    } else {
+      MapEntry<String, String>? entry;
+      for (final candidate in _terminalRemoteViewportRequestsInFlight.entries) {
+        if (candidate.value == sessionId) {
+          entry = candidate;
+          break;
+        }
+      }
+      if (entry == null) return;
+      expectedSession = entry.value;
+      _terminalRemoteViewportRequestsInFlight.remove(entry.key);
+    }
+    if (expectedSession != sessionId) return;
+
+    final effects = _terminalOutputController.accept(
+      message,
+      activeSessionId: _sessionId,
+    );
+    _applyTerminalOutputEffects(effects);
+    _sendNextRemoteTerminalViewportRequest(sessionId);
+  }
+
+  /// Called by the terminal view after it has exhausted the locally replayed
+  /// scrollback. Positive pixels mean moving upward into older history; the
+  /// host interprets `displayOffset` as an offset from the live bottom.
+  void _requestRemoteTerminalViewportScroll(double pixels, double cellHeight) {
+    final sessionId = _sessionId?.trim();
+    if (sessionId == null || sessionId.isEmpty || !pixels.isFinite) return;
+    if (!_transportConnected || !_remoteProtocolReady) return;
+    if (!_terminalViewportClaimable) return;
+    if (pixels == 0) return;
+
+    final snapshot = _terminalOutputController.screenSnapshot(sessionId);
+    if (snapshot == null) return;
+    final cell = cellHeight.isFinite && cellHeight > 0 ? cellHeight : 1.0;
+    final lineDelta = (pixels.abs() / cell).ceil().clamp(1, 512).toInt();
+    final hasRemoteViewport = _terminalOutputController.hasRemoteViewport(
+      sessionId,
+    );
+    if (!hasRemoteViewport && pixels < 0) return;
+
+    final target = hasRemoteViewport
+        ? (snapshot.displayOffset + (pixels > 0 ? lineDelta : -lineDelta))
+              .clamp(
+                0,
+                snapshot.totalLines > snapshot.rows
+                    ? snapshot.totalLines - snapshot.rows
+                    : 0,
+              )
+              .toInt()
+        : (1 << 30);
+    _terminalRemoteViewportPendingOffsets[sessionId] = target;
+    _sendNextRemoteTerminalViewportRequest(sessionId);
+  }
+
+  void _sendNextRemoteTerminalViewportRequest(String sessionId) {
+    if (_terminalRemoteViewportRequestsInFlight.values.contains(sessionId)) {
+      return;
+    }
+    final target = _terminalRemoteViewportPendingOffsets.remove(sessionId);
+    if (target == null) return;
+    final snapshot = _terminalOutputController.screenSnapshot(sessionId);
+    if (snapshot != null &&
+        _terminalOutputController.hasRemoteViewport(sessionId) &&
+        target == snapshot.displayOffset) {
+      return;
+    }
+    final requestId = _nextRemoteTerminalViewportRequestId(sessionId);
+    final sent = _sendTerminalEnvelope(
+      remoteTerminalViewportScrollEnvelope(
+        sessionId: sessionId,
+        requestId: requestId,
+        displayOffset: target,
+      ),
+      terminal: _terminalById(sessionId),
+    );
+    if (sent) {
+      _terminalRemoteViewportRequestsInFlight[requestId] = sessionId;
+      CoduxLog.debug(
+        '[codux-flutter-terminal] request remote viewport session=$sessionId offset=$target request=$requestId',
+      );
+    }
+  }
+
+  String _nextRemoteTerminalViewportRequestId(String sessionId) {
+    _terminalRemoteViewportRequestCounter += 1;
+    return 'viewport-${DateTime.now().microsecondsSinceEpoch}-$_terminalRemoteViewportRequestCounter-$sessionId';
+  }
+
+  void _resetRemoteViewportRequests({String? sessionId}) {
+    final id = sessionId?.trim();
+    if (id == null || id.isEmpty) {
+      _terminalRemoteViewportRequestsInFlight.clear();
+      _terminalRemoteViewportPendingOffsets.clear();
+      return;
+    }
+    _terminalRemoteViewportPendingOffsets.remove(id);
+    _terminalRemoteViewportRequestsInFlight.removeWhere(
+      (_, value) => value == id,
+    );
+  }
+
   void _applyTerminalOutputEffects(List<RemoteTerminalOutputEffect> effects) {
     for (final effect in effects) {
       switch (effect.kind) {
@@ -250,6 +371,7 @@ extension _HomePageTerminal on HomeController {
       _cancelTerminalBaselineRearm();
     }
     _terminalOutputController.removeSession(id);
+    _resetRemoteViewportRequests(sessionId: id);
     _terminalBufferRetry.resetSession(id);
     _terminalInputSender.clear(sessionId: id);
     _terminalBindingCoordinator.clearSessionBaselineStale(id);
@@ -565,6 +687,23 @@ extension _HomePageTerminal on HomeController {
   void _takeOverTerminalViewport({String? sessionId}) {
     final id = sessionId ?? _sessionId;
     if (id == null || id.trim().isEmpty) return;
+    if (!_transportConnected || !_transportReady || _activeTransport == null) {
+      // The headless-agent handoff copy is also used when the underlying link
+      // has gone away. A viewport claim cannot be delivered in that state, so
+      // make the action useful by bringing the transport back first.
+      CoduxLog.info(
+        '[codux-flutter-terminal] take over requested while disconnected; reconnecting session=$id',
+      );
+      _applyState(() {
+        _remoteHandedAway = false;
+        _terminalViewportInteractive = false;
+        _terminalViewportOwner = '';
+        _status = _t('app.reconnecting');
+      });
+      final target = _activeDevice;
+      if (target != null) _connect(target, true);
+      return;
+    }
     _claimTerminalViewport(
       sessionId: id,
       intent: _TerminalViewportClaimIntent.force,

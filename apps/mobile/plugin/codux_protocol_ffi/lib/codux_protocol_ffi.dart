@@ -1806,6 +1806,11 @@ final _outputRouterHasCachedOutput = _dylib
       Bool Function(Pointer<Void>, Pointer<Utf8>),
       bool Function(Pointer<Void>, Pointer<Utf8>)
     >('codux_output_router_has_cached_output');
+final _outputRouterHasRemoteViewport = _dylib
+    .lookupFunction<
+      Bool Function(Pointer<Void>, Pointer<Utf8>),
+      bool Function(Pointer<Void>, Pointer<Utf8>)
+    >('codux_output_router_has_remote_viewport');
 final _outputRouterBufferOffset = _dylib
     .lookupFunction<
       Int64 Function(Pointer<Void>, Pointer<Utf8>),
@@ -1976,6 +1981,11 @@ class RemoteOutputRouter {
   bool hasCachedOutput(String sessionId) => _withSession(
     sessionId,
     (ptr) => _outputRouterHasCachedOutput(_liveHandle(), ptr),
+  );
+
+  bool hasRemoteViewport(String sessionId) => _withSession(
+    sessionId,
+    (ptr) => _outputRouterHasRemoteViewport(_liveHandle(), ptr),
   );
 
   int bufferOffset(String sessionId) => _withSession(

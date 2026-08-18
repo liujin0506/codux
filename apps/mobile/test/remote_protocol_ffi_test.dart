@@ -25,9 +25,31 @@ void main() {
       RemoteMessageType.terminalBuffer,
     );
     expect(
+      codux_protocol_ffi.messageType('terminalViewportScroll'),
+      RemoteMessageType.terminalViewportScroll,
+    );
+    expect(
+      codux_protocol_ffi.messageType('terminalViewportScrolled'),
+      RemoteMessageType.terminalViewportScrolled,
+    );
+    expect(
       codux_protocol_ffi.messageType('gitStatus'),
       RemoteMessageType.gitStatus,
     );
+  });
+
+  test('builds a host viewport scroll request with a stable request id', () {
+    final envelope = remoteTerminalViewportScrollEnvelope(
+      sessionId: 'session-1',
+      requestId: 'viewport-1',
+      displayOffset: 42,
+    );
+
+    expect(envelope.type, RemoteMessageType.terminalViewportScroll);
+    expect(envelope.sessionId, 'session-1');
+    expect((envelope.payload as Map)['viewportRequestId'], 'viewport-1');
+    expect((envelope.payload as Map)['displayOffset'], 42);
+    expect((envelope.payload as Map)['overscanRows'], 0);
   });
 
   test('Rust FFI builds terminal resource subscribe envelope', () {

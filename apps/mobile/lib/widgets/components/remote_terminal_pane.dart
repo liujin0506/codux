@@ -44,6 +44,7 @@ class RemoteTerminalPane extends StatefulWidget {
     required this.onSendKey,
     required this.onToggleKeyboard,
     required this.onRequestKeyboard,
+    this.onRemoteViewportScroll,
     required this.onPaste,
     required this.onCopy,
     required this.onUpload,
@@ -82,6 +83,7 @@ class RemoteTerminalPane extends StatefulWidget {
   final ValueChanged<String> onSendKey;
   final VoidCallback onToggleKeyboard;
   final VoidCallback onRequestKeyboard;
+  final void Function(double pixels, double cellHeight)? onRemoteViewportScroll;
   final VoidCallback onPaste;
   final VoidCallback onCopy;
   final VoidCallback onUpload;
@@ -89,6 +91,7 @@ class RemoteTerminalPane extends StatefulWidget {
   // Handoff: the desktop (or another device) currently owns this session. Show a
   // placeholder instead of the live terminal; onTakeOver reclaims it to here.
   final bool handedAway;
+
   /// Host-configured AI shortcut shown in the tool FAB.
   final MobileAiToolCapability aiTool;
   final String handoffMessageKey;
@@ -145,7 +148,11 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.handedAway) {
+    // A handoff claim cannot be delivered while the transport is down. Keep
+    // the reconnect affordance visible until the link is ready again; once it
+    // is connected, preserve the ownership placeholder to avoid stealing a
+    // desktop/other-device terminal during recovery.
+    if (widget.handedAway && widget.connected) {
       return _buildHandedAwayPlaceholder(context);
     }
     final showTerminalToolbar =
@@ -245,6 +252,8 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
                                 onSendKey: widget.onSendKey,
                                 onSelectionChanged: widget.onSelectionChanged,
                                 onRequestKeyboard: widget.onRequestKeyboard,
+                                onRemoteViewportScroll:
+                                    widget.onRemoteViewportScroll,
                                 keyboardRequested: widget.keyboardRequested,
                                 keyboardRequestSerial:
                                     widget.keyboardRequestSerial,

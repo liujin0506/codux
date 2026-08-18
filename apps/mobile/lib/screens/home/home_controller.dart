@@ -62,6 +62,13 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
   final Set<String> _viewportOwnerRefreshAfterBaseline = {};
   final Map<String, int> _terminalOutputAckSeqBySession = {};
   final Map<String, DateTime> _terminalOutputAckAtBySession = {};
+
+  /// At most one host viewport request is in flight per session. A fast drag
+  /// updates the pending target and the next request is sent when the current
+  /// keyframe arrives, avoiding a queue of stale full-screen snapshots.
+  final Map<String, String> _terminalRemoteViewportRequestsInFlight = {};
+  final Map<String, int> _terminalRemoteViewportPendingOffsets = {};
+  int _terminalRemoteViewportRequestCounter = 0;
   int _terminalBufferRequestCounter = 0;
   bool _keyboardRequested = false;
   int _keyboardRequestSerial = 0;
@@ -195,6 +202,14 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
   DateTime? _connectionGraceUntil;
   DateTime? _lastTransportRefreshAt;
   PendingWorktreeSwitch? _pendingWorktreeSwitch;
+  StoredWorkspaceSelection _storedWorkspaceSelection =
+      const StoredWorkspaceSelection();
+  String? _storedWorkspaceSelectionHostId;
+  bool _storedWorkspaceSelectionLoaded = false;
+  bool _workspaceSelectionRestoreSuppressed = false;
+  bool _workspaceProjectSelectionRestored = false;
+  bool _restoringWorkspaceSelection = false;
+  final Set<String> _restoredWorktreeSelectionProjects = {};
   // When a phone project switch has no terminal yet, keep the switcher open
   // until the host creates/broadcasts one instead of exposing an empty pane.
   String? _pendingPhoneProjectSwitcherCloseId;

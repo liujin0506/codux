@@ -178,6 +178,17 @@ pub extern "C" fn codux_output_router_has_cached_output(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn codux_output_router_has_remote_viewport(
+    router: *const FfiOutputRouter,
+    session_id: *const c_char,
+) -> bool {
+    match (router_ref(router), c_to_string(session_id)) {
+        (Some(router), Some(session_id)) => router.has_remote_viewport(&session_id),
+        _ => false,
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn codux_output_router_buffer_offset(
     router: *const FfiOutputRouter,
     session_id: *const c_char,

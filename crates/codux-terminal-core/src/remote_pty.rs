@@ -7,6 +7,20 @@ use crate::{HeadlessTerminalScreen, TerminalScreenSnapshot, TerminalSequence};
 /// buffers grow without limit; past the cap we drop the oldest held frames.
 const MAX_HELD_LIVE: usize = 2048;
 
+/// Metadata for a viewport that was rendered by the host's authoritative
+/// terminal screen. The local screen still owns the decoded cells, but these
+/// values keep the consumer's renderer aware that those cells represent a
+/// remote scrollback position rather than the local replay position.
+#[derive(Clone, Copy, Debug)]
+struct RemoteViewportMetadata {
+    cols: usize,
+    rows: usize,
+    total_lines: usize,
+    display_offset: usize,
+    margin_rows: usize,
+    margin_rows_below: usize,
+}
+
 pub struct RemotePtySession<T> {
     max_cached_chars: usize,
     content: String,
@@ -14,6 +28,7 @@ pub struct RemotePtySession<T> {
     buffer_end: Option<usize>,
     sequence: TerminalSequence,
     history_screen: HeadlessTerminalScreen,
+    remote_viewport: Option<RemoteViewportMetadata>,
     awaiting_baseline: bool,
     held_sequenced_live: BTreeMap<TerminalSequence, T>,
     held_unsequenced_live: Vec<T>,
@@ -28,6 +43,7 @@ impl<T> RemotePtySession<T> {
             buffer_end: None,
             sequence: 0,
             history_screen: HeadlessTerminalScreen::new(80, 24, 2_000),
+            remote_viewport: None,
             awaiting_baseline: false,
             held_sequenced_live: BTreeMap::new(),
             held_unsequenced_live: Vec::new(),
@@ -59,10 +75,65 @@ impl<T> RemotePtySession<T> {
         // One screen owns both the replayed history and authoritative visible
         // keyframes, so live output, scrolling, and baseline restores cannot
         // diverge into separate render states.
-        self.history_screen.snapshot()
+        let mut snapshot = self.history_screen.snapshot();
+        if let Some(viewport) = self.remote_viewport {
+            snapshot.cols = viewport.cols;
+            snapshot.rows = viewport.rows;
+            snapshot.total_lines = viewport.total_lines;
+            snapshot.display_offset = viewport.display_offset;
+            snapshot.margin_rows = viewport.margin_rows;
+            snapshot.margin_rows_below = viewport.margin_rows_below;
+        }
+        snapshot
+    }
+
+    pub fn has_remote_viewport(&self) -> bool {
+        self.remote_viewport.is_some()
+    }
+
+    /// Replace the visible grid with a host-rendered viewport keyframe. The
+    /// raw cache remains intact for reconnect/baseline recovery; the remote
+    /// metadata tells the UI how to request the adjacent viewport from the
+    /// host instead of trying to reflow raw ANSI locally (which is incorrect
+    /// for full-screen TUIs).
+    pub fn apply_remote_viewport_snapshot(
+        &mut self,
+        screen_data: &str,
+        screen_wrapped_rows: Option<&[bool]>,
+        cols: usize,
+        rows: usize,
+        total_lines: usize,
+        display_offset: usize,
+        margin_rows: usize,
+        margin_rows_below: usize,
+    ) {
+        if cols > 0 && rows > 0 {
+            let current = self.history_screen.snapshot();
+            if current.cols != cols || current.rows != rows {
+                self.history_screen.resize(cols, rows);
+            }
+        }
+        self.history_screen.scroll_to_bottom();
+        if !screen_data.is_empty() {
+            self.history_screen
+                .replace_visible_with_keyframe(screen_data.as_bytes());
+            if let Some(wrapped_rows) = screen_wrapped_rows {
+                self.history_screen
+                    .restore_visible_wrapped_rows(wrapped_rows);
+            }
+        }
+        self.remote_viewport = Some(RemoteViewportMetadata {
+            cols: cols.max(1),
+            rows: rows.max(1),
+            total_lines: total_lines.max(rows.max(1)),
+            display_offset,
+            margin_rows,
+            margin_rows_below,
+        });
     }
 
     pub fn resize_screen(&mut self, cols: usize, rows: usize) {
+        self.remote_viewport = None;
         self.history_screen.resize(cols, rows);
     }
 
@@ -78,12 +149,14 @@ impl<T> RemotePtySession<T> {
     }
 
     pub fn require_baseline(&mut self) {
+        self.remote_viewport = None;
         self.awaiting_baseline = true;
         self.held_sequenced_live.clear();
         self.held_unsequenced_live.clear();
     }
 
     pub fn reset_transient(&mut self, reset_sequence: bool) {
+        self.remote_viewport = None;
         self.awaiting_baseline = false;
         self.held_sequenced_live.clear();
         self.held_unsequenced_live.clear();
@@ -128,23 +201,44 @@ impl<T> RemotePtySession<T> {
         buffer_end: Option<usize>,
         sequence: Option<TerminalSequence>,
     ) -> Vec<T> {
+        self.remote_viewport = None;
         // Preserve the user's scroll position across a baseline replace: a
         // resync (e.g. after a dropped frame) rebuilds the buffer, and snapping
         // back to the bottom mid-scroll is jarring. If the user was scrolled up
         // by N lines, restore that distance from the new bottom.
         let prev_offset = self.history_screen.display_offset();
+        let previous_content = self.content.clone();
+        let previous_buffer_end = self.buffer_end;
+        let merged_content =
+            merge_baseline_content(&previous_content, previous_buffer_end, content, buffer_end);
+        // A screen keyframe is authoritative for the current viewport, but it
+        // does not contain the whole scrollback. During a reconnect the host
+        // often returns only the current AI/TUI screen, so clearing the local
+        // screen here would throw away history the phone already received.
+        // Keep that screen history while the absolute PTY watermark still
+        // belongs to the same terminal lifetime. A host restart resets the
+        // watermark, which intentionally falls through to a clean rebuild.
+        let preserve_screen_history = screen_data.is_some()
+            && !previous_content.is_empty()
+            && same_terminal_lifetime(
+                previous_content.chars().count(),
+                previous_buffer_end,
+                buffer_end,
+            );
         self.content.clear();
-        self.content.push_str(content);
+        self.content.push_str(&merged_content);
         trim_cache_buffer(&mut self.content, self.max_cached_chars);
         if let Some(buffer_length) = buffer_length {
             self.buffer_length = buffer_length;
         }
         self.buffer_end = buffer_end;
-        self.history_screen.clear();
-        let mut rendered = false;
-        if !content.is_empty() {
-            self.history_screen.process(content.as_bytes());
-            rendered = true;
+        let mut rendered = preserve_screen_history;
+        if !preserve_screen_history {
+            self.history_screen.clear();
+            if !self.content.is_empty() {
+                self.history_screen.process(self.content.as_bytes());
+                rendered = true;
+            }
         }
         // Reconstruct the current screen from the host keyframe. An alt-screen
         // TUI (e.g. Claude) keeps its UI outside raw scrollback, while a normal
@@ -190,6 +284,7 @@ impl<T> RemotePtySession<T> {
     }
 
     pub fn complete_empty_baseline(&mut self, sequence: Option<TerminalSequence>) -> Vec<T> {
+        self.remote_viewport = None;
         let base_sequence = sequence.unwrap_or(self.sequence);
         self.sequence = base_sequence;
         self.awaiting_baseline = false;
@@ -212,6 +307,7 @@ impl<T> RemotePtySession<T> {
         buffer_end: Option<usize>,
         sequence: Option<TerminalSequence>,
     ) {
+        self.remote_viewport = None;
         let data_chars = data.chars().count();
         let previous_end = self.buffer_end;
         let covered_chars = buffer_end
@@ -265,6 +361,7 @@ impl<T> RemotePtySession<T> {
     }
 
     pub fn clear(&mut self) {
+        self.remote_viewport = None;
         self.content.clear();
         self.buffer_length = 0;
         self.buffer_end = None;
@@ -272,6 +369,99 @@ impl<T> RemotePtySession<T> {
         self.history_screen.clear();
         self.reset_transient(false);
     }
+}
+
+/// Decide whether a baseline belongs to the same append-only PTY lifetime as
+/// the locally cached output. The host's [buffer_end] is an absolute character
+/// watermark; when a restarted host reports a lower watermark, old screen
+/// history must not leak into the new session.
+fn same_terminal_lifetime(
+    previous_content_chars: usize,
+    previous_buffer_end: Option<usize>,
+    next_buffer_end: Option<usize>,
+) -> bool {
+    let (Some(previous_end), Some(next_end)) = (previous_buffer_end, next_buffer_end) else {
+        return false;
+    };
+    let previous_start = previous_end.saturating_sub(previous_content_chars);
+    next_end >= previous_start
+}
+
+/// Merge overlapping append-only history windows across a reconnect. A tail
+/// baseline can start inside the cached window; replacing it verbatim would
+/// discard the older lines the phone already has, while concatenating blindly
+/// would duplicate the overlap. If the windows cannot be aligned, the new
+/// host baseline remains authoritative and the screen keyframe path can still
+/// preserve the old rendered scrollback for the same terminal lifetime.
+fn merge_baseline_content(
+    previous: &str,
+    previous_buffer_end: Option<usize>,
+    next: &str,
+    next_buffer_end: Option<usize>,
+) -> String {
+    if previous.is_empty() || next.is_empty() {
+        if next.is_empty()
+            && !previous.is_empty()
+            && same_terminal_lifetime(
+                previous.chars().count(),
+                previous_buffer_end,
+                next_buffer_end,
+            )
+        {
+            return previous.to_string();
+        }
+        return next.to_string();
+    }
+    let (Some(previous_end), Some(next_end)) = (previous_buffer_end, next_buffer_end) else {
+        return next.to_string();
+    };
+    let previous_chars = previous.chars().count();
+    let next_chars = next.chars().count();
+    let previous_start = previous_end.saturating_sub(previous_chars);
+    let next_start = next_end.saturating_sub(next_chars);
+
+    // A delayed/stale baseline that is fully covered by the local cache must
+    // not roll the screen backward.
+    if next_start >= previous_start && next_end <= previous_end {
+        return previous.to_string();
+    }
+    if next_end < previous_start || previous_end < next_start {
+        return next.to_string();
+    }
+
+    if next_start >= previous_start {
+        let overlap = previous_end.saturating_sub(next_start).min(next_chars);
+        if text_suffix_equals_prefix(previous, next, overlap) {
+            return append_after_chars(previous, next, overlap);
+        }
+    } else if next_end >= previous_start {
+        let overlap = next_end.saturating_sub(previous_start).min(previous_chars);
+        if text_suffix_equals_prefix(next, previous, overlap) {
+            return append_after_chars(next, previous, overlap);
+        }
+    }
+
+    next.to_string()
+}
+
+fn text_suffix_equals_prefix(left: &str, right: &str, chars: usize) -> bool {
+    if chars == 0 {
+        return true;
+    }
+    let left_start = left.chars().count().saturating_sub(chars);
+    left.chars().skip(left_start).eq(right.chars().take(chars))
+}
+
+fn append_after_chars(prefix: &str, suffix: &str, overlap: usize) -> String {
+    let suffix_start = suffix
+        .char_indices()
+        .nth(overlap)
+        .map(|(index, _)| index)
+        .unwrap_or(suffix.len());
+    let mut merged = String::with_capacity(prefix.len() + suffix.len() - suffix_start);
+    merged.push_str(prefix);
+    merged.push_str(&suffix[suffix_start..]);
+    merged
 }
 
 /// Trailing line budget for the cached raw history and native ANSI replay.

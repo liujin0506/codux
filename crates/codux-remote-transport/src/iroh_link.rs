@@ -62,10 +62,12 @@ const UPLOAD_QUEUE_CAPACITY: usize = 2;
 /// the cross-path between the two nodes (measured: first dial times out, the very
 /// next one connects in ~18ms), so we want to give up on a stalled dial quickly
 /// and re-dial the same already-online endpoint rather than wait out a long hang.
-const IROH_DIAL_BASE_TIMEOUT: Duration = Duration::from_secs(4);
+/// Two seconds leaves room for a high-latency relay handshake while avoiding
+/// the full multi-second pause users otherwise see before the warm retry starts.
+const IROH_DIAL_BASE_TIMEOUT: Duration = Duration::from_secs(2);
 /// How many times to re-dial on the same warm endpoint before surfacing an error
 /// to the reconnect loop (which then cold-starts a fresh endpoint). Each attempt
-/// gets `BASE + 2s * attempt`, so 4s + 6s + 8s = 18s of dialling on one online().
+/// gets `BASE + 2s * attempt`, so 2s + 4s + 6s = 12s of dialling on one online().
 const IROH_DIAL_ATTEMPTS: usize = 3;
 
 type IrohSender = mpsc::Sender<Vec<u8>>;
@@ -1602,6 +1604,11 @@ fn spawn_path_watcher(connection: Connection, on_state: RemoteTransportStateHand
                 PathEvent::Selected { remote_addr, .. } => {
                     publish_transport_state_for_addr(&on_state, &remote_addr, None);
                 }
+                // A connection can keep its streams open while the last
+                // network path is being retired. Surface that transition now
+                // so the mobile reconnect loop does not wait for QUIC's much
+                // longer idle timeout to discover the dead route.
+                PathEvent::Closed { .. } => publish_path_state(&connection, &on_state),
                 PathEvent::Lagged { .. } => publish_path_state(&connection, &on_state),
                 _ => {}
             }
@@ -1617,7 +1624,12 @@ fn publish_path_state(connection: &Connection, on_state: &RemoteTransportStateHa
             return;
         }
     }
-    on_state(String::new(), "connected:path=unknown".to_string());
+    let state = if paths.is_empty() {
+        "connected:path=none"
+    } else {
+        "connected:path=unknown"
+    };
+    on_state(String::new(), state.to_string());
 }
 
 fn publish_transport_state_for_addr(

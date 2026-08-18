@@ -405,6 +405,34 @@ impl RingHistory {
         }
         (data, offset, self.retained_chars, self.total_chars)
     }
+
+    /// Return a bounded page from the retained history window. Offsets are
+    /// relative to the oldest character currently retained by this ring, not
+    /// to the lifetime-total watermark. The latter is returned separately so a
+    /// reconnecting viewer can tell whether the ring advanced while it was
+    /// paging.
+    pub(super) fn snapshot_window(
+        &self,
+        offset: usize,
+        max_chars: usize,
+    ) -> (String, usize, usize, usize, bool) {
+        let text = self.to_text();
+        let total_retained = self.retained_chars;
+        let start = offset.min(total_retained);
+        let data = text
+            .chars()
+            .skip(start)
+            .take(max_chars.max(1))
+            .collect::<String>();
+        let end = start.saturating_add(data.chars().count());
+        (
+            data,
+            start,
+            total_retained,
+            self.total_chars,
+            end < total_retained,
+        )
+    }
 }
 
 pub(super) fn byte_index_for_char_offset(text: &str, char_offset: usize) -> usize {

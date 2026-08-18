@@ -409,6 +409,42 @@ fn baseline_keyframe_restores_soft_and_hard_line_breaks() {
 }
 
 #[test]
+fn remote_viewport_keyframe_keeps_raw_cache_and_reports_host_position() {
+    let mut session = RemotePtySession::<String>::new(2048);
+    session.resize_screen(20, 8);
+    let history = scrollable_history("cached history");
+    session.replace_from_baseline(
+        &history,
+        None,
+        None,
+        Some(history.chars().count()),
+        Some(history.chars().count()),
+        Some(3),
+    );
+
+    session.apply_remote_viewport_snapshot(
+        "\x1b[2J\x1b[Holder viewport",
+        Some(&[false; 8]),
+        20,
+        8,
+        120,
+        112,
+        0,
+        0,
+    );
+
+    let snapshot = session.screen_snapshot();
+    assert!(session.has_remote_viewport());
+    assert_eq!(snapshot.display_offset, 112);
+    assert_eq!(snapshot.total_lines, 120);
+    assert!(snapshot.data.contains("older viewport"));
+    assert_eq!(session.content(), history);
+
+    session.append_live("new", None, None, Some(4));
+    assert!(!session.has_remote_viewport());
+}
+
+#[test]
 fn baseline_scroll_restore_falls_back_to_bottom_when_history_shrinks() {
     let mut session = RemotePtySession::<String>::new(2048);
     session.resize_screen(20, 8);
@@ -486,6 +522,54 @@ fn baseline_watermark_appends_only_uncovered_live_suffix() {
 
     assert_eq!(session.content(), "12345overlap");
     assert_eq!(session.buffer_length(), 12);
+}
+
+#[test]
+fn reconnect_baseline_merges_overlapping_cached_history() {
+    let mut session = RemotePtySession::<String>::new(512);
+    session.replace_from_baseline("old-1\nold-2\n", None, None, Some(12), Some(12), Some(10));
+
+    // The host's reconnect baseline starts in the locally cached window and
+    // contains newer output. Keep the old prefix without duplicating the
+    // overlapping `old-2` line.
+    session.replace_from_baseline(
+        "old-2\nnew",
+        Some("\x1b[2J\x1b[Hcurrent"),
+        None,
+        Some(15),
+        Some(15),
+        Some(11),
+    );
+
+    assert_eq!(session.content(), "old-1\nold-2\nnew");
+}
+
+#[test]
+fn reconnect_keyframe_preserves_cached_screen_scrollback() {
+    let mut session = RemotePtySession::<String>::new(10_000);
+    session.resize_screen(20, 8);
+    let history = scrollable_history("cached");
+    let end = history.chars().count();
+    session.replace_from_baseline(&history, None, None, Some(end), Some(end), Some(3));
+    let before = session.screen_snapshot().total_lines;
+
+    // A full-screen reconnect keyframe contains the current TUI screen but no
+    // prior scrollback. It must refresh the visible rows without erasing the
+    // locally retained history.
+    session.replace_from_baseline(
+        "",
+        Some("\x1b[2J\x1b[Hcurrent"),
+        None,
+        Some(end),
+        Some(end),
+        Some(4),
+    );
+    let after = session.screen_snapshot();
+
+    assert_eq!(after.total_lines, before);
+    assert!(after.data.contains("current"));
+    scroll_history_up(&mut session, 8);
+    assert!(session.screen_snapshot().data.contains("cached"));
 }
 
 #[test]

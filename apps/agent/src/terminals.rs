@@ -19,11 +19,11 @@ use codux_protocol::{
     terminal_live_output_payload,
 };
 use codux_remote_transport::{RemoteTransport, RemoteTransportUpload};
+use codux_runtime_core::terminal::terminal_snapshot_payload;
 use codux_runtime_core::upload::{
     sanitized_upload_name, terminal_upload_directory, terminal_upload_path_input,
     unique_upload_path,
 };
-use codux_runtime_core::terminal::terminal_snapshot_payload;
 use codux_runtime_live::remote_terminal_dispatch::{
     self, RemoteTerminalDispatch, TerminalMessage, apply_terminal_osc_color_env,
     finish_terminal_create_viewer_lifecycle, prepare_terminal_create_lifecycle,
@@ -733,6 +733,64 @@ fn send_terminal_baseline(
     }
 }
 
+/// Send an offset-addressable page from the agent's retained PTY history. The
+/// normal subscribe path intentionally sends the tail plus a screen keyframe,
+/// but a mobile viewer that has reached the top of its local cache needs to
+/// fetch older retained output without restarting the terminal session.
+fn send_terminal_history_page(
+    driver: &TerminalManager,
+    transport: &TransportSlot,
+    fanout_state: &TerminalFanout,
+    device_id: &str,
+    session_id: &str,
+    payload: &Value,
+) {
+    let max_chars = payload
+        .get("maxChars")
+        .and_then(Value::as_u64)
+        .map(|value| value as usize)
+        .unwrap_or(REMOTE_TERMINAL_BUFFER_MAX_CHARS);
+    let offset = payload
+        .get("offset")
+        .and_then(Value::as_u64)
+        .map(|value| value as usize)
+        .unwrap_or(0);
+    let chunk_chars = payload
+        .get("chunkChars")
+        .and_then(Value::as_u64)
+        .map(|value| value as usize);
+    let request_id = payload
+        .get("requestId")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let Ok((data, page_offset, retained_chars, buffer_end, truncated)) =
+        driver.snapshot_window(session_id, offset, max_chars)
+    else {
+        return;
+    };
+    let output_seq = fanout_state.current_seq(session_id);
+    let window = RemoteTerminalBufferWindow {
+        data,
+        screen_data: None,
+        screen_wrapped_rows: None,
+        offset: page_offset,
+        total_characters: retained_chars,
+        buffer_end: Some(buffer_end),
+        truncated,
+        output_seq: Some(output_seq),
+        request_id,
+        tail: false,
+        has_previous: page_offset > 0,
+        baseline_failed: false,
+    };
+    for payload in terminal_buffer_payloads(&window, output_seq, chunk_chars) {
+        let mut envelope =
+            json!({ "type": REMOTE_TERMINAL_OUTPUT, "sessionId": session_id, "payload": payload });
+        envelope["deviceId"] = json!(device_id);
+        send(transport, Some(device_id), envelope, true);
+    }
+}
+
 /// Adapts the headless agent to the shared remote-terminal router
 /// ([`RemoteTerminalDispatch`]). It borrows the agent's PTY manager, transport
 /// slot and multi-client fan-out state. The arms that are identical to the
@@ -882,11 +940,40 @@ impl RemoteTerminalDispatch for AgentTerminalCtx<'_> {
     }
 
     fn handle_terminal_buffer_msg(&self, msg: &TerminalMessage) {
-        // Parity with the desktop's `terminal.buffer`: register the viewer and
-        // serve the session's tail baseline (the agent keeps a single tail
-        // window rather than the desktop's offset-addressable cache).
+        // Register the viewer for both tail baselines and offset-addressable
+        // history pages. The latter is used when a mobile viewer scrolls past
+        // the locally retained window.
         if let (Some(id), Some(device_id)) = (msg.session_id, msg.device_id) {
-            self.subscribe_session(id, device_id, true, msg.payload);
+            self.add_viewer(id, device_id);
+            // Existing terminal.buffer callers omit `tail` or set it true for
+            // the normal baseline. Only an explicit non-tail/history request
+            // is allowed to select the offset page; defaulting to the page
+            // path would silently drop the screen keyframe on older clients.
+            let history_page = msg
+                .payload
+                .get("historyPage")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+                || msg.payload.get("tail").and_then(Value::as_bool) == Some(false);
+            if history_page {
+                send_terminal_history_page(
+                    self.driver,
+                    self.transport,
+                    self.fanout,
+                    device_id,
+                    id,
+                    msg.payload,
+                );
+            } else {
+                send_terminal_baseline(
+                    self.driver,
+                    self.transport,
+                    self.fanout,
+                    device_id,
+                    id,
+                    msg.payload,
+                );
+            }
         }
     }
 

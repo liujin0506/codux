@@ -162,6 +162,12 @@ extension _HomePageTransport on HomeController {
   }
 
   void _handleTransportClosed(String reason) {
+    if (_reconnectTimer != null && !_connectInFlight) {
+      CoduxLog.debug(
+        '[codux-flutter-remote] duplicate transport close ignored reason=$reason',
+      );
+      return;
+    }
     _remoteRuntimeEpoch += 1;
     _transportConnected = false;
     _connectInFlight = false;
@@ -181,6 +187,13 @@ extension _HomePageTransport on HomeController {
       if (terminalCreateCancelled) _syncRuntimeViewState();
       _transportReady = false;
       _hostResponsive = false;
+      // Keep the last viewport owner across a reconnect so a desktop handoff
+      // is not implicitly stolen when the link comes back. The pane hides the
+      // handoff placeholder while transportReady is false and shows the
+      // reconnect UI instead.
+      _terminalViewportInteractive = false;
+      _lastViewportClaimAt = null;
+      _lastViewportClaimSession = null;
       _status = _t('app.reconnecting');
       _resetTerminalUiChrome();
       _terminalBufferRetry.reset();

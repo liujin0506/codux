@@ -200,6 +200,12 @@ impl RemoteTerminalOutputRouter {
         serde_json::to_string(&session.screen_snapshot()).ok()
     }
 
+    pub fn has_remote_viewport(&self, session_id: &str) -> bool {
+        self.sessions
+            .get(session_id)
+            .is_some_and(RemotePtySession::has_remote_viewport)
+    }
+
     pub fn resize_screen(&mut self, session_id: &str, cols: usize, rows: usize) {
         self.ensure_session(session_id).resize_screen(cols, rows);
         self.bump_render(session_id);
@@ -436,6 +442,9 @@ impl RemoteTerminalOutputRouter {
         active_session_id: Option<&str>,
         replaying_held_live: bool,
     ) -> Vec<RemoteTerminalOutputEffect> {
+        if message.get("type").and_then(Value::as_str) == Some("terminal.viewport.scrolled") {
+            return self.accept_remote_viewport(message, active_session_id);
+        }
         let mut payload = match message.get("payload") {
             Some(payload)
                 if payload.is_object()
@@ -836,6 +845,67 @@ impl RemoteTerminalOutputRouter {
         effects
     }
 
+    fn accept_remote_viewport(
+        &mut self,
+        message: &Value,
+        active_session_id: Option<&str>,
+    ) -> Vec<RemoteTerminalOutputEffect> {
+        let Some(session_id) = message
+            .get("sessionId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            return Vec::new();
+        };
+        let Some(payload) = message.get("payload").filter(|value| value.is_object()) else {
+            return Vec::new();
+        };
+        let Some(screen_data) = payload.get("screenData").and_then(Value::as_str) else {
+            return Vec::new();
+        };
+        let cols = payload_int(payload, "cols")
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(0);
+        let rows = payload_int(payload, "rows")
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(0);
+        let total_lines = payload_int(payload, "totalLines")
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(rows);
+        let display_offset = payload_int(payload, "displayOffset")
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(0);
+        let margin_rows = payload_int(payload, "marginRows")
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(0);
+        let margin_rows_below = payload_int(payload, "marginRowsBelow")
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(0);
+        let wrapped_rows = payload_bool_array(payload, "screenWrappedRows");
+
+        self.ensure_session(session_id)
+            .apply_remote_viewport_snapshot(
+                screen_data,
+                wrapped_rows.as_deref(),
+                cols,
+                rows,
+                total_lines,
+                display_offset,
+                margin_rows,
+                margin_rows_below,
+            );
+        self.bump_render(session_id);
+        if active_session_id == Some(session_id) {
+            vec![RemoteTerminalOutputEffect::simple(
+                RemoteTerminalOutputEffectKind::SessionUpdated,
+                session_id,
+            )]
+        } else {
+            Vec::new()
+        }
+    }
+
     fn replay_held(
         &mut self,
         held_live: Vec<String>,
@@ -1085,6 +1155,25 @@ mod tests {
         })
     }
 
+    fn viewport_scrolled(session: &str, offset: i64) -> Value {
+        json!({
+            "type": "terminal.viewport.scrolled",
+            "sessionId": session,
+            "payload": {
+                "sessionId": session,
+                "displayOffset": offset,
+                "totalLines": 120,
+                "cols": 20,
+                "rows": 8,
+                "marginRows": 0,
+                "marginRowsBelow": 0,
+                "screenData": "\u{1b}[2J\u{1b}[Hremote viewport",
+                "screenWrappedRows": [false, false, false, false, false, false, false, false],
+                "viewportRequestId": "viewport-1",
+            }
+        })
+    }
+
     fn live_with_watermark(session: &str, data: &str, buffer_end: i64, output_seq: i64) -> Value {
         json!({
             "type": "terminal.output",
@@ -1159,6 +1248,33 @@ mod tests {
             ]
         );
         assert_eq!(router.content("session-1"), Some("old-new"));
+    }
+
+    #[test]
+    fn remote_viewport_response_updates_screen_without_entering_output_sequencer() {
+        let mut router = RemoteTerminalOutputRouter::new(64, 65536);
+
+        let effects = router.accept(&viewport_scrolled("session-1", 112), Some("session-1"));
+
+        assert_eq!(kinds(&effects), ["sessionUpdated"]);
+        assert!(router.has_remote_viewport("session-1"));
+        let snapshot: Value = serde_json::from_str(
+            &router
+                .screen_snapshot_json("session-1")
+                .expect("viewport snapshot"),
+        )
+        .expect("valid snapshot json");
+        assert_eq!(snapshot["displayOffset"], 112);
+        assert_eq!(snapshot["totalLines"], 120);
+        assert!(
+            snapshot["data"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("remote viewport")
+        );
+
+        router.accept(&live("session-1", "live", 1), Some("session-1"));
+        assert!(!router.has_remote_viewport("session-1"));
     }
 
     #[test]

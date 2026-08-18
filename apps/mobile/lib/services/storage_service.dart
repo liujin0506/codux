@@ -2,12 +2,38 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/remote_models.dart';
 
+class StoredWorkspaceSelection {
+  const StoredWorkspaceSelection({
+    this.projectId,
+    this.worktreeIdsByProject = const {},
+  });
+
+  final String? projectId;
+  final Map<String, String> worktreeIdsByProject;
+
+  String? worktreeIdForProject(String projectId) {
+    final value = worktreeIdsByProject[projectId.trim()];
+    return value == null || value.trim().isEmpty ? null : value.trim();
+  }
+
+  StoredWorkspaceSelection copyWith({
+    String? projectId,
+    Map<String, String>? worktreeIdsByProject,
+  }) {
+    return StoredWorkspaceSelection(
+      projectId: projectId ?? this.projectId,
+      worktreeIdsByProject: worktreeIdsByProject ?? this.worktreeIdsByProject,
+    );
+  }
+}
+
 class StorageService {
   static const devicesKey = 'codux.mobile.devices';
   static const singleDeviceKey = 'codux.mobile.device';
   static const lastDeviceIdKey = 'codux.mobile.last_device_id';
   static const settingsKey = 'codux.mobile.settings';
   static const projectCachePrefix = 'codux.mobile.projects';
+  static const workspaceSelectionPrefix = 'codux.mobile.workspace_selection';
 
   Future<List<StoredDevice>> loadDevices() async {
     final prefs = await SharedPreferences.getInstance();
@@ -115,6 +141,74 @@ class StorageService {
     );
   }
 
+  Future<StoredWorkspaceSelection> loadWorkspaceSelection(
+    StoredDevice device,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getString(_workspaceSelectionKey(device));
+    if (value == null || value.isEmpty) {
+      return const StoredWorkspaceSelection();
+    }
+    try {
+      final decoded = jsonDecode(value);
+      if (decoded is! Map) return const StoredWorkspaceSelection();
+      final projectId = _cleanString(decoded['projectId']);
+      final rawWorktrees = decoded['worktreeIdsByProject'];
+      final worktreeIds = <String, String>{};
+      if (rawWorktrees is Map) {
+        for (final entry in rawWorktrees.entries) {
+          final project = _cleanString(entry.key);
+          final worktree = _cleanString(entry.value);
+          if (project != null && worktree != null) {
+            worktreeIds[project] = worktree;
+          }
+        }
+      }
+      return StoredWorkspaceSelection(
+        projectId: projectId,
+        worktreeIdsByProject: worktreeIds,
+      );
+    } catch (_) {
+      return const StoredWorkspaceSelection();
+    }
+  }
+
+  Future<void> saveWorkspaceSelection(
+    StoredDevice device, {
+    required String projectId,
+    String? worktreeId,
+  }) async {
+    final cleanProjectId = _cleanString(projectId);
+    if (cleanProjectId == null) return;
+    final previous = await loadWorkspaceSelection(device);
+    final worktreeIds = Map<String, String>.from(previous.worktreeIdsByProject);
+    final cleanWorktreeId = _cleanString(worktreeId);
+    if (cleanWorktreeId == null) {
+      worktreeIds.remove(cleanProjectId);
+    } else {
+      worktreeIds[cleanProjectId] = cleanWorktreeId;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _workspaceSelectionKey(device),
+      jsonEncode({
+        'projectId': cleanProjectId,
+        'worktreeIdsByProject': worktreeIds,
+      }),
+    );
+  }
+
   String _projectCacheKey(StoredDevice device) =>
       '$projectCachePrefix.${device.hostId}';
+
+  String _workspaceSelectionKey(StoredDevice device) {
+    final hostId = device.hostId.trim();
+    final scope = hostId.isNotEmpty ? hostId : device.deviceId.trim();
+    return '$workspaceSelectionPrefix.$scope';
+  }
+
+  String? _cleanString(Object? value) {
+    final text = value?.toString().trim();
+    return text == null || text.isEmpty ? null : text;
+  }
 }

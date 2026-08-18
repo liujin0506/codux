@@ -84,6 +84,7 @@ extension _HomePageWorkspace on HomeController {
 
   void _selectWorktree(RemoteWorktreeInfo worktree) {
     _worktreeActions.selectWorktree(worktree);
+    _rememberWorkspaceSelection(userInitiated: !_restoringWorkspaceSelection);
   }
 
   void _openSessionFromSwitcher(AISessionRecord session) {
@@ -684,9 +685,7 @@ extension _HomePageWorkspace on HomeController {
     Widget Function(BuildContext routeContext) builder,
   ) async {
     if (!mounted) return;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: builder),
-    );
+    await Navigator.of(context).push<void>(MaterialPageRoute(builder: builder));
   }
 
   void _restorePhoneTerminalAfterTool() {
@@ -849,10 +848,7 @@ extension _HomePageWorkspace on HomeController {
             topInset: MediaQuery.paddingOf(routeContext).top,
             title: path,
             onBack: () => Navigator.of(routeContext).pop(),
-            child: PadDiffView(
-              diff: _gitDiff,
-              path: _gitDiffPath,
-            ),
+            child: PadDiffView(diff: _gitDiff, path: _gitDiffPath),
           );
         },
       );

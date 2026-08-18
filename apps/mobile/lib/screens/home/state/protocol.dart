@@ -134,6 +134,8 @@ extension _HomePageProtocol on HomeController {
           _handleTerminalClosed(message);
         case final type when type == RemoteMessageType.terminalViewportState:
           _handleTerminalViewportState(message);
+        case final type when type == RemoteMessageType.terminalViewportScrolled:
+          _handleTerminalViewportScrolled(message);
         case final type when type == RemoteMessageType.worktreeList:
           _handleWorktreeList(message);
         case final type when type == RemoteMessageType.worktreeUpdated:
@@ -279,6 +281,7 @@ extension _HomePageProtocol on HomeController {
         _applyRuntimePlan(worktreePlan, reason: 'project-list-worktrees');
       }
     }
+    _tryRestoreStoredWorkspaceSelection();
     CoduxLog.debug(
       '[codux-flutter-projects] project.list count=${next.length} selected=${_selectedProjectId ?? ''}',
     );
@@ -341,6 +344,7 @@ extension _HomePageProtocol on HomeController {
       return;
     }
     _applyWorktreeState(message, allowRuntimeSelection: false);
+    _tryRestoreStoredWorkspaceSelection();
   }
 
   void _handleWorktreeUpdated(RelayEnvelope message) {

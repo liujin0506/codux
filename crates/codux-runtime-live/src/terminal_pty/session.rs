@@ -405,6 +405,14 @@ impl TerminalPtySession {
         self.history.lock().tail_text(max_chars)
     }
 
+    pub fn snapshot_window(
+        &self,
+        offset: usize,
+        max_chars: usize,
+    ) -> (String, usize, usize, usize, bool) {
+        self.history.lock().snapshot_window(offset, max_chars)
+    }
+
     pub fn baseline_snapshot(
         &self,
         max_chars: usize,

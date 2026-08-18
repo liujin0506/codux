@@ -3,6 +3,59 @@ import 'package:codux_flutter/services/remote_terminal_output_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'host viewport keyframes replace the visible grid without raw replay',
+    () {
+      final controller = RemoteTerminalOutputController();
+      addTearDown(controller.dispose);
+
+      controller.bindSession('session-1', requireBaseline: false);
+      final effects = controller.accept(
+        const RelayEnvelope(
+          type: 'terminal.viewport.scrolled',
+          sessionId: 'session-1',
+          payload: {
+            'sessionId': 'session-1',
+            'displayOffset': 112,
+            'totalLines': 120,
+            'cols': 20,
+            'rows': 8,
+            'screenData': '\u001b[2J\u001b[Holder viewport',
+            'screenWrappedRows': [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+            ],
+          },
+        ),
+        activeSessionId: 'session-1',
+      );
+
+      expect(_kinds(effects), [RemoteTerminalOutputEffectKind.sessionUpdated]);
+      final snapshot = controller.screenSnapshot('session-1');
+      expect(snapshot, isNotNull);
+      expect(snapshot!.displayOffset, 112);
+      expect(snapshot.totalLines, 120);
+      expect(snapshot.data, contains('older viewport'));
+      expect(controller.hasRemoteViewport('session-1'), isTrue);
+
+      controller.accept(
+        const RelayEnvelope(
+          type: 'terminal.output',
+          sessionId: 'session-1',
+          payload: {'data': 'live', 'outputSeq': 1},
+        ),
+        activeSessionId: 'session-1',
+      );
+      expect(controller.hasRemoteViewport('session-1'), isFalse);
+    },
+  );
+
   test('truncated baseline renders as the retained terminal window', () {
     final controller = RemoteTerminalOutputController(maxBufferChars: 4);
 
@@ -134,10 +187,10 @@ void main() {
     controller.bindSession('session-1', requireBaseline: true);
 
     controller.accept(
-      _liveOutput('overlap', outputSeq: 11).withPayload({
-        'bufferLength': 12,
-        'bufferEnd': 12,
-      }),
+      _liveOutput(
+        'overlap',
+        outputSeq: 11,
+      ).withPayload({'bufferLength': 12, 'bufferEnd': 12}),
       activeSessionId: 'session-1',
     );
     controller.accept(

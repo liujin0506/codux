@@ -98,6 +98,38 @@ void main() {
     await transport.close();
   });
 
+  test(
+    'connect keeps a pending native dial on the busy poll cadence',
+    () async {
+      final timers = <_FakePollTimer>[];
+      late _FakeControllerHandle handle;
+      final transport = RustControllerTransport(
+        handleFactory: (_) {
+          handle = _FakeControllerHandle([]);
+          return handle;
+        },
+        pollTimerFactory: (delay, callback) {
+          final timer = _FakePollTimer(delay, callback);
+          timers.add(timer);
+          return timer;
+        },
+      );
+
+      final connecting = transport.connect(_storedDevice());
+      await Future<void>.delayed(Duration.zero);
+
+      expect(timers.single.delay, const Duration(milliseconds: 16));
+      handle.addEvent({'kind': 'state', 'state': 'connected:path=relay'});
+      timers.single.fire();
+      await connecting;
+
+      expect(timers.last.delay, const Duration(milliseconds: 16));
+      timers.last.fire();
+      expect(timers.last.delay, const Duration(milliseconds: 100));
+      await transport.close();
+    },
+  );
+
   test('connect fails when native transport reports failure', () async {
     final transport = RustControllerTransport(
       handleFactory: (_) => _FakeControllerHandle([

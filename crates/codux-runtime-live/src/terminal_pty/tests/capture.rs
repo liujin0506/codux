@@ -53,6 +53,22 @@ fn terminal_history_snapshot_keeps_a_retained_full_leading_line() {
 }
 
 #[test]
+fn terminal_history_snapshot_window_pages_retained_history() {
+    let mut history = RingHistory::new(1024);
+    history.push_text("0123456789");
+    history.push_text("abcdefghij");
+
+    assert_eq!(
+        history.snapshot_window(4, 6),
+        ("456789".to_string(), 4, 20, 20, true)
+    );
+    assert_eq!(
+        history.snapshot_window(16, 20),
+        ("ghij".to_string(), 16, 20, 20, false)
+    );
+}
+
+#[test]
 fn terminal_history_clear_keeps_the_lifetime_watermark() {
     let mut history = RingHistory::new(1024);
     history.push_text("before");

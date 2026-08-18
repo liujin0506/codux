@@ -87,4 +87,42 @@ void main() {
     expect(iroh?.relayUrl, 'https://relay.example');
     expect(iroh?.ticket, isEmpty);
   });
+
+  test(
+    'workspace selection is scoped by host and keeps each project choice',
+    () async {
+      const device = StoredDevice(
+        server: 'https://relay-a.example',
+        hostId: 'host-1',
+        deviceId: 'device-1',
+        token: 'token',
+        name: 'Phone',
+      );
+      const sameHost = StoredDevice(
+        server: 'https://relay-b.example',
+        hostId: 'host-1',
+        deviceId: 'device-1',
+        token: 'token',
+        name: 'Phone',
+      );
+      final storage = StorageService();
+
+      await storage.saveWorkspaceSelection(
+        device,
+        projectId: 'project-1',
+        worktreeId: 'worktree-1',
+      );
+      await storage.saveWorkspaceSelection(
+        device,
+        projectId: 'project-2',
+        worktreeId: 'project-2',
+      );
+
+      final selection = await storage.loadWorkspaceSelection(sameHost);
+
+      expect(selection.projectId, 'project-2');
+      expect(selection.worktreeIdForProject('project-1'), 'worktree-1');
+      expect(selection.worktreeIdForProject('project-2'), 'project-2');
+    },
+  );
 }
