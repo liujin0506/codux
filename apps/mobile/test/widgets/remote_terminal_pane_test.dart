@@ -149,6 +149,32 @@ void main() {
     expect(keyboardOffset, greaterThan(restingOffset + 250));
   });
 
+  testWidgets('terminal tool fab clears the bottom terminal input area', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: AppPreferences(
+          accent: AccentChoices.cyan,
+          locale: LocaleChoices.english,
+          themeMode: ThemeMode.dark,
+          child: SizedBox(width: 360, height: 720, child: _pane()),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final terminalBottom = tester
+        .getBottomLeft(find.byKey(const ValueKey('remote-terminal-body')))
+        .dy;
+    final fabBottom = tester.getBottomLeft(find.byType(TerminalToolFab)).dy;
+
+    // Leave at least four default terminal rows between the FAB and the grid
+    // edge, where bottom-anchored TUIs render their composer.
+    expect(terminalBottom - fabBottom, greaterThanOrEqualTo(64));
+  });
+
   testWidgets('disconnected terminal pane shows reconnect hint', (tester) async {
     var reconnectTapped = false;
     await tester.pumpWidget(
@@ -204,10 +230,30 @@ void main() {
     );
     await tester.pump();
 
+    final collapsedDecoration =
+        tester
+                .widget<DecoratedBox>(
+                  find.byKey(const ValueKey('terminal-tool-fab-button')),
+                )
+                .decoration
+            as BoxDecoration;
+    expect(
+      collapsedDecoration.color,
+      AppColors.terminalElevated.withValues(alpha: 0.72),
+    );
+
     await tester.tap(find.byIcon(Icons.apps_rounded));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
+    final expandedDecoration =
+        tester
+                .widget<DecoratedBox>(
+                  find.byKey(const ValueKey('terminal-tool-fab-button')),
+                )
+                .decoration
+            as BoxDecoration;
+    expect(expandedDecoration.color, AppColors.terminalChrome);
     expect(find.text('Upload'), findsOneWidget);
     expect(find.text('Voice'), findsOneWidget);
 

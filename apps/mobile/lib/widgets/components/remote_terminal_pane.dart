@@ -13,6 +13,11 @@ import 'self_drawn_terminal_view.dart';
 import 'terminal_tool_fab.dart';
 import 'toolbar.dart';
 
+// Codex/Claude's composer is bottom-anchored in the terminal grid. Keep the
+// floating tool menu above that multi-row input area instead of covering it.
+const _terminalToolFabInputClearanceRows = 4;
+const _terminalToolFabMinInputClearance = 64.0;
+
 class RemoteTerminalPane extends StatefulWidget {
   const RemoteTerminalPane({
     super.key,
@@ -171,6 +176,11 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
         : 0.0;
     final toolbarSafeBottom = imeOpen ? 0.0 : edgeInset;
     final toolbarBaseHeight = Toolbar.height;
+    final terminalToolFabInputClearance = math.max(
+      _terminalToolFabMinInputClearance,
+      (_cursorMetrics?.lineHeight ?? 16.0) *
+          _terminalToolFabInputClearanceRows,
+    ).toDouble();
     final keyboardLift = effectiveKeyboardHeight > 0
         ? (effectiveKeyboardHeight - bottomInset).clamp(0.0, double.infinity)
         : 0.0;
@@ -317,7 +327,8 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
                     bottomOffset:
                         toolbarBottom +
                         (showTerminalToolbar ? terminalToolbarHeight : 0) +
-                        AppSpacing.m,
+                        AppSpacing.m +
+                        terminalToolFabInputClearance,
                     leftInset: edgeInset,
                     onSendKey: widget.onSendKey,
                     aiTool: widget.aiTool,

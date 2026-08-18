@@ -11,6 +11,7 @@ const _terminalToolFabShadow = BoxShadow(
   blurRadius: 10,
   offset: Offset(0, 3),
 );
+const _terminalToolFabCollapsedOpacity = 0.72;
 
 /// Expandable floating tool menu for terminal actions not on the bottom toolbar.
 class TerminalToolFab extends StatefulWidget {
@@ -198,11 +199,14 @@ class _TerminalToolFabState extends State<TerminalToolFab>
             ),
           ),
           DecoratedBox(
+            key: const ValueKey('terminal-tool-fab-button'),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: _expanded
                   ? AppColors.terminalChrome
-                  : AppColors.terminalElevated,
+                  : AppColors.terminalElevated.withValues(
+                      alpha: _terminalToolFabCollapsedOpacity,
+                    ),
               border: Border.all(color: _terminalToolFabBorder),
               boxShadow: const [_terminalToolFabShadow],
             ),
