@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.27] - 2026-08-19
+
+### Fixed
+
+- Mobile terminal recovery now preserves the selected project and worktree, restores more history after relay reconnects, keeps terminal tools clear of the composer, and creates missing terminals without losing project selection.
+- AI session lists now refresh after asynchronous index updates and reconnects, while AI usage statistics refresh on demand and remain scoped to the selected remote project.
+
 ## [2.0.26] - 2026-08-18
 
 ### Fixed
