@@ -74,6 +74,10 @@ type CandidateSlot = Arc<Mutex<Option<(String, String)>>>;
 /// registers by requesting `ai.stats`; the poller re-pushes fresh stats to them
 /// when the live AI runtime changes, so remote views tick like the desktop's.
 type AIStatsWatchers = Arc<Mutex<HashMap<String, HashMap<String, String>>>>;
+/// Devices watching a project's AI session list. History indexing is
+/// asynchronous, so a list request can legitimately return the cached
+/// snapshot first; the indexer poller re-pushes the completed list here.
+type AISessionWatchers = Arc<Mutex<HashMap<String, HashMap<String, String>>>>;
 
 struct AgentWorktreeRuntime {
     _control: Arc<AgentWorktreeControl>,
@@ -282,6 +286,88 @@ fn push_ai_stats_for_project(
     }
 }
 
+fn register_ai_session_watcher(
+    watchers: &AISessionWatchers,
+    project_id: &str,
+    device_id: &str,
+    scope_id: &str,
+) {
+    let Ok(mut watchers) = watchers.lock() else {
+        return;
+    };
+    for (id, devices) in watchers.iter_mut() {
+        if id != project_id {
+            devices.remove(device_id);
+        }
+    }
+    watchers.retain(|_, devices| !devices.is_empty());
+    watchers
+        .entry(project_id.to_string())
+        .or_default()
+        .insert(device_id.to_string(), scope_id.to_string());
+}
+
+fn register_ai_session_watcher_for_request(
+    watchers: &AISessionWatchers,
+    device_id: Option<&str>,
+    project_id: &str,
+    scope_id: &str,
+) {
+    if project_id.trim().is_empty() {
+        return;
+    }
+    if let Some(device_id) = device_id.filter(|value| !value.trim().is_empty()) {
+        register_ai_session_watcher(watchers, project_id, device_id, scope_id);
+    }
+}
+
+fn send_ai_sessions_to_device(slot: &TransportSlot, device_id: &str, payload: Value) {
+    let envelope = json!({
+        "type": REMOTE_AI_SESSION_RESULT,
+        "payload": payload,
+        "deviceId": device_id,
+    });
+    let Ok(bytes) = serde_json::to_vec(&envelope) else {
+        return;
+    };
+    if let Ok(guard) = slot.lock()
+        && let Some(transport) = guard.as_ref()
+    {
+        transport.send(bytes, Some(device_id));
+    }
+}
+
+fn push_ai_sessions_for_project(
+    slot: &TransportSlot,
+    indexer: &AIHistoryIndexer,
+    watchers: &AISessionWatchers,
+    project_id: &str,
+) {
+    let devices = match watchers.lock() {
+        Ok(watchers) => watchers.get(project_id).cloned(),
+        Err(_) => return,
+    };
+    let Some(devices) = devices.filter(|devices| !devices.is_empty()) else {
+        return;
+    };
+    let projects = AgentProjectStore::new().list();
+    let Some(project) = projects.into_iter().find(|item| item.id == project_id) else {
+        return;
+    };
+    for (device_id, scope_id) in devices {
+        let request = json!({
+            "op": "list",
+            "projectId": project.id,
+            "projectName": project.name,
+            "projectPath": project.path,
+            "worktreeId": scope_id,
+        });
+        if let Ok(payload) = crate::sessions::ai_session_payload(indexer, &request) {
+            send_ai_sessions_to_device(slot, &device_id, payload);
+        }
+    }
+}
+
 fn remove_ai_stats_watcher_device(device_id: &str, watchers: &AIStatsWatchers) {
     if let Ok(mut watchers) = watchers.lock() {
         for devices in watchers.values_mut() {
@@ -297,11 +383,27 @@ fn remove_ai_stats_watcher_project(project_id: &str, watchers: &AIStatsWatchers)
     }
 }
 
+fn remove_ai_session_watcher_device(device_id: &str, watchers: &AISessionWatchers) {
+    if let Ok(mut watchers) = watchers.lock() {
+        for devices in watchers.values_mut() {
+            devices.remove(device_id);
+        }
+        watchers.retain(|_, devices| !devices.is_empty());
+    }
+}
+
+fn remove_ai_session_watcher_project(project_id: &str, watchers: &AISessionWatchers) {
+    if let Ok(mut watchers) = watchers.lock() {
+        watchers.remove(project_id);
+    }
+}
+
 fn remove_device_state(
     device_id: &str,
     driver: &TerminalManager,
     fanout: &crate::terminals::TerminalFanout,
     ai_stats_watchers: &AIStatsWatchers,
+    ai_session_watchers: &AISessionWatchers,
 ) {
     let device_id = device_id.trim();
     if device_id.is_empty() {
@@ -320,6 +422,7 @@ fn remove_device_state(
         .collect::<Vec<_>>();
     fanout.remove_device(device_id);
     remove_ai_stats_watcher_device(device_id, ai_stats_watchers);
+    remove_ai_session_watcher_device(device_id, ai_session_watchers);
     for session_id in affected_sessions {
         if fanout.viewers(&session_id).is_empty() {
             driver.shrink_remote_screen_scrollback(&session_id);
@@ -337,6 +440,7 @@ struct AgentMessageHandlerContext {
     indexer: AIHistoryIndexer,
     ai_current_sessions: Arc<AgentAICurrentSessionProvider>,
     ai_stats_watchers: AIStatsWatchers,
+    ai_session_watchers: AISessionWatchers,
     host_id: String,
     name: String,
     mobile_ai_tool: MobileAiTool,
@@ -353,6 +457,7 @@ fn make_handler(
         indexer,
         ai_current_sessions,
         ai_stats_watchers,
+        ai_session_watchers,
         host_id,
         name,
         mobile_ai_tool,
@@ -549,7 +654,13 @@ fn make_handler(
                 if let Some(device_id) =
                     device_id.or_else(|| (!source.is_empty()).then_some(source))
                 {
-                    remove_device_state(device_id, &driver, &fanout, &ai_stats_watchers);
+                    remove_device_state(
+                        device_id,
+                        &driver,
+                        &fanout,
+                        &ai_stats_watchers,
+                        &ai_session_watchers,
+                    );
                 }
                 None
             }
@@ -734,6 +845,7 @@ fn make_handler(
                         Ok(items) => {
                             fanout.remove_project(&id);
                             remove_ai_stats_watcher_project(&id, &ai_stats_watchers);
+                            remove_ai_session_watcher_project(&id, &ai_session_watchers);
                             Some((REMOTE_PROJECT_LIST, project_list_payload(items, None, None)))
                         }
                         Err(error) => Some((REMOTE_ERROR, json!({ "message": error }))),
@@ -972,6 +1084,23 @@ fn make_handler(
             }
             REMOTE_AI_SESSION => {
                 // The host runs the codux-ai-sessions engine against its own history.
+                if payload.get("op").and_then(Value::as_str) == Some("list") {
+                    let project_id = payload
+                        .get("projectId")
+                        .and_then(Value::as_str)
+                        .unwrap_or("");
+                    let scope_id = payload
+                        .get("worktreeId")
+                        .and_then(Value::as_str)
+                        .filter(|value| !value.trim().is_empty())
+                        .unwrap_or(project_id);
+                    register_ai_session_watcher_for_request(
+                        &ai_session_watchers,
+                        device_id,
+                        project_id,
+                        scope_id,
+                    );
+                }
                 match crate::sessions::ai_session_payload(&indexer, &payload) {
                     Ok(result) => Some((REMOTE_AI_SESSION_RESULT, result)),
                     Err(error) => Some((REMOTE_ERROR, json!({ "message": error }))),
@@ -1204,6 +1333,7 @@ async fn connect_serving_host(
         ai_runtime: Arc::clone(&ai_runtime),
     });
     let ai_stats_watchers: AIStatsWatchers = Arc::new(Mutex::new(HashMap::new()));
+    let ai_session_watchers: AISessionWatchers = Arc::new(Mutex::new(HashMap::new()));
     let indexer = crate::ai_stats::open_indexer();
     // For a custom relay the iroh relay URL must be set explicitly; for presets
     // the transport resolves it from `relay_preset`.
@@ -1231,6 +1361,7 @@ async fn connect_serving_host(
                 indexer: indexer.clone(),
                 ai_current_sessions: Arc::clone(&ai_current_sessions),
                 ai_stats_watchers: Arc::clone(&ai_stats_watchers),
+                ai_session_watchers: Arc::clone(&ai_session_watchers),
                 host_id: cfg.host_id.clone(),
                 name: cfg.name.clone(),
                 mobile_ai_tool: cfg.mobile_ai_tool.clone(),
@@ -1246,9 +1377,16 @@ async fn connect_serving_host(
                 let driver = Arc::clone(&driver);
                 let fanout = fanout.clone();
                 let ai_stats_watchers = Arc::clone(&ai_stats_watchers);
+                let ai_session_watchers = Arc::clone(&ai_session_watchers);
                 Arc::new(move |device_id, state| {
                     if matches!(state.as_str(), "closed" | "failed" | "disconnected") {
-                        remove_device_state(&device_id, &driver, &fanout, &ai_stats_watchers);
+                        remove_device_state(
+                            &device_id,
+                            &driver,
+                            &fanout,
+                            &ai_stats_watchers,
+                            &ai_session_watchers,
+                        );
                     }
                 })
             },
@@ -1300,6 +1438,7 @@ async fn connect_serving_host(
         indexer,
         ai_current_sessions,
         ai_stats_watchers,
+        ai_session_watchers,
     );
     spawn_terminal_status_poller(Arc::clone(&slot), ai_runtime);
     Ok((
@@ -1322,6 +1461,7 @@ fn spawn_ai_stats_poller(
     indexer: AIHistoryIndexer,
     provider: Arc<AgentAICurrentSessionProvider>,
     watchers: AIStatsWatchers,
+    session_watchers: AISessionWatchers,
 ) {
     tokio::spawn(async move {
         use codux_ai_history::indexer::AIHistoryEvent;
@@ -1347,6 +1487,12 @@ fn spawn_ai_stats_poller(
                         &watchers,
                         &project_id,
                     );
+                    push_ai_sessions_for_project(
+                        &slot,
+                        &indexer,
+                        &session_watchers,
+                        &project_id,
+                    );
                 }
             }
             let projects = AgentProjectStore::new().list();
@@ -1363,6 +1509,11 @@ fn spawn_ai_stats_poller(
                 }
                 Err(_) => continue,
             };
+            if let Ok(mut session_watchers) = session_watchers.lock() {
+                session_watchers.retain(|project_id, devices| {
+                    !devices.is_empty() && project_ids.contains(project_id.as_str())
+                });
+            }
             last.retain(|scope_key, _| {
                 snapshot.values().any(|devices| {
                     devices

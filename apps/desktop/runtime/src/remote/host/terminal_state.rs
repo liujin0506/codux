@@ -706,6 +706,7 @@ impl RemoteHostRuntime {
         self.resource_subscriptions.remove_device(device_id);
         self.clear_terminal_device_acks(device_id);
         self.clear_ai_stats_watcher_device(device_id);
+        self.clear_ai_session_watcher_device(device_id);
         for session_id in session_ids {
             if self.terminal_output_viewers(&session_id).is_empty() {
                 self.terminals.shrink_remote_screen_scrollback(&session_id);

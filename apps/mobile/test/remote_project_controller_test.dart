@@ -82,13 +82,31 @@ void main() {
     expect((list.payload as Map)['projectName'], 'feat');
     expect((list.payload as Map)['projectPath'], '/repo/.codux/worktrees/feat');
     expect((list.payload as Map)['worktreeId'], 'worktree-1');
+    expect((list.payload as Map)['refresh'], isTrue);
+
+    final rename = controller.aiSessionRenameEnvelope(
+      project,
+      'sess-1',
+      'Renamed',
+      worktree: worktree,
+    );
+    expect((rename.payload as Map)['op'], 'indexedRename');
+    final remove = controller.aiSessionRemoveEnvelope(
+      project,
+      'sess-1',
+      worktree: worktree,
+    );
+    expect((remove.payload as Map)['op'], 'indexedRemove');
 
     final restore = controller.aiSessionRestoreEnvelope(
       project,
       'sess-1',
       worktree: worktree,
     );
-    expect((restore.payload as Map)['projectPath'], '/repo/.codux/worktrees/feat');
+    expect(
+      (restore.payload as Map)['projectPath'],
+      '/repo/.codux/worktrees/feat',
+    );
     expect((restore.payload as Map)['worktreeId'], 'worktree-1');
   });
 
@@ -97,11 +115,17 @@ void main() {
     expect((list.payload as Map)['projectPath'], '/repo');
     expect((list.payload as Map).containsKey('worktreeId'), isFalse);
     expect((list.payload as Map)['projectName'], 'Project');
+    expect((list.payload as Map)['refresh'], isTrue);
   });
 
   test('builds project utility envelopes', () {
     expect(controller.removeEnvelope(project).type, 'project.remove');
     expect(controller.aiStatsEnvelope(project).type, 'ai.stats');
+    expect(
+      (controller.aiStatsEnvelope(project, refresh: true).payload
+          as Map)['refresh'],
+      isTrue,
+    );
     expect(
       (controller.aiStatsEnvelope(project, worktreeId: 'worktree-1').payload
           as Map)['worktreeId'],

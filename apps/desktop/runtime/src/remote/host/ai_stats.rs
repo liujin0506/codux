@@ -162,6 +162,40 @@ impl RemoteHostRuntime {
         }
     }
 
+    /// Record that a device is waiting for the indexed session list of one
+    /// project/scope. Session history is not a resource subscription, but its
+    /// first refresh can be asynchronous just like `ai.stats`.
+    pub(super) fn register_ai_session_watcher(
+        &self,
+        project_id: &str,
+        device_id: &str,
+        scope_id: &str,
+    ) {
+        let Ok(mut watchers) = self.ai_session_watchers.lock() else {
+            return;
+        };
+        for (id, devices) in watchers.iter_mut() {
+            if id != project_id {
+                devices.remove(device_id);
+            }
+        }
+        watchers.retain(|_, devices| !devices.is_empty());
+        watchers
+            .entry(project_id.to_string())
+            .or_default()
+            .insert(device_id.to_string(), scope_id.to_string());
+    }
+
+    /// Drop a disconnected device from every session-list watcher set.
+    pub(super) fn clear_ai_session_watcher_device(&self, device_id: &str) {
+        if let Ok(mut watchers) = self.ai_session_watchers.lock() {
+            for devices in watchers.values_mut() {
+                devices.remove(device_id);
+            }
+            watchers.retain(|_, devices| !devices.is_empty());
+        }
+    }
+
     pub(super) fn remove_ai_stats_watcher(&self, project_id: Option<&str>, device_id: &str) {
         let Ok(mut watchers) = self.ai_stats_watchers.lock() else {
             return;
@@ -202,6 +236,43 @@ impl RemoteHostRuntime {
         };
         let project_id = self.ai_stats_watcher_project_id(&state.project_id);
         self.push_ai_stats_for_project(&project_id, &snapshot);
+        self.push_ai_sessions_for_project(&project_id);
+    }
+
+    fn push_ai_sessions_for_project(&self, project_id: &str) {
+        let devices = match self.ai_session_watchers.lock() {
+            Ok(watchers) => watchers.get(project_id).cloned(),
+            Err(_) => return,
+        };
+        let Some(devices) = devices.filter(|devices| !devices.is_empty()) else {
+            return;
+        };
+        let project = ProjectStore::new(self.support_dir.clone())
+            .projects_snapshot()
+            .into_iter()
+            .find(|project| project.id == project_id);
+        let Some(project) = project else {
+            return;
+        };
+        let service = codux_ai_sessions::AIHistoryService::new(self.support_dir.clone());
+        for (device_id, scope_id) in devices {
+            let request = self.ai_history_request_for_scope(&project, &scope_id);
+            let payload = json!({ "op": "list" });
+            let Ok(result) = codux_ai_sessions::session_op_result_with_indexer(
+                &service,
+                &self.ai_history,
+                request,
+                &payload,
+            ) else {
+                continue;
+            };
+            self.send(
+                REMOTE_AI_SESSION_RESULT,
+                Some(&device_id),
+                None,
+                json!({ "op": "list", "result": result }),
+            );
+        }
     }
 
     /// Build and send `ai.stats` to each device watching `project_id`, using each
@@ -313,6 +384,25 @@ impl RemoteHostRuntime {
     pub(super) fn handle_ai_session(&self, envelope: &RemoteEnvelope) {
         let payload = &envelope.payload;
         let op = payload.get("op").and_then(Value::as_str).unwrap_or("");
+        if op == "list"
+            && let (Some(project_id), Some(device_id)) = (
+                payload
+                    .get("projectId")
+                    .and_then(Value::as_str)
+                    .filter(|value| !value.trim().is_empty()),
+                envelope
+                    .device_id
+                    .as_deref()
+                    .filter(|value| !value.trim().is_empty()),
+            )
+        {
+            let scope_id = payload
+                .get("worktreeId")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or(project_id);
+            self.register_ai_session_watcher(project_id, device_id, scope_id);
+        }
         let store = ProjectStore::new(self.support_dir.clone());
         let snapshot = store.snapshot();
         let worktree_id = payload

@@ -133,6 +133,13 @@ impl<T> RemotePtySession<T> {
     }
 
     pub fn resize_screen(&mut self, cols: usize, rows: usize) {
+        let current = self.history_screen.snapshot();
+        if current.cols == cols && current.rows == rows {
+            // Viewport state is metadata layered over the same cell grid. A
+            // repeated viewport-state notification with the same dimensions
+            // must not throw away an in-flight/visible remote history page.
+            return;
+        }
         self.remote_viewport = None;
         self.history_screen.resize(cols, rows);
     }
@@ -307,7 +314,18 @@ impl<T> RemotePtySession<T> {
         buffer_end: Option<usize>,
         sequence: Option<TerminalSequence>,
     ) {
-        self.remote_viewport = None;
+        // Keep a remote history page stable while live output continues to
+        // arrive. Clearing the viewport here makes a high-latency page request
+        // race with the output stream: the next frame snaps back to the local
+        // replay (or a partially rebuilt blank screen), producing gaps between
+        // pages. A page at offset zero is the live tail, so it should continue
+        // to follow output normally; only an older page is pinned.
+        let preserve_remote_viewport = self
+            .remote_viewport
+            .is_some_and(|viewport| viewport.display_offset > 0);
+        if !preserve_remote_viewport {
+            self.remote_viewport = None;
+        }
         let data_chars = data.chars().count();
         let previous_end = self.buffer_end;
         let covered_chars = buffer_end
@@ -333,11 +351,13 @@ impl<T> RemotePtySession<T> {
             // the host's absolute history watermark to append only the suffix
             // not covered by that baseline. Follow the bottom only if we were
             // already there, so a user scrolled up into history stays put.
-            let was_at_bottom = self.history_screen.display_offset() == 0;
             push_cache_buffer(&mut self.content, uncovered, self.max_cached_chars);
-            self.history_screen.process(uncovered.as_bytes());
-            if was_at_bottom {
-                self.history_screen.scroll_to_bottom();
+            if !preserve_remote_viewport {
+                let was_at_bottom = self.history_screen.display_offset() == 0;
+                self.history_screen.process(uncovered.as_bytes());
+                if was_at_bottom {
+                    self.history_screen.scroll_to_bottom();
+                }
             }
         }
         let advances_watermark = match (previous_end, buffer_end) {

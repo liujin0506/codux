@@ -1,7 +1,7 @@
 //! Shared `ai.session` op dispatch. Both the desktop and headless remote hosts
-//! route the wire op (`list` / `detail` / `rename` / `remove` / `restore` /
-//! `fork`) through this single table so neither host serves a partial set or
-//! drifts on shape.
+//! route the wire op (`list` / `detail` / `rename` / `remove` /
+//! `indexedRename` / `indexedRemove` / `restore` / `fork`) through this single
+//! table so neither host serves a partial set or drifts on shape.
 //! The host resolves `project_path` (its own projectId fallback) and supplies
 //! the service; this returns the inner `result` value for `{op, result}`.
 
@@ -18,6 +18,14 @@ pub fn session_op_result_with_indexer(
 ) -> Result<Value, String> {
     let op = payload.get("op").and_then(Value::as_str).unwrap_or("");
     let session_id = string_field(payload, "sessionId");
+    if op == "list"
+        && payload
+            .get("refresh")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        indexer.refresh_project(project.clone())?;
+    }
     if op == "list"
         && let Ok(state) = indexer.project_state(project.clone())
     {

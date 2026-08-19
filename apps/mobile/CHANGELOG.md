@@ -10,6 +10,8 @@ Important changes to this project are documented here.
 
 - The phone now restores the last selected project and worktree after reopening or reconnecting instead of defaulting to the first worktree.
 - Improved first-connect and reconnect behavior over relays, and restored more terminal history after a disconnect.
+- Refreshed AI sessions after indexed renames, removals, and reconnects so the mobile session list no longer stays stale.
+- Refreshed AI usage statistics on demand and kept them scoped to the selected remote project.
 
 ## [2.0.26] - 2026-08-18
 

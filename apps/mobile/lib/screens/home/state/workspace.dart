@@ -271,6 +271,8 @@ extension _HomePageWorkspace on HomeController {
         _applyState(() => _aiSessions = next);
       case 'rename':
       case 'remove':
+      case 'indexedRename':
+      case 'indexedRemove':
         // The host applied the change; pull a fresh list so the row updates.
         _requestAISessions(force: true);
       case 'restore':

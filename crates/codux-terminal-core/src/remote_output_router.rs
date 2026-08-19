@@ -1274,7 +1274,8 @@ mod tests {
         );
 
         router.accept(&live("session-1", "live", 1), Some("session-1"));
-        assert!(!router.has_remote_viewport("session-1"));
+        assert!(router.has_remote_viewport("session-1"));
+        assert_eq!(router.content("session-1"), Some("live"));
     }
 
     #[test]

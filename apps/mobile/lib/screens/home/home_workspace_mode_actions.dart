@@ -71,6 +71,7 @@ class HomeWorkspaceModeActions {
     final fallback = projectController.aiStatsEnvelope(
       project,
       worktreeId: selectedWorktreeId,
+      refresh: true,
     );
     resourceSubscriptions.requestProject(
       resource: RemoteResourceType.aiStats,
@@ -79,6 +80,7 @@ class HomeWorkspaceModeActions {
       extraPayload: {
         'worktreeId': selectedWorktreeId,
         'projectPath': project.path,
+        'refresh': true,
       },
     );
   }
@@ -89,6 +91,7 @@ class HomeWorkspaceModeActions {
     final fallback = projectController.aiStatsEnvelope(
       project,
       worktreeId: selectedWorktreeId,
+      refresh: true,
     );
     resourceSubscriptions.requestProject(
       resource: RemoteResourceType.aiStats,
@@ -97,6 +100,7 @@ class HomeWorkspaceModeActions {
       extraPayload: {
         'worktreeId': selectedWorktreeId,
         'projectPath': project.path,
+        'refresh': true,
       },
     );
   }

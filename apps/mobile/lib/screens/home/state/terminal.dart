@@ -163,6 +163,7 @@ extension _HomePageTerminal on HomeController {
       expectedSession = _terminalRemoteViewportRequestsInFlight.remove(
         requestId,
       );
+      _terminalRemoteViewportInFlightOffsets.remove(requestId);
       if (expectedSession == null) return;
     } else {
       MapEntry<String, String>? entry;
@@ -175,6 +176,7 @@ extension _HomePageTerminal on HomeController {
       if (entry == null) return;
       expectedSession = entry.value;
       _terminalRemoteViewportRequestsInFlight.remove(entry.key);
+      _terminalRemoteViewportInFlightOffsets.remove(entry.key);
     }
     if (expectedSession != sessionId) return;
 
@@ -205,8 +207,26 @@ extension _HomePageTerminal on HomeController {
     );
     if (!hasRemoteViewport && pixels < 0) return;
 
+    // During a slow relay response the published snapshot still points at
+    // the previous page. Build the next target from the pending/in-flight
+    // target instead, otherwise a fast drag collapses several gestures into a
+    // single short page and the user sees stale pages or apparent gaps.
+    int? inFlightOffset;
+    for (final entry in _terminalRemoteViewportRequestsInFlight.entries) {
+      if (entry.value == sessionId) {
+        inFlightOffset = _terminalRemoteViewportInFlightOffsets[entry.key];
+        break;
+      }
+    }
+    final baseOffset = _terminalRemoteViewportPendingOffsets[sessionId] ??
+        inFlightOffset ??
+        snapshot.displayOffset;
+
+    // The first host page should continue from the local replay boundary.
+    // Asking for the host's oldest page here would skip everything between
+    // the phone's retained cache and the host's deeper scrollback.
     final target = hasRemoteViewport
-        ? (snapshot.displayOffset + (pixels > 0 ? lineDelta : -lineDelta))
+        ? (baseOffset + (pixels > 0 ? lineDelta : -lineDelta))
               .clamp(
                 0,
                 snapshot.totalLines > snapshot.rows
@@ -214,7 +234,7 @@ extension _HomePageTerminal on HomeController {
                     : 0,
               )
               .toInt()
-        : (1 << 30);
+        : snapshot.displayOffset;
     _terminalRemoteViewportPendingOffsets[sessionId] = target;
     _sendNextRemoteTerminalViewportRequest(sessionId);
   }
@@ -242,6 +262,7 @@ extension _HomePageTerminal on HomeController {
     );
     if (sent) {
       _terminalRemoteViewportRequestsInFlight[requestId] = sessionId;
+      _terminalRemoteViewportInFlightOffsets[requestId] = target;
       CoduxLog.debug(
         '[codux-flutter-terminal] request remote viewport session=$sessionId offset=$target request=$requestId',
       );
@@ -257,12 +278,18 @@ extension _HomePageTerminal on HomeController {
     final id = sessionId?.trim();
     if (id == null || id.isEmpty) {
       _terminalRemoteViewportRequestsInFlight.clear();
+      _terminalRemoteViewportInFlightOffsets.clear();
       _terminalRemoteViewportPendingOffsets.clear();
       return;
     }
     _terminalRemoteViewportPendingOffsets.remove(id);
     _terminalRemoteViewportRequestsInFlight.removeWhere(
       (_, value) => value == id,
+    );
+    _terminalRemoteViewportInFlightOffsets.removeWhere(
+      (requestId, _) => !_terminalRemoteViewportRequestsInFlight.containsKey(
+        requestId,
+      ),
     );
   }
 

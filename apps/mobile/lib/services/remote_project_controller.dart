@@ -112,12 +112,17 @@ class RemoteProjectController {
     );
   }
 
-  RelayEnvelope aiStatsEnvelope(ProjectInfo project, {String? worktreeId}) {
+  RelayEnvelope aiStatsEnvelope(
+    ProjectInfo project, {
+    String? worktreeId,
+    bool refresh = false,
+  }) {
     final cleanWorktreeId = worktreeId?.trim();
     return RelayEnvelope(
       type: RemoteMessageType.aiStats,
       payload: {
         'projectId': project.id,
+        if (refresh) 'refresh': true,
         if (cleanWorktreeId != null && cleanWorktreeId.isNotEmpty)
           'worktreeId': cleanWorktreeId,
       },
@@ -132,15 +137,20 @@ class RemoteProjectController {
   RelayEnvelope aiSessionListEnvelope(
     ProjectInfo project, {
     RemoteWorktreeInfo? worktree,
+    bool refresh = true,
   }) {
     return RelayEnvelope(
       type: RemoteMessageType.aiSession,
-      payload: {'op': 'list', ...aiSessionScope(project, worktree)},
+      payload: {
+        'op': 'list',
+        if (refresh) 'refresh': true,
+        ...aiSessionScope(project, worktree),
+      },
     );
   }
 
-  /// Rename a session in the host's AI history. Host replies `ai.session.result`
-  /// with op `rename`; we refresh the list afterwards.
+  /// Rename a session in the host's indexed AI history. Host replies with
+  /// `indexedRename`; we refresh the list afterwards.
   RelayEnvelope aiSessionRenameEnvelope(
     ProjectInfo project,
     String sessionId,
@@ -150,7 +160,7 @@ class RemoteProjectController {
     return RelayEnvelope(
       type: RemoteMessageType.aiSession,
       payload: {
-        'op': 'rename',
+        'op': 'indexedRename',
         ...aiSessionScope(project, worktree),
         'sessionId': sessionId,
         'title': title,
@@ -158,7 +168,8 @@ class RemoteProjectController {
     );
   }
 
-  /// Remove a session from the host's AI history. Host replies with op `remove`.
+  /// Remove a session from the host's indexed AI history. Host replies with
+  /// `indexedRemove`.
   RelayEnvelope aiSessionRemoveEnvelope(
     ProjectInfo project,
     String sessionId, {
@@ -167,7 +178,7 @@ class RemoteProjectController {
     return RelayEnvelope(
       type: RemoteMessageType.aiSession,
       payload: {
-        'op': 'remove',
+        'op': 'indexedRemove',
         ...aiSessionScope(project, worktree),
         'sessionId': sessionId,
       },

@@ -52,7 +52,10 @@ void main() {
         ),
         activeSessionId: 'session-1',
       );
-      expect(controller.hasRemoteViewport('session-1'), isFalse);
+      // Live output must not snap an older host-rendered page back to the
+      // phone's local replay while a user is paging through history.
+      expect(controller.hasRemoteViewport('session-1'), isTrue);
+      expect(controller.cachedOutput('session-1'), contains('live'));
     },
   );
 

@@ -21,12 +21,14 @@ pub fn ai_stats_payload_from_state_value(
     let mut payload =
         snapshot.unwrap_or_else(|| empty_ai_stats_payload(&project_id, &project_name));
     if let Some(object) = payload.as_object_mut() {
-        object
-            .entry("projectId")
-            .or_insert_with(|| json!(project_id.clone()));
-        object
-            .entry("projectName")
-            .or_insert_with(|| json!(project_name.clone()));
+        // The indexed snapshot is keyed by the selected history scope. For a
+        // worktree that scope id is intentionally different from the project
+        // id used by the remote resource subscription and by the mobile
+        // project selector. Keep the snapshot's internal scope data, but make
+        // the outer wire identity authoritative so clients do not discard a
+        // valid worktree response as belonging to another project.
+        object.insert("projectId".to_string(), json!(project_id.clone()));
+        object.insert("projectName".to_string(), json!(project_name.clone()));
         object.insert(
             "updatedAt".to_string(),
             json!(chrono::Utc::now().to_rfc3339()),
@@ -114,6 +116,29 @@ mod tests {
         assert_eq!(payload["projectSummary"]["projectTotalTokens"], 12);
         assert_eq!(payload["currentSessions"][0]["sessionId"], "ai-1");
         assert_eq!(payload["currentSessions"][0]["terminalId"], "term-1");
+    }
+
+    #[test]
+    fn worktree_snapshot_uses_the_remote_project_identity() {
+        let payload = ai_stats_payload_from_state_value(
+            "project-1",
+            "Project",
+            json!({
+                "snapshot": {
+                    "projectId": "worktree-1",
+                    "projectName": "Feature",
+                    "projectSummary": {"projectId": "worktree-1"},
+                    "sessions": []
+                }
+            }),
+            Vec::new(),
+        );
+
+        assert_eq!(payload["projectId"], "project-1");
+        assert_eq!(payload["projectName"], "Project");
+        // The summary remains scoped to the indexed worktree; only the outer
+        // resource identity is rewritten for client-side routing.
+        assert_eq!(payload["projectSummary"]["projectId"], "worktree-1");
     }
 
     #[test]

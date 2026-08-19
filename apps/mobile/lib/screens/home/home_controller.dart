@@ -67,6 +67,7 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
   /// updates the pending target and the next request is sent when the current
   /// keyframe arrives, avoiding a queue of stale full-screen snapshots.
   final Map<String, String> _terminalRemoteViewportRequestsInFlight = {};
+  final Map<String, int> _terminalRemoteViewportInFlightOffsets = {};
   final Map<String, int> _terminalRemoteViewportPendingOffsets = {};
   int _terminalRemoteViewportRequestCounter = 0;
   int _terminalBufferRequestCounter = 0;

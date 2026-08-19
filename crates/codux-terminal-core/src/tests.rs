@@ -441,7 +441,65 @@ fn remote_viewport_keyframe_keeps_raw_cache_and_reports_host_position() {
     assert_eq!(session.content(), history);
 
     session.append_live("new", None, None, Some(4));
+    let while_scrolled = session.screen_snapshot();
+    assert!(session.has_remote_viewport());
+    assert_eq!(while_scrolled.display_offset, 112);
+    assert!(while_scrolled.data.contains("older viewport"));
+    assert_eq!(session.content(), format!("{history}new"));
+}
+
+#[test]
+fn live_output_at_remote_tail_returns_to_live_screen() {
+    let mut session = RemotePtySession::<String>::new(2048);
+    session.resize_screen(20, 8);
+    let history = scrollable_history("cached history");
+    session.replace_from_baseline(
+        &history,
+        None,
+        None,
+        Some(history.chars().count()),
+        Some(history.chars().count()),
+        Some(3),
+    );
+
+    session.apply_remote_viewport_snapshot(
+        "\x1b[2J\x1b[Hremote tail",
+        Some(&[false; 8]),
+        20,
+        8,
+        120,
+        0,
+        0,
+        0,
+    );
+    assert!(session.has_remote_viewport());
+
+    session.append_live("new", None, None, Some(4));
     assert!(!session.has_remote_viewport());
+    assert!(session.screen_snapshot().data.contains("new"));
+}
+
+#[test]
+fn same_size_resize_keeps_remote_viewport_keyframe() {
+    let mut session = RemotePtySession::<String>::new(2048);
+    session.resize_screen(20, 8);
+    session.apply_remote_viewport_snapshot(
+        "\x1b[2J\x1b[Hremote page",
+        Some(&[false; 8]),
+        20,
+        8,
+        120,
+        24,
+        0,
+        0,
+    );
+
+    session.resize_screen(20, 8);
+
+    let snapshot = session.screen_snapshot();
+    assert!(session.has_remote_viewport());
+    assert_eq!(snapshot.display_offset, 24);
+    assert!(snapshot.data.contains("remote page"));
 }
 
 #[test]

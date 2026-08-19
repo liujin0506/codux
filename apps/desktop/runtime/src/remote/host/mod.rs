@@ -173,6 +173,11 @@ pub struct RemoteHostRuntime {
     // devices when the live AI runtime changes (so remote views tick like the
     // desktop's local view) and when a cold-on-request index finishes refreshing.
     pub(crate) ai_stats_watchers: Mutex<HashMap<String, HashMap<String, String>>>,
+    // Devices that have requested an AI session list. The history indexer can
+    // finish that list asynchronously, so the completed snapshot is pushed
+    // back to the same device/scope instead of leaving the mobile switcher on
+    // the initial empty/cached result.
+    pub(crate) ai_session_watchers: Mutex<HashMap<String, HashMap<String, String>>>,
 }
 
 mod agent_worktree;
@@ -306,6 +311,7 @@ impl RemoteHostRuntime {
             send_seq_by_device: Mutex::new(HashMap::new()),
             receive_seq_by_device: Mutex::new(HashMap::new()),
             ai_stats_watchers: Mutex::new(HashMap::new()),
+            ai_session_watchers: Mutex::new(HashMap::new()),
         }
     }
 
@@ -337,6 +343,12 @@ impl RemoteHostRuntime {
         }
         if let Ok(mut receive_seq) = self.receive_seq_by_device.lock() {
             receive_seq.clear();
+        }
+        if let Ok(mut watchers) = self.ai_stats_watchers.lock() {
+            watchers.clear();
+        }
+        if let Ok(mut watchers) = self.ai_session_watchers.lock() {
+            watchers.clear();
         }
     }
 
@@ -393,6 +405,9 @@ impl RemoteHostRuntime {
         self.clear_remote_project_scope_for_project(project_id);
         self.resource_subscriptions.remove_project(project_id);
         if let Ok(mut watchers) = self.ai_stats_watchers.lock() {
+            watchers.remove(project_id);
+        }
+        if let Ok(mut watchers) = self.ai_session_watchers.lock() {
             watchers.remove(project_id);
         }
     }
