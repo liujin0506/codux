@@ -529,6 +529,7 @@ extension _HomePageConnection on HomeController {
     unawaited(_closeActiveTransport());
     _terminalInputBatcher.reset();
     _terminalInputSender.clear();
+    _terminalOutputController.resetTransient();
     final terminalCreateCancelled = _remoteRuntime.cancelTerminalCreate();
     if (resetRuntime) {
       _terminalOutputController.resetAll();
@@ -635,6 +636,10 @@ extension _HomePageConnection on HomeController {
     _sendQueue.reset(seed: DateTime.now().microsecondsSinceEpoch);
     _receiveSequenceGuard.reset();
     _receiveChain = Future<void>.value();
+    // Any pending baseline belongs to the previous transport generation. Keep
+    // the cache, but release the old assembler/request so reconnect can issue
+    // one authoritative baseline for the new generation.
+    _terminalOutputController.resetTransient();
     if (background && _lastConnectedAt != null) {
       _startConnectionGrace(reason: 'background_connect');
     }
@@ -791,6 +796,7 @@ extension _HomePageConnection on HomeController {
       );
       return false;
     }
+    final sendGeneration = _transportGeneration;
     CoduxLog.debug(
       '[codux-flutter-remote] send type=${message.type} session=${message.sessionId ?? ''}',
     );
@@ -799,6 +805,10 @@ extension _HomePageConnection on HomeController {
         message: message,
         transport: transport,
         connected: () => _transportConnected,
+        isCurrent: () =>
+            _transportConnected &&
+            identical(_activeTransport, transport) &&
+            _transportGeneration == sendGeneration,
         activeDevice: _activeDevice,
         terminalStream: sendTerminal,
         onResult: (sentMessage, result) {

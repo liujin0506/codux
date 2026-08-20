@@ -16,8 +16,20 @@ extension _HomePageProtocol on HomeController {
   ) async {
     try {
       final seq = message.seq;
+      // Baselines are emitted as `terminal.output` too, but they are a
+      // different stream from live output: a chunked baseline may arrive
+      // several seconds after newer live frames. Put it on the buffer
+      // sequence channel so the sliding duplicate window for live output
+      // cannot discard a late history chunk before the assembler sees it.
+      final isTerminalBaseline =
+          message.type == RemoteMessageType.terminalOutput &&
+          message.payload is Map &&
+          (message.payload as Map)['buffer'] == true;
+      final sequenceType = isTerminalBaseline
+          ? RemoteMessageType.terminalBuffer
+          : message.type;
       if (!_receiveSequenceGuard.accept(
-        type: message.type,
+        type: sequenceType,
         sessionId: message.sessionId,
         seq: seq,
       )) {
@@ -186,7 +198,10 @@ extension _HomePageProtocol on HomeController {
         case final type when type == RemoteMessageType.fileRead:
           _handleFileRead(message);
         case final type when type == RemoteMessageType.fileWritten:
-          _applyState(() => _fileEditorSaving = false);
+          _applyState(() {
+            _fileEditorSaving = false;
+            _fileEditorOriginal = _fileEditorController.text;
+          });
           _showToast(_t('file.saved'));
         case final type when type == RemoteMessageType.fileRenamed:
           _requestProjectFiles(_projectFilesPath);

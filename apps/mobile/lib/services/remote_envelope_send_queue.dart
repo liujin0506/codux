@@ -4,6 +4,7 @@ import 'remote_transport.dart';
 typedef RemoteSendErrorHandler = void Function(Object error);
 typedef RemoteSendResultHandler =
     void Function(RelayEnvelope message, RemoteEnvelopeSendResult result);
+typedef RemoteSendCurrentChecker = bool Function();
 
 enum RemoteEnvelopeSendResult { delivered, droppedWhileDisconnected, rejected }
 
@@ -22,6 +23,7 @@ class RemoteEnvelopeSendQueue {
     required bool Function() connected,
     StoredDevice? activeDevice,
     bool terminalStream = false,
+    RemoteSendCurrentChecker? isCurrent,
     RemoteSendErrorHandler? onError,
     RemoteSendResultHandler? onResult,
   }) {
@@ -29,7 +31,13 @@ class RemoteEnvelopeSendQueue {
     final previous = _chain.catchError((_) {});
     final task = previous
         .then((_) async {
-          if (!connected()) {
+          // A queued send belongs to the transport/generation it was created
+          // for. `connected == true` is not enough here: a reconnect can make
+          // the app connected again while this old queue item is still
+          // waiting behind another send. Without this fence it gets written
+          // through the old transport and its late result can tear down the
+          // freshly reconnected link.
+          if (!connected() || (isCurrent != null && !isCurrent())) {
             onResult?.call(
               message,
               RemoteEnvelopeSendResult.droppedWhileDisconnected,
@@ -44,8 +52,24 @@ class RemoteEnvelopeSendQueue {
                 ? await transport.sendTerminal(envelope)
                 : await transport.send(envelope);
           } catch (error) {
+            if (isCurrent != null && !isCurrent()) {
+              onResult?.call(
+                message,
+                RemoteEnvelopeSendResult.droppedWhileDisconnected,
+              );
+              return;
+            }
             onResult?.call(message, RemoteEnvelopeSendResult.rejected);
             onError?.call(error);
+            return;
+          }
+          // The transport may have closed while the native send was in
+          // flight. Do not report that old result to the new connection.
+          if (isCurrent != null && !isCurrent()) {
+            onResult?.call(
+              message,
+              RemoteEnvelopeSendResult.droppedWhileDisconnected,
+            );
             return;
           }
           onResult?.call(

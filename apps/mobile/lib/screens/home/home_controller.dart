@@ -675,6 +675,10 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
       focusTerminalViewSoon: _focusTerminalViewSoon,
       onSessionStateChanged: (previous, reason) {
         if (previous.sessionId == _sessionId) return;
+        // A terminal selection belongs to the rendered session. Clear the
+        // controller copy as soon as the binding changes so the copy action,
+        // swipe lock, and selection toolbar cannot operate on the old PTY.
+        _clearTerminal();
         _terminalViewportTakeOverTimer?.cancel();
         _terminalViewportTakeOverTimer = null;
         _pendingTerminalViewportTakeOverSessionId = null;

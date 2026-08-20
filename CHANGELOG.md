@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.28] - 2026-08-21
+
+### Fixed
+
+- Mobile terminal switching and reconnects now clear stale selection/modifier state, release the remote viewport when leaving the workspace, and reset the removed device's runtime cleanly.
+- Terminal history and envelope sequencing now keep late baselines from being dropped as stale live output.
+- The mobile file editor now confirms before discarding unsaved changes and updates its clean baseline after saving.
+
 ## [2.0.27] - 2026-08-19
 
 ### Fixed

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:codux_flutter/models/remote_models.dart';
@@ -135,6 +136,31 @@ void main() {
     expect(errors, hasLength(1));
   });
 
+  test(
+    'does not report an old in-flight send after generation changes',
+    () async {
+      final queue = RemoteEnvelopeSendQueue();
+      final transport = _BlockingTransport();
+      final results = <RemoteEnvelopeSendResult>[];
+      var generation = 1;
+
+      final pending = queue.send(
+        message: const RelayEnvelope(type: 'old.request'),
+        transport: transport,
+        connected: () => true,
+        isCurrent: () => generation == 1,
+        onResult: (_, result) => results.add(result),
+      );
+      await transport.started.future;
+
+      generation = 2;
+      transport.release.complete(true);
+      await pending;
+
+      expect(results, [RemoteEnvelopeSendResult.droppedWhileDisconnected]);
+    },
+  );
+
   test('routes terminal stream envelopes through terminal transport', () async {
     final queue = RemoteEnvelopeSendQueue();
     final transport = _FakeTransport();
@@ -215,5 +241,17 @@ class _FakeTransport implements RemoteTransport {
     required Uint8List bytes,
   }) async {
     return sendResult;
+  }
+}
+
+class _BlockingTransport extends _FakeTransport {
+  final started = Completer<void>();
+  final release = Completer<bool>();
+
+  @override
+  Future<bool> send(Map<String, dynamic> envelope) async {
+    sent.add(envelope);
+    if (!started.isCompleted) started.complete();
+    return release.future;
   }
 }

@@ -249,8 +249,7 @@ class _CoduxHomePageState extends State<CoduxHomePage>
                 c._insertTerminalText(text);
                 c._applyState(() => c._showVoiceOverlay = false);
               },
-              onCloseFileEditor: () =>
-                  c._applyState(() => c._editingFilePath = null),
+              onCloseFileEditor: c._requestCloseFileEditor,
               onEditFile: c._beginEditingFile,
               onSaveFile: c._saveEditingFile,
             ),
@@ -515,11 +514,8 @@ class _CoduxHomePageState extends State<CoduxHomePage>
       onEditFile: c._beginEditingFile,
       onSaveFile: c._saveEditingFile,
       onCancelFileEdit: c._cancelEditingFile,
-      onCloseFileEditor: () => c._applyState(() => c._editingFilePath = null),
-      onBack: () => c._applyState(() {
-        c._showTerminal = false;
-        c._workspaceMode = WorkspaceMode.terminal;
-      }),
+      onCloseFileEditor: c._requestCloseFileEditor,
+      onBack: c._closeTerminalFromWorkspace,
       onEditProject: c._requestProjectEdit,
       onAddProject: c._requestProjectAdd,
       onRemoveProject: c._requestProjectRemove,

@@ -828,7 +828,7 @@ class FileEditorView extends StatelessWidget {
             children: [
               if (showClose)
                 IconButton(
-                  onPressed: onClose,
+                  onPressed: saving ? null : onClose,
                   icon: Icon(closeIcon, size: 22),
                   color: AppColors.textPrimary,
                 )

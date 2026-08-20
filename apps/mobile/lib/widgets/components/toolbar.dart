@@ -10,6 +10,7 @@ import '../../theme/app_theme.dart';
 class Toolbar extends StatefulWidget {
   const Toolbar({
     super.key,
+    this.sessionId,
     required this.onSendKey,
     required this.onPaste,
     required this.applicationCursor,
@@ -49,6 +50,7 @@ class Toolbar extends StatefulWidget {
     return math.max(math.max(viewPadding.left, viewPadding.right), cornerInset);
   }
 
+  final String? sessionId;
   final ValueChanged<String> onSendKey;
   final VoidCallback onPaste;
   final bool applicationCursor;
@@ -74,6 +76,14 @@ class Toolbar extends StatefulWidget {
 
 class _ToolbarState extends State<Toolbar> {
   bool _ctrl = false;
+
+  @override
+  void didUpdateWidget(covariant Toolbar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.sessionId != oldWidget.sessionId && _ctrl) {
+      _ctrl = false;
+    }
+  }
 
   void _clearModifiers() {
     if (!_ctrl) return;

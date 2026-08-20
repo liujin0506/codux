@@ -204,7 +204,17 @@ class RemoteTerminalBindingCoordinator {
         _outputController.hasCachedOutput(bindSessionId) &&
         !_outputController.hasSequenceGap(bindSessionId) &&
         !_baselineStaleSessionIds.contains(bindSessionId);
-    final needsBaseline = !hasUsableCache || plan.bindFullBuffer;
+    // A topology reply can cause a second bind while the baseline started by
+    // protocol-ready is still in flight. Keep that request single-flight even
+    // when the cache is still empty (the old code reset the assembler and
+    // issued a second request in that case). A transport-generation reset
+    // clears abandoned requests before the next connection starts, so an
+    // active request here always belongs to the current connection.
+    final hasPendingBaseline = _outputController.hasActiveBufferRequest(
+      bindSessionId,
+    );
+    final needsBaseline =
+        !hasPendingBaseline && (!hasUsableCache || plan.bindFullBuffer);
     if (needsBaseline) {
       _outputController.bindSession(bindSessionId, requireBaseline: true);
     }

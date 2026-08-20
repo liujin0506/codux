@@ -474,6 +474,7 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
                     right: 0,
                     bottom: toolbarBottom,
                     child: Toolbar(
+                      sessionId: widget.sessionId,
                       onSendKey: widget.onSendKey,
                       applicationCursor: false,
                       keyboardVisible: imeOpen,

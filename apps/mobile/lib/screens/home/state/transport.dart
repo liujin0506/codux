@@ -187,6 +187,11 @@ extension _HomePageTransport on HomeController {
     }
     _terminalInputBatcher.reset();
     _terminalInputSender.clear();
+    // A baseline request is tied to the old transport. Keep cached output and
+    // its sequence watermark for a smooth reconnect, but release the old
+    // assembler/request so the next generation cannot mistake it for an
+    // active pull and skip the fresh baseline.
+    _terminalOutputController.resetTransient();
     final terminalCreateCancelled = _remoteRuntime.cancelTerminalCreate();
     _applyState(() {
       if (terminalCreateCancelled) _syncRuntimeViewState();

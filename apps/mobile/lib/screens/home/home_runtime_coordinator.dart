@@ -73,6 +73,15 @@ class HomeRuntimeCoordinator {
 
   void applyRuntimePlan(RemoteRuntimePlan plan, {String reason = ''}) {
     final previous = captureSnapshot();
+    // A protocol-ready reconnect starts the terminal baseline immediately,
+    // while the project/terminal list replies can arrive a moment later with
+    // `resetTerminalBuffer`. Do not cancel that in-flight baseline merely
+    // because the topology snapshot landed; doing so leaves the cached screen
+    // in place and turns the host's valid response into a stale response.
+    final preserveInFlightBaseline =
+        plan.resetTerminalBuffer &&
+        plan.bindSessionId != null &&
+        outputController.hasActiveBufferRequest(plan.bindSessionId!);
     if (plan.stateChanged ||
         plan.clearTerminal ||
         plan.resetTerminalBuffer ||
@@ -96,10 +105,23 @@ class HomeRuntimeCoordinator {
     }
     if (plan.resetTerminalBuffer) {
       terminalBufferRetry.reset();
-      outputController.resetTransient();
-      setTerminalBufferLoading(false);
+      if (!preserveInFlightBaseline) {
+        outputController.resetTransient();
+        setTerminalBufferLoading(false);
+      }
     }
     syncRuntimeViewState();
+
+    // `resetTerminalBuffer` means the current cache is not authoritative for
+    // the next bind. Mark the target stale before applying the bind so a
+    // cached terminal still gets one fresh baseline instead of a live-only
+    // subscription. When a baseline is already in flight, the request itself
+    // is the freshness marker and must be preserved above.
+    if (plan.resetTerminalBuffer &&
+        plan.bindSessionId != null &&
+        !preserveInFlightBaseline) {
+      terminalBindingCoordinator.markSessionBaselineStale(plan.bindSessionId!);
+    }
 
     final next = captureSnapshot();
     if (previous.sessionId != next.sessionId ||
@@ -132,6 +154,12 @@ class HomeRuntimeCoordinator {
     }
     if (plan.bindSessionId != null) {
       applyTerminalBind(plan, reason);
+      if (preserveInFlightBaseline) {
+        // The topology reset above intentionally preserved the request, but
+        // also reset the retry coordinator. Re-arm its watcher for the same
+        // single-flight request so a stalled transfer still self-heals.
+        trackTerminalBaselineRequest(plan.bindSessionId!);
+      }
     }
     onSessionStateChanged(previous, reason);
   }

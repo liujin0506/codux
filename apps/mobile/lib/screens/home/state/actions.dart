@@ -30,12 +30,11 @@ extension _HomePageActions on HomeController {
     );
     if (result.removedActive) {
       _shouldReconnect = false;
-      _transportConnected = false;
-      unawaited(_closeActiveTransport());
-      _clearLatencyProbe();
-      if (_remoteRuntime.cancelTerminalCreate()) {
-        _syncRuntimeViewState();
-      }
+      _disconnectTransport(
+        status: _t('app.disconnected'),
+        closeTerminal: true,
+        resetRuntime: true,
+      );
     }
     await _saveDevices(result.state.devices);
     if (result.state.devices.isEmpty) {
@@ -447,12 +446,7 @@ extension _HomePageActions on HomeController {
 
   void _handleBackNavigation() {
     if (_editingFilePath != null) {
-      _applyState(() {
-        _editingFilePath = null;
-        _fileEditorLoading = false;
-        _fileEditorSaving = false;
-        _fileEditorEditing = false;
-      });
+      _requestCloseFileEditor();
       return;
     }
     if (_showScanner) {
@@ -496,6 +490,14 @@ extension _HomePageActions on HomeController {
     }
     _disconnectTransport(status: _t('app.disconnected'), closeTerminal: true);
     SystemNavigator.pop();
+  }
+
+  void _closeTerminalFromWorkspace() {
+    _releaseTerminalViewport();
+    _applyState(() {
+      _showTerminal = false;
+      _workspaceMode = WorkspaceMode.terminal;
+    });
   }
 
   void _handleWorkspaceEdgeDragStart(DragStartDetails details) {

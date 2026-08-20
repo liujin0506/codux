@@ -95,3 +95,38 @@ class FileDeleteDialog extends StatelessWidget {
     );
   }
 }
+
+class FileUnsavedChangesDialog extends StatelessWidget {
+  const FileUnsavedChangesDialog({
+    super.key,
+    required this.title,
+    required this.message,
+    required this.cancelLabel,
+    required this.discardLabel,
+  });
+
+  final String title;
+  final String message;
+  final String cancelLabel;
+  final String discardLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.bgSurface,
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(cancelLabel),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(discardLabel),
+        ),
+      ],
+    );
+  }
+}

@@ -581,7 +581,7 @@ extension _HomePageWorkspace on HomeController {
                 saving: _fileEditorSaving,
                 editing: _fileEditorEditing,
                 editable: _fileEditorEditable,
-                onClose: () => Navigator.of(routeContext).pop(),
+                onClose: () => unawaited(_closePhoneFileEditor(routeContext)),
                 onEdit: _beginEditingFile,
                 onSave: _saveEditingFile,
                 onCancelEdit: _cancelEditingFile,
@@ -665,6 +665,45 @@ extension _HomePageWorkspace on HomeController {
       _fileEditorController.text = _fileEditorOriginal;
       _fileEditorEditing = false;
     });
+  }
+
+  Future<bool> _confirmCloseFileEditor() async {
+    if (!_fileEditorEditing) return true;
+    if (_fileEditorSaving) return false;
+    if (_fileEditorController.text == _fileEditorOriginal) return true;
+    final prefs = AppPreferences.of(context);
+    return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => FileUnsavedChangesDialog(
+            title: prefs.t('file.unsavedTitle'),
+            message: prefs.t('file.unsavedConfirm'),
+            cancelLabel: prefs.t('file.cancel'),
+            discardLabel: prefs.t('file.discard'),
+          ),
+        ) ??
+        false;
+  }
+
+  Future<void> _closePhoneFileEditor(BuildContext routeContext) async {
+    if (!await _confirmCloseFileEditor()) return;
+    if (routeContext.mounted) Navigator.of(routeContext).pop();
+  }
+
+  void _requestCloseFileEditor() {
+    unawaited(
+      _confirmCloseFileEditor().then((confirmed) {
+        if (!confirmed || !mounted) return;
+        _applyState(() {
+          if (_fileEditorEditing) {
+            _fileEditorController.text = _fileEditorOriginal;
+          }
+          _editingFilePath = null;
+          _fileEditorLoading = false;
+          _fileEditorSaving = false;
+          _fileEditorEditing = false;
+        });
+      }),
+    );
   }
 
   void _focusTerminalSoon() {
