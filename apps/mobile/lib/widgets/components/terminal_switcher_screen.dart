@@ -40,6 +40,8 @@ class TerminalSwitcherScreen extends StatefulWidget {
     required this.onRefreshTerminals,
     required this.aiSessions,
     required this.onOpenSessions,
+    this.initialSection = TerminalSwitcherSection.terminals,
+    this.onSectionChanged,
     required this.onRefreshSessions,
     required this.onOpenSession,
     required this.onRenameSession,
@@ -74,6 +76,8 @@ class TerminalSwitcherScreen extends StatefulWidget {
   final VoidCallback onRefreshTerminals;
   final List<AISessionRecord> aiSessions;
   final VoidCallback onOpenSessions;
+  final TerminalSwitcherSection initialSection;
+  final ValueChanged<TerminalSwitcherSection>? onSectionChanged;
   final VoidCallback onRefreshSessions;
   final ValueChanged<AISessionRecord> onOpenSession;
   final ValueChanged<AISessionRecord> onRenameSession;
@@ -84,7 +88,21 @@ class TerminalSwitcherScreen extends StatefulWidget {
 }
 
 class _TerminalSwitcherScreenState extends State<TerminalSwitcherScreen> {
-  TerminalSwitcherSection _section = TerminalSwitcherSection.terminals;
+  late TerminalSwitcherSection _section;
+
+  @override
+  void initState() {
+    super.initState();
+    _section = widget.initialSection;
+  }
+
+  @override
+  void didUpdateWidget(covariant TerminalSwitcherScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialSection != widget.initialSection) {
+      _section = widget.initialSection;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -139,6 +157,7 @@ class _TerminalSwitcherScreenState extends State<TerminalSwitcherScreen> {
               value: _section,
               onChanged: (next) {
                 setState(() => _section = next);
+                widget.onSectionChanged?.call(next);
                 if (next == TerminalSwitcherSection.worktrees) {
                   widget.onOpenWorktrees();
                 } else if (next == TerminalSwitcherSection.sessions) {
@@ -236,19 +255,30 @@ class _ProjectStrip extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.s),
         SizedBox(
-          height: 42,
+          height: 44,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(right: AppSpacing.xs),
             itemCount: projects.length + 1,
             separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.s),
             itemBuilder: (context, index) {
               if (index == projects.length) {
-                return _ProjectChip(
+                return Semantics(
+                  button: true,
                   label: prefs.t('project.add'),
-                  initials: '+',
-                  active: false,
-                  accent: accent,
-                  onTap: onAdd,
+                  child: Material(
+                    color: AppColors.bgSurface,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      onTap: onAdd,
+                      child: SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Icon(Icons.add_rounded, color: accent, size: 22),
+                      ),
+                    ),
+                  ),
                 );
               }
               final project = projects[index];
@@ -381,10 +411,11 @@ class _SectionTabs extends StatelessWidget {
   Widget build(BuildContext context) {
     final prefs = AppPreferences.of(context);
     return Container(
-      height: 40,
+      height: 44,
       decoration: BoxDecoration(
         color: AppColors.bgSurface,
         borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.34)),
       ),
       child: Row(
         children: [
@@ -425,9 +456,9 @@ class _Segment extends StatelessWidget {
     final accent = Theme.of(context).colorScheme.secondary;
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(3),
         child: Material(
-          color: active ? accent.withValues(alpha: 0.16) : Colors.transparent,
+          color: active ? accent.withValues(alpha: 0.13) : Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadius.sm),
           child: InkWell(
             borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -681,26 +712,32 @@ class _SessionList extends StatelessWidget {
             : session.id;
         final time = formatEpochSeconds(session.time);
         final tool = session.tool.trim();
+        final model = session.model?.trim() ?? '';
         final subtitle = [
           if (tool.isNotEmpty) tool,
+          if (model.isNotEmpty) model,
           if (time.isNotEmpty) time,
         ].join(' · ');
+        final usage = formatSessionUsage(session);
         return SwipeListTile(
           key: ValueKey('terminal-switcher-session-${session.id}'),
           title: title,
           subtitle: subtitle.isEmpty ? session.id : subtitle,
+          height: usage.isEmpty ? 78 : 88,
           leadingIcon: Icons.forum_outlined,
           onTap: () => onOpen(session),
-          trailing: session.size > 0
-              ? Text(
-                  formatTokenSize(session.size),
+          footer: usage.isEmpty
+              ? null
+              : Text(
+                  usage,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 12,
+                    color: accent.withValues(alpha: 0.82),
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
-                )
-              : null,
+                ),
           actions: [
             SwipeListAction(
               label: prefs.t('session.menuRename'),

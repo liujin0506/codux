@@ -122,6 +122,10 @@ void main() {
     expect(controller.removeEnvelope(project).type, 'project.remove');
     expect(controller.aiStatsEnvelope(project).type, 'ai.stats');
     expect(
+      (controller.aiStatsEnvelope(project).payload as Map)['projectPath'],
+      '/repo',
+    );
+    expect(
       (controller.aiStatsEnvelope(project, refresh: true).payload
           as Map)['refresh'],
       isTrue,

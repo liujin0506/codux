@@ -4,12 +4,66 @@ const int _terminalStaleOutputSeqTolerance = 8;
 
 enum _TerminalViewportClaimIntent { auto, force }
 
+int? _terminalIntValue(Object? value) => switch (value) {
+  int number => number,
+  num number => number.toInt(),
+  String text => int.tryParse(text),
+  _ => null,
+};
+
+@visibleForTesting
+bool shouldApplyTerminalViewportResponseForTest({
+  required int? responseOffset,
+  required int? requestedOffset,
+  required int? pendingOffset,
+}) =>
+    pendingOffset == null ||
+    pendingOffset == (responseOffset ?? requestedOffset);
+
 /// Terminal session handling for [_CoduxHomePageState]: output/upload
 /// effects, buffer-resync bookkeeping, viewport claim/release, resize, input
 /// send, and terminal create/lookup. Split into a part + extension to keep the
 /// State class navigable; behaviour is unchanged. Rebuilds route through
 /// [_CoduxHomePageState._applyState] (`setState` is `@protected`).
 extension _HomePageTerminal on HomeController {
+  void _notifyWaitingTerminalsInBackground() {
+    if (_appInForeground || _waitingNotificationTerminals.isEmpty) return;
+    for (final terminalId in _waitingNotificationTerminals) {
+      final terminal = _terminalById(terminalId);
+      final name = terminal?.title.trim().isNotEmpty == true
+          ? terminal!.title.trim()
+          : 'Codux';
+      unawaited(
+        AndroidConnectionKeeper.notifyIntervention(
+          terminalId: terminalId,
+          title: '$name needs your input',
+          body: 'Tap to return to the terminal',
+        ),
+      );
+    }
+  }
+
+  void _handleTerminalStatus(RelayEnvelope message) {
+    final payload = message.payload;
+    if (payload is! Map) return;
+    final terminalId = '${payload['terminalId'] ?? ''}'.trim();
+    if (terminalId.isEmpty) return;
+    final state = '${payload['state'] ?? ''}'.trim().toLowerCase();
+    if (state == 'waiting') {
+      if (!_waitingNotificationTerminals.add(terminalId)) return;
+      CoduxLog.info(
+        '[codux-flutter-notification] intervention terminal=$terminalId source=${payload['source'] ?? ''}',
+      );
+      if (!_appInForeground) {
+        _notifyWaitingTerminalsInBackground();
+      }
+      return;
+    }
+    if (_waitingNotificationTerminals.remove(terminalId)) {
+      unawaited(AndroidConnectionKeeper.cancelIntervention(terminalId));
+    }
+  }
+
   void _handleTerminalViewportState(RelayEnvelope message) {
     final sessionId = message.sessionId?.trim();
     if (sessionId == null || sessionId.isEmpty) return;
@@ -32,6 +86,19 @@ extension _HomePageTerminal on HomeController {
     // "Take over here" to move the PTY grid to this device.
     final handedAway =
         owner.isNotEmpty && (localOwner.isEmpty || owner != localOwner);
+    final takeOverConfirmed =
+        sessionId == _pendingTerminalViewportTakeOverSessionId &&
+        localOwner.isNotEmpty &&
+        owner == localOwner;
+    if (takeOverConfirmed) {
+      _terminalViewportTakeOverTimer?.cancel();
+      _terminalViewportTakeOverTimer = null;
+      _pendingTerminalViewportTakeOverSessionId = null;
+      _terminalViewportTakeOverReconnectAttempted = false;
+      CoduxLog.info(
+        '[codux-flutter-terminal] take over confirmed session=$sessionId owner=$owner',
+      );
+    }
     final staleOutput =
         payload != null &&
         payload['staleOutput'] == true &&
@@ -43,7 +110,8 @@ extension _HomePageTerminal on HomeController {
     if (sessionId == _sessionId) {
       final interactive = localOwner.isNotEmpty && owner == localOwner;
       final becameInteractive = interactive && !_terminalViewportInteractive;
-      if (handedAway != _remoteHandedAway ||
+      if (takeOverConfirmed ||
+          handedAway != _remoteHandedAway ||
           interactive != _terminalViewportInteractive) {
         _applyState(() {
           _remoteHandedAway = handedAway;
@@ -159,11 +227,14 @@ extension _HomePageTerminal on HomeController {
     if (sessionId == null || sessionId.isEmpty) return;
     final requestId = payload['viewportRequestId']?.toString().trim();
     String? expectedSession;
+    int? requestedOffset;
     if (requestId != null && requestId.isNotEmpty) {
       expectedSession = _terminalRemoteViewportRequestsInFlight.remove(
         requestId,
       );
-      _terminalRemoteViewportInFlightOffsets.remove(requestId);
+      requestedOffset = _terminalRemoteViewportInFlightOffsets.remove(
+        requestId,
+      );
       if (expectedSession == null) return;
     } else {
       MapEntry<String, String>? entry;
@@ -176,9 +247,30 @@ extension _HomePageTerminal on HomeController {
       if (entry == null) return;
       expectedSession = entry.value;
       _terminalRemoteViewportRequestsInFlight.remove(entry.key);
-      _terminalRemoteViewportInFlightOffsets.remove(entry.key);
+      requestedOffset = _terminalRemoteViewportInFlightOffsets.remove(
+        entry.key,
+      );
     }
     if (expectedSession != sessionId) return;
+
+    // A fast drag can queue a newer target while the relay is still returning
+    // the previous page. Painting that intermediate keyframe makes adjacent
+    // pages flash through each other (especially when the user reverses
+    // direction). Keep the last stable grid and immediately fetch the newest
+    // target instead.
+    final responseOffset = _terminalIntValue(payload['displayOffset']);
+    final pendingOffset = _terminalRemoteViewportPendingOffsets[sessionId];
+    if (!shouldApplyTerminalViewportResponseForTest(
+      responseOffset: responseOffset,
+      requestedOffset: requestedOffset,
+      pendingOffset: pendingOffset,
+    )) {
+      CoduxLog.debug(
+        '[codux-flutter-terminal] skip superseded viewport session=$sessionId response=${responseOffset ?? requestedOffset ?? -1} pending=$pendingOffset',
+      );
+      _sendNextRemoteTerminalViewportRequest(sessionId);
+      return;
+    }
 
     final effects = _terminalOutputController.accept(
       message,
@@ -218,7 +310,8 @@ extension _HomePageTerminal on HomeController {
         break;
       }
     }
-    final baseOffset = _terminalRemoteViewportPendingOffsets[sessionId] ??
+    final baseOffset =
+        _terminalRemoteViewportPendingOffsets[sessionId] ??
         inFlightOffset ??
         snapshot.displayOffset;
 
@@ -287,9 +380,8 @@ extension _HomePageTerminal on HomeController {
       (_, value) => value == id,
     );
     _terminalRemoteViewportInFlightOffsets.removeWhere(
-      (requestId, _) => !_terminalRemoteViewportRequestsInFlight.containsKey(
-        requestId,
-      ),
+      (requestId, _) =>
+          !_terminalRemoteViewportRequestsInFlight.containsKey(requestId),
     );
   }
 
@@ -655,23 +747,23 @@ extension _HomePageTerminal on HomeController {
     _terminalViewportController.markSent(id, resize);
   }
 
-  void _claimTerminalViewport({
+  bool _claimTerminalViewport({
     String? sessionId,
     bool renewOnly = false,
     _TerminalViewportClaimIntent intent = _TerminalViewportClaimIntent.auto,
   }) {
     final id = sessionId ?? _sessionId;
-    if (id == null || id.trim().isEmpty) return;
-    if (!_terminalViewportClaimable) return;
+    if (id == null || id.trim().isEmpty) return false;
+    if (!_terminalViewportClaimable) return false;
     final terminal = _terminalById(id);
-    if (terminal == null || !_canResizeTerminal(terminal)) return;
+    if (terminal == null || !_canResizeTerminal(terminal)) return false;
     if (!renewOnly &&
         intent == _TerminalViewportClaimIntent.auto &&
         _lastViewportClaimSession == id &&
         _lastViewportClaimAt != null &&
         DateTime.now().difference(_lastViewportClaimAt!) <
             _viewportClaimThrottle) {
-      return;
+      return false;
     }
     final sent = _sendTerminalEnvelope(
       RelayEnvelope(
@@ -688,6 +780,7 @@ extension _HomePageTerminal on HomeController {
       _lastViewportClaimAt = DateTime.now();
       _lastViewportClaimSession = id;
     }
+    return sent;
   }
 
   void _releaseTerminalViewport({String? sessionId}) {
@@ -714,27 +807,110 @@ extension _HomePageTerminal on HomeController {
   void _takeOverTerminalViewport({String? sessionId}) {
     final id = sessionId ?? _sessionId;
     if (id == null || id.trim().isEmpty) return;
-    if (!_transportConnected || !_transportReady || _activeTransport == null) {
-      // The headless-agent handoff copy is also used when the underlying link
-      // has gone away. A viewport claim cannot be delivered in that state, so
-      // make the action useful by bringing the transport back first.
-      CoduxLog.info(
-        '[codux-flutter-terminal] take over requested while disconnected; reconnecting session=$id',
+    _terminalViewportTakeOverTimer?.cancel();
+    _terminalViewportTakeOverTimer = null;
+    _applyState(() {
+      _pendingTerminalViewportTakeOverSessionId = id;
+      _terminalViewportTakeOverReconnectAttempted = false;
+    });
+    if (!_transportConnected ||
+        !_transportReady ||
+        !_remoteProtocolReady ||
+        _activeTransport == null) {
+      _reconnectForPendingTerminalViewportTakeOver(
+        id,
+        reason: 'transport-not-ready',
       );
-      _applyState(() {
-        _remoteHandedAway = false;
-        _terminalViewportInteractive = false;
-        _terminalViewportOwner = '';
-        _status = _t('app.reconnecting');
-      });
-      final target = _activeDevice;
-      if (target != null) _connect(target, true);
       return;
     }
-    _claimTerminalViewport(
-      sessionId: id,
+    _sendPendingTerminalViewportTakeOver(id, reason: 'user');
+  }
+
+  void _sendPendingTerminalViewportTakeOver(
+    String sessionId, {
+    required String reason,
+  }) {
+    if (_pendingTerminalViewportTakeOverSessionId != sessionId) return;
+    if (_terminalViewportTakeOverTimer != null) return;
+    if (!_transportConnected ||
+        !_transportReady ||
+        !_remoteProtocolReady ||
+        _activeTransport == null) {
+      return;
+    }
+    final sent = _claimTerminalViewport(
+      sessionId: sessionId,
       intent: _TerminalViewportClaimIntent.force,
     );
+    if (!sent) {
+      CoduxLog.info(
+        '[codux-flutter-terminal] take over waiting for terminal state session=$sessionId reason=$reason',
+      );
+      return;
+    }
+    CoduxLog.info(
+      '[codux-flutter-terminal] take over sent session=$sessionId reason=$reason',
+    );
+    _terminalViewportTakeOverTimer?.cancel();
+    _terminalViewportTakeOverTimer = Timer(_viewportTakeOverAckTimeout, () {
+      _terminalViewportTakeOverTimer = null;
+      if (!mounted || _pendingTerminalViewportTakeOverSessionId != sessionId) {
+        return;
+      }
+      if (_terminalViewportTakeOverReconnectAttempted) {
+        CoduxLog.warn(
+          '[codux-flutter-terminal] take over failed after reconnect session=$sessionId',
+        );
+        _applyState(() {
+          _pendingTerminalViewportTakeOverSessionId = null;
+          _terminalViewportTakeOverReconnectAttempted = false;
+        });
+        return;
+      }
+      _terminalViewportTakeOverReconnectAttempted = true;
+      _reconnectForPendingTerminalViewportTakeOver(
+        sessionId,
+        reason: 'ack-timeout',
+        restart: true,
+      );
+    });
+  }
+
+  void _reconnectForPendingTerminalViewportTakeOver(
+    String sessionId, {
+    required String reason,
+    bool restart = false,
+  }) {
+    if (_pendingTerminalViewportTakeOverSessionId != sessionId) return;
+    final target = _activeDevice;
+    if (target == null) {
+      _terminalViewportTakeOverTimer?.cancel();
+      _terminalViewportTakeOverTimer = null;
+      _applyState(() {
+        _pendingTerminalViewportTakeOverSessionId = null;
+        _terminalViewportTakeOverReconnectAttempted = false;
+      });
+      return;
+    }
+    CoduxLog.warn(
+      '[codux-flutter-terminal] take over reconnect session=$sessionId reason=$reason restart=$restart',
+    );
+    if (restart) {
+      _disconnectTransport(
+        status: _t('app.reconnecting'),
+        closeTerminal: false,
+        notifyHost: false,
+      );
+    } else if (mounted) {
+      _applyState(() => _status = _t('app.reconnecting'));
+    }
+    _connect(target, true);
+  }
+
+  void _resumePendingTerminalViewportTakeOver({required String reason}) {
+    final sessionId = _pendingTerminalViewportTakeOverSessionId;
+    if (sessionId == null || sessionId != _sessionId) return;
+    _sendPendingTerminalViewportTakeOver(sessionId, reason: reason);
   }
 
   String _terminalHandoffMessageKey() {

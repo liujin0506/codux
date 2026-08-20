@@ -172,6 +172,18 @@ pub struct RemoteAISessionSummary {
     pub time: f64,
     /// Total tokens (the "size" of the session).
     pub size: i64,
+    /// Uncached input tokens.
+    #[serde(default)]
+    pub input_tokens: i64,
+    /// Output tokens, including any provider-reported reasoning output.
+    #[serde(default)]
+    pub output_tokens: i64,
+    /// Input tokens served from the provider cache.
+    #[serde(default)]
+    pub cached_input_tokens: i64,
+    /// Number of indexed requests contributing to this session.
+    #[serde(default)]
+    pub request_count: i64,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub usage_amounts: Vec<RemoteAIUsageAmount>,
 }

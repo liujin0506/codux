@@ -11,6 +11,31 @@ extension _HomePageWorkspace on HomeController {
     _terminalActions.selectTerminal(terminal);
   }
 
+  String? _swipeTerminal(int direction) {
+    if (direction == 0) return null;
+    final current = _currentTerminal();
+    if (current == null) return null;
+    final terminals = _currentProjectTerminals()
+        .where(
+          (terminal) =>
+              _isAccessibleTerminal(terminal) &&
+              terminal.worktreeId == current.worktreeId,
+        )
+        .toList();
+    if (terminals.length < 2) return null;
+    final currentIndex = terminals.indexWhere((item) => item.id == current.id);
+    if (currentIndex < 0) return null;
+    final step = direction > 0 ? 1 : -1;
+    final targetIndex =
+        (currentIndex + step + terminals.length) % terminals.length;
+    final target = terminals[targetIndex];
+    _selectTerminal(target);
+    final title = target.title.trim();
+    return title.isNotEmpty
+        ? title
+        : '${_t('workspace.terminal')} ${targetIndex + 1}';
+  }
+
   void _createCurrentProjectTerminal() {
     // An explicit create action means the user is already using the switcher;
     // keep it open so the newly-created terminal remains visible in the list.
@@ -31,9 +56,16 @@ extension _HomePageWorkspace on HomeController {
     _terminalActions.closeTerminal(terminal);
   }
 
-  Future<void> _openTerminalSwitcher() async {
+  Future<void> _openTerminalSwitcher({
+    TerminalSwitcherSection section = TerminalSwitcherSection.terminals,
+  }) async {
+    _applyState(() => _terminalSwitcherSection = section);
     await _terminalActions.openTerminalSwitcher(_showTerminalSwitcher);
     _requestAISessions();
+  }
+
+  void _openSessionHistoryShortcut() {
+    unawaited(_openTerminalSwitcher(section: TerminalSwitcherSection.sessions));
   }
 
   void _closeTerminalSwitcher() {
@@ -44,6 +76,7 @@ extension _HomePageWorkspace on HomeController {
 
   void _hideTerminalSwitcher() {
     _showTerminalSwitcher = false;
+    _terminalSwitcherSection = TerminalSwitcherSection.terminals;
     _pendingPhoneProjectSwitcherCloseId = null;
   }
 
@@ -236,10 +269,10 @@ extension _HomePageWorkspace on HomeController {
     final worktree = _selectedWorktree;
     final scopeId = '${project.id}/${worktree?.id ?? ''}';
     if (!force && _aiSessionsScopeId == scopeId) return;
-    _aiSessionsScopeId = scopeId;
-    _send(
+    final sent = _send(
       _projectController.aiSessionListEnvelope(project, worktree: worktree),
     );
+    if (sent) _aiSessionsScopeId = scopeId;
   }
 
   void _handleAISessionResult(Object? payload) {
@@ -728,6 +761,7 @@ extension _HomePageWorkspace on HomeController {
             child: AIStatsPanel(
               stats: _currentAIStats,
               loading: _aiStatsLoading,
+              onShowLogs: _showLogViewer,
               onRefresh: () {
                 _applyState(() => _aiStatsLoading = true);
                 _workspaceModeActions.refreshAIStats();

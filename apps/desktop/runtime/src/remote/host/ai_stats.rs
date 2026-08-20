@@ -118,7 +118,11 @@ impl RemoteHostRuntime {
     /// A worktree-scoped index reports the worktree id, not the project id.
     pub(super) fn ai_stats_watcher_project_id(&self, scope_id: &str) -> String {
         let snapshot = ProjectStore::new(self.support_dir.clone()).snapshot();
-        if snapshot.projects.iter().any(|project| project.id == scope_id) {
+        if snapshot
+            .projects
+            .iter()
+            .any(|project| project.id == scope_id)
+        {
             return scope_id.to_string();
         }
         snapshot

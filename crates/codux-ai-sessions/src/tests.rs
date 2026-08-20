@@ -60,6 +60,38 @@ fn restore_command_uses_interactive_session_flags() {
 }
 
 #[test]
+fn remote_session_summary_includes_detailed_usage_metrics() {
+    let remote = codux_protocol::RemoteAISessionSummary::from(AISessionSummary {
+        id: "session-1".to_string(),
+        session_key: "session-1".to_string(),
+        external_session_id: None,
+        title: "Usage".to_string(),
+        source: "codex".to_string(),
+        project_name: None,
+        project_path: None,
+        last_model: Some("gpt-5".to_string()),
+        last_seen_at: 1.0,
+        input_tokens: 8,
+        output_tokens: 2,
+        total_tokens: 10,
+        cached_input_tokens: 2,
+        request_count: 3,
+        active_duration_seconds: 0,
+        usage_amounts: Vec::new(),
+    });
+
+    assert_eq!(remote.input_tokens, 8);
+    assert_eq!(remote.output_tokens, 2);
+    assert_eq!(remote.cached_input_tokens, 2);
+    assert_eq!(remote.request_count, 3);
+    let json = serde_json::to_value(remote).expect("serialize remote summary");
+    assert_eq!(json["inputTokens"], 8);
+    assert_eq!(json["outputTokens"], 2);
+    assert_eq!(json["cachedInputTokens"], 2);
+    assert_eq!(json["requestCount"], 3);
+}
+
+#[test]
 fn rename_and_remove_project_sessions_preserve_summary_totals() {
     let support_dir = temp_support_dir("rename-remove");
     create_test_history_db(&support_dir);

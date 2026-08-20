@@ -87,6 +87,7 @@ abstract final class RemoteMessageType {
   static final terminalOutput = codux_protocol_ffi.messageType(
     'terminalOutput',
   );
+  static const terminalStatus = 'terminal.status';
   static final terminalOutputAck = codux_protocol_ffi.messageType(
     'terminalOutputAck',
   );

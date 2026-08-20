@@ -591,6 +591,19 @@ class RemoteGitDiff {
       );
 }
 
+/// One usage amount attached to an AI conversation-history record.
+class AIUsageAmount {
+  const AIUsageAmount({required this.unit, required this.value});
+
+  final String unit;
+  final double value;
+
+  factory AIUsageAmount.fromJson(Map<String, dynamic> json) => AIUsageAmount(
+    unit: '${json['unit'] ?? ''}',
+    value: json['value'] is num ? (json['value'] as num).toDouble() : 0,
+  );
+}
+
 /// One AI conversation-history record from `ai.session` (op `list`). Mirrors the
 /// shared `RemoteAISessionSummary` DTO — same fields from any host.
 class AISessionRecord {
@@ -601,6 +614,11 @@ class AISessionRecord {
     required this.model,
     required this.time,
     required this.size,
+    this.inputTokens = 0,
+    this.outputTokens = 0,
+    this.cachedInputTokens = 0,
+    this.requestCount = 0,
+    this.usageAmounts = const [],
   });
 
   final String id;
@@ -609,15 +627,44 @@ class AISessionRecord {
   final String? model;
   final double time;
   final int size;
+  final int inputTokens;
+  final int outputTokens;
+  final int cachedInputTokens;
+  final int requestCount;
+  final List<AIUsageAmount> usageAmounts;
 
-  factory AISessionRecord.fromJson(Map<String, dynamic> json) => AISessionRecord(
-    id: '${json['id'] ?? ''}',
-    title: '${json['title'] ?? ''}',
-    tool: '${json['tool'] ?? ''}',
-    model: json['model']?.toString(),
-    time: (json['time'] is num) ? (json['time'] as num).toDouble() : 0,
-    size: (json['size'] is num) ? (json['size'] as num).toInt() : 0,
-  );
+  factory AISessionRecord.fromJson(Map<String, dynamic> json) {
+    final rawUsageAmounts = json['usageAmounts'] ?? json['usage_amounts'];
+    final usageAmounts = rawUsageAmounts is List
+        ? rawUsageAmounts
+              .whereType<Map>()
+              .map(
+                (item) =>
+                    AIUsageAmount.fromJson(Map<String, dynamic>.from(item)),
+              )
+              .where(
+                (amount) => amount.unit.trim().isNotEmpty && amount.value > 0,
+              )
+              .toList(growable: false)
+        : const <AIUsageAmount>[];
+    return AISessionRecord(
+      id: '${json['id'] ?? ''}',
+      title: '${json['title'] ?? ''}',
+      tool: '${json['tool'] ?? ''}',
+      model: json['model']?.toString(),
+      time: (json['time'] is num) ? (json['time'] as num).toDouble() : 0,
+      size: (json['size'] is num) ? (json['size'] as num).toInt() : 0,
+      inputTokens: _intValue(json['inputTokens'] ?? json['input_tokens']) ?? 0,
+      outputTokens:
+          _intValue(json['outputTokens'] ?? json['output_tokens']) ?? 0,
+      cachedInputTokens:
+          _intValue(json['cachedInputTokens'] ?? json['cached_input_tokens']) ??
+          0,
+      requestCount:
+          _intValue(json['requestCount'] ?? json['request_count']) ?? 0,
+      usageAmounts: usageAmounts,
+    );
+  }
 }
 
 /// One saved SSH profile from `ssh.list` — mirrors the shared

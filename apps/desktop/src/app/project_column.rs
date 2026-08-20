@@ -228,7 +228,10 @@ impl Render for ProjectColumnView {
     }
 }
 
-fn project_column_header(collapsed: bool, _cx: &mut Context<ProjectColumnView>) -> impl IntoElement {
+fn project_column_header(
+    collapsed: bool,
+    _cx: &mut Context<ProjectColumnView>,
+) -> impl IntoElement {
     let header_bg = theme::title_bar_fill();
     if collapsed {
         titlebar_drag_area(

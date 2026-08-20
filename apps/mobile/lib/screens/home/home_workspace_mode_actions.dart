@@ -58,11 +58,11 @@ class HomeWorkspaceModeActions {
   final RemoteProjectFileController projectFileController;
   final RemoteResourceSubscriptionCoordinator resourceSubscriptions;
 
-  void requestAIStats(String selectProjectMessage) {
+  bool requestAIStats(String selectProjectMessage) {
     final project = selectedProject;
     if (project == null) {
       showToast(selectProjectMessage);
-      return;
+      return false;
     }
     if (workspaceMode == WorkspaceMode.terminal) {
       releaseTerminalViewport();
@@ -73,36 +73,26 @@ class HomeWorkspaceModeActions {
       worktreeId: selectedWorktreeId,
       refresh: true,
     );
-    resourceSubscriptions.requestProject(
-      resource: RemoteResourceType.aiStats,
-      projectId: project.id,
-      fallback: fallback,
-      extraPayload: {
-        'worktreeId': selectedWorktreeId,
-        'projectPath': project.path,
-        'refresh': true,
-      },
-    );
+    final sent = sendEnvelope(fallback);
+    if (!sent) {
+      setModeState(WorkspaceMode.stats, aiStatsLoading: false);
+    }
+    return sent;
   }
 
-  void refreshAIStats() {
+  bool refreshAIStats() {
     final project = selectedProject;
-    if (!remoteProtocolReady || project == null) return;
+    if (project == null) return false;
     final fallback = projectController.aiStatsEnvelope(
       project,
       worktreeId: selectedWorktreeId,
       refresh: true,
     );
-    resourceSubscriptions.requestProject(
-      resource: RemoteResourceType.aiStats,
-      projectId: project.id,
-      fallback: fallback,
-      extraPayload: {
-        'worktreeId': selectedWorktreeId,
-        'projectPath': project.path,
-        'refresh': true,
-      },
-    );
+    final sent = sendEnvelope(fallback);
+    if (!sent) {
+      setModeState(workspaceMode, aiStatsLoading: false);
+    }
+    return sent;
   }
 
   void requestGitStatus() {

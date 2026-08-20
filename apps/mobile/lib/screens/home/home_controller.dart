@@ -62,6 +62,7 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
   final Set<String> _viewportOwnerRefreshAfterBaseline = {};
   final Map<String, int> _terminalOutputAckSeqBySession = {};
   final Map<String, DateTime> _terminalOutputAckAtBySession = {};
+  final Set<String> _waitingNotificationTerminals = {};
 
   /// At most one host viewport request is in flight per session. A fast drag
   /// updates the pending target and the next request is sent when the current
@@ -99,16 +100,20 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
   String? _pairingError;
   bool _showTerminal = false;
   bool _showTerminalSwitcher = false;
+  TerminalSwitcherSection _terminalSwitcherSection =
+      TerminalSwitcherSection.terminals;
   bool _terminalReady = false;
   bool _terminalViewportInteractive = false;
   // Handoff: true when the desktop (or another device) owns this session. The
   // phone stays passive until the on-screen "Take over here" action forces it.
   bool _remoteHandedAway = false;
   String _terminalViewportOwner = '';
+  String? _pendingTerminalViewportTakeOverSessionId;
+  Timer? _terminalViewportTakeOverTimer;
+  bool _terminalViewportTakeOverReconnectAttempted = false;
   bool _isHeadlessAgentHost = false;
   // Host-configured AI shortcut for the terminal tool menu; empty until the
   // host advertises one in host.info.
-  MobileAiToolCapability _mobileAiTool = MobileAiToolCapability.fallback;
   // The last automatic claim, used to collapse bind/focus/first-layout triggers
   // for the same session into one request window.
   DateTime? _lastViewportClaimAt;
@@ -128,6 +133,10 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
       !_showProjectForm &&
       !_showFilePicker &&
       _workspaceMode == WorkspaceMode.terminal;
+
+  bool get _terminalViewportTakeOverPending =>
+      _pendingTerminalViewportTakeOverSessionId != null &&
+      _pendingTerminalViewportTakeOverSessionId == _sessionId;
 
   bool get _terminalDataVisible =>
       _showTerminal && _workspaceMode == WorkspaceMode.terminal;
@@ -190,6 +199,7 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _terminalListRetryTimer;
   final Map<String, Timer> _projectSelectAckTimers = {};
   Timer? _hostResponseTimer;
+  bool _transportHealthProbeActive = false;
   int get _projectListRetryAttempt => _remoteSync.projectListRetryAttempt;
   int get _terminalListRetryAttempt => _remoteSync.terminalListRetryAttempt;
   double? _edgeBackDragStartX;
@@ -277,7 +287,7 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
       };
     }
     if (_isRecoveringConnection) return _t('status.retry');
-    if (_transportConnected || _backgroundConnect) {
+    if (_connectInFlight || _transportConnected || _backgroundConnect) {
       return _t('status.connecting');
     }
     if (_status == _t('pair.repairRequired') ||
@@ -383,7 +393,7 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
     // the terminal is actually on screen. Claims for the current owner are
     // idempotent renewals on the host.
     _viewportLeaseKeepalive = Timer.periodic(const Duration(seconds: 8), (_) {
-      if (!mounted || !_appInForeground) return;
+      if (!mounted || (!_appInForeground && !_isHeadlessAgentHost)) return;
       if (_workspaceMode != WorkspaceMode.terminal || !_hasShownTerminal) {
         return;
       }
@@ -464,6 +474,7 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      unawaited(AndroidConnectionKeeper.prepareNotifications());
       _startNetworkRouteRefresh();
       unawaited(_bootstrap());
     });
@@ -475,6 +486,7 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
       _notifyHostBeforeTransportClose();
     }
     _viewportLeaseKeepalive?.cancel();
+    _terminalViewportTakeOverTimer?.cancel();
     _terminalBaselineRearmTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _disposing = true;
@@ -514,6 +526,8 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     CoduxLog.info('[codux-flutter-lifecycle] state=${state.name}');
     if (state == AppLifecycleState.resumed) {
+      unawaited(AndroidConnectionKeeper.stop());
+      unawaited(AndroidConnectionKeeper.prepareNotifications());
       _appInForeground = true;
       _appSuspended = false;
       final device = _activeDevice;
@@ -539,6 +553,7 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     if (state == AppLifecycleState.detached) {
+      unawaited(AndroidConnectionKeeper.stop());
       _appInForeground = false;
       _appSuspended = true;
       _disconnectTransport(
@@ -557,14 +572,23 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       _appInForeground = false;
-      _appSuspended = true;
-      _pauseLatencyProbe();
+      // Android runs a foreground keeper below, so timers, transport
+      // heartbeats and reconnects remain active while the screen is off.
+      // Other platforms retain their native suspended lifecycle behaviour.
+      _appSuspended = !Platform.isAndroid;
       // Hand the viewport straight back: the host flips the owner to the
       // desktop and broadcasts, so the desktop restores its own dimensions
       // immediately instead of waiting for the lease to expire.
       if (_transportConnected) {
-        _releaseTerminalViewport();
+        unawaited(AndroidConnectionKeeper.start());
+        // A headless agent has no desktop viewport to hand back to. Releasing
+        // here created a phantom "desktop" owner and forced the phone through
+        // a takeover flow on every foreground resume.
+        if (!_isHeadlessAgentHost) {
+          _releaseTerminalViewport();
+        }
       }
+      _notifyWaitingTerminalsInBackground();
       CoduxLog.info(
         '[codux-flutter-lifecycle] background keep transport state=${state.name}',
       );
@@ -651,6 +675,10 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
       focusTerminalViewSoon: _focusTerminalViewSoon,
       onSessionStateChanged: (previous, reason) {
         if (previous.sessionId == _sessionId) return;
+        _terminalViewportTakeOverTimer?.cancel();
+        _terminalViewportTakeOverTimer = null;
+        _pendingTerminalViewportTakeOverSessionId = null;
+        _terminalViewportTakeOverReconnectAttempted = false;
         _terminalViewportInteractive = false;
         _remoteHandedAway = false;
         _terminalViewportOwner = '';

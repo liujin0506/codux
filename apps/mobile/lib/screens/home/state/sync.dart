@@ -375,22 +375,30 @@ extension _HomePageSync on HomeController {
       closingTerminal = projectTerminals.first;
       closingSessionId = closingTerminal.id;
     }
-    final shouldCreateReplacement = projectTerminals.length > 1;
-    final canCloseCurrent = projectTerminals.length > 1;
-    if (closingSessionId != null && canCloseCurrent) {
-      final plan = _remoteRuntime.removeTerminal(closingSessionId);
+    // Rebuilding is allowed to close the last terminal. The normal close
+    // action deliberately keeps one terminal alive, but that guard would make
+    // this action a no-op for the common single-terminal project:
+    // `_clearTerminal` only clears the local selection and does not affect the
+    // host PTY.
+    final sessionIdToRebuild = closingSessionId;
+    final hasTerminalToRebuild = sessionIdToRebuild != null;
+    if (sessionIdToRebuild != null) {
+      final plan = _remoteRuntime.removeTerminal(sessionIdToRebuild);
       _applyRuntimePlan(plan, reason: 'rebuild-terminal');
       _sendTerminalEnvelope(
         RelayEnvelope(
           type: RemoteMessageType.terminalClose,
-          sessionId: closingSessionId,
+          sessionId: sessionIdToRebuild,
         ),
         terminal: closingTerminal,
       );
     } else {
       _clearTerminal();
     }
-    if (shouldCreateReplacement) {
+    // Send create after close so the host processes the replacement in order.
+    // If the project has no usable terminal at all, this also makes the menu
+    // action useful as a recovery action.
+    if (hasTerminalToRebuild || projectTerminals.isEmpty) {
       _createTerminal(projectId);
     }
     _showToast(_t('terminal.rebuilding'));

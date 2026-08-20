@@ -1,7 +1,7 @@
 part of '../home_page.dart';
 
 /// UI-triggered actions: device management, project selection, clipboard
-/// + upload + voice, update/about, log viewer and edge-back navigation.
+/// + upload, update/about, log viewer and edge-back navigation.
 ///
 /// Split into a part + extension to keep the State class navigable; behaviour
 /// is unchanged. Rebuilds route through [_CoduxHomePageState._applyState]
@@ -179,15 +179,22 @@ extension _HomePageActions on HomeController {
     );
   }
 
+  Future<void> _copyAndPasteTerminalSelection() async {
+    final prefs = AppPreferences.of(context);
+    final text = _terminalSelectedText;
+    if (text?.trim().isNotEmpty != true) {
+      _showSnack(prefs.t('toolbar.copyEmpty'));
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: text!));
+    _insertTerminalText(text);
+    _showSnack(prefs.t('toolbar.copyPasteDone'));
+  }
+
   String _visibleTerminalText() {
     final sessionId = _sessionId;
     if (sessionId == null) return '';
     return _terminalOutputController.cachedOutput(sessionId)?.trimRight() ?? '';
-  }
-
-  Future<void> _startVoiceInput() async {
-    if (_showVoiceOverlay) return;
-    _applyState(() => _showVoiceOverlay = true);
   }
 
   Future<void> _chooseUploadForTerminal() async {
@@ -216,6 +223,16 @@ extension _HomePageActions on HomeController {
     CoduxLog.info('[codux-flutter-upload] source selected source=$source');
     if (source == null || !mounted) return;
     await _uploadPickedFileToTerminal(source);
+  }
+
+  Future<void> _chooseUploadAndPastePathForTerminal() async {
+    if (_terminalUploadLoading) return;
+    if (!_canUploadOverCurrentPath) {
+      _showSnack(_t('upload.directRequired'));
+      _applyState(() => _status = _t('upload.directRequired'));
+      return;
+    }
+    await _uploadPickedFileToTerminal(TerminalUploadSource.file);
   }
 
   Future<void> _uploadPickedFileToTerminal(TerminalUploadSource source) async {

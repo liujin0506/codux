@@ -802,14 +802,8 @@ fn project_badge_text_uses_first_character() {
         project_badge_text_from_name("wx-pay-api"),
         Some("W".to_string())
     );
-    assert_eq!(
-        project_badge_text_from_name("codux"),
-        Some("C".to_string())
-    );
-    assert_eq!(
-        project_badge_text_from_name("项目"),
-        Some("项".to_string())
-    );
+    assert_eq!(project_badge_text_from_name("codux"), Some("C".to_string()));
+    assert_eq!(project_badge_text_from_name("项目"), Some("项".to_string()));
     assert_eq!(
         project_badge_text_from_name("用户中心"),
         Some("用".to_string())

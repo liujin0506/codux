@@ -127,6 +127,8 @@ impl AgentPairingState {
     fn publish(
         &self,
         candidate: &(String, String),
+        host_id: &str,
+        host_name: &str,
         relay_authentication: &str,
     ) -> Result<String, String> {
         let credential = self
@@ -138,6 +140,8 @@ impl AgentPairingState {
             &credential,
             &candidate.0,
             &candidate.1,
+            host_id,
+            host_name,
             relay_authentication,
         ))
     }
@@ -169,8 +173,14 @@ impl AgentPairingState {
             .ok()
             .and_then(|candidate| candidate.clone());
         if let Some(candidate) = candidate.as_ref() {
-            let ticket =
-                pairing_ticket_url(&next, &candidate.0, &candidate.1, relay_authentication);
+            let ticket = pairing_ticket_url(
+                &next,
+                &candidate.0,
+                &candidate.1,
+                host_id,
+                name,
+                relay_authentication,
+            );
             crate::runstate::write_ticket_at(&self.ticket_path, &ticket)?;
         }
         let devices = crate::device_store::record_at(
@@ -1004,11 +1014,19 @@ fn make_handler(
                     .get("projectId")
                     .and_then(Value::as_str)
                     .unwrap_or("");
+                eprintln!(
+                    "[ai.stats] request project_id={project_id} worktree_id={} refresh={}",
+                    payload
+                        .get("worktreeId")
+                        .and_then(Value::as_str)
+                        .unwrap_or(""),
+                    payload
+                        .get("refresh")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false),
+                );
                 let store = AgentProjectStore::new();
-                let project = store
-                    .list()
-                    .into_iter()
-                    .find(|item| item.id == project_id);
+                let project = store.list().into_iter().find(|item| item.id == project_id);
                 match project {
                     Some(project) => {
                         let current_session_scope_id = payload
@@ -1084,6 +1102,18 @@ fn make_handler(
             }
             REMOTE_AI_SESSION => {
                 // The host runs the codux-ai-sessions engine against its own history.
+                eprintln!(
+                    "[ai.session] request op={} project_id={} worktree_id={}",
+                    payload.get("op").and_then(Value::as_str).unwrap_or(""),
+                    payload
+                        .get("projectId")
+                        .and_then(Value::as_str)
+                        .unwrap_or(""),
+                    payload
+                        .get("worktreeId")
+                        .and_then(Value::as_str)
+                        .unwrap_or(""),
+                );
                 if payload.get("op").and_then(Value::as_str) == Some("list") {
                     let project_id = payload
                         .get("projectId")
@@ -1335,6 +1365,24 @@ async fn connect_serving_host(
     let ai_stats_watchers: AIStatsWatchers = Arc::new(Mutex::new(HashMap::new()));
     let ai_session_watchers: AISessionWatchers = Arc::new(Mutex::new(HashMap::new()));
     let indexer = crate::ai_stats::open_indexer();
+    for project in AgentProjectStore::new().list() {
+        let request = crate::ai_stats::ai_history_request_for_scope(
+            &project.id,
+            &project.name,
+            &project.path,
+            &project.id,
+        );
+        match indexer.refresh_project(request) {
+            Ok(()) => eprintln!(
+                "[ai.index] queued project_id={} path={}",
+                project.id, project.path
+            ),
+            Err(error) => eprintln!(
+                "[ai.index] queue failed project_id={} path={} error={error}",
+                project.id, project.path
+            ),
+        }
+    }
     // For a custom relay the iroh relay URL must be set explicitly; for presets
     // the transport resolves it from `relay_preset`.
     let iroh_relay_url = if cfg.relay_preset == "custom" {
@@ -1476,6 +1524,12 @@ fn spawn_ai_stats_poller(
                     && !state.is_loading
                     && !state.queued
                 {
+                    eprintln!(
+                        "[ai.index] completed project_id={} path={} error={}",
+                        state.project_id,
+                        state.project_path,
+                        state.error.as_deref().unwrap_or("none"),
+                    );
                     // A worktree-scoped index reports the worktree id; map it
                     // back to the project the watchers are keyed under.
                     let project_id =
@@ -1487,12 +1541,7 @@ fn spawn_ai_stats_poller(
                         &watchers,
                         &project_id,
                     );
-                    push_ai_sessions_for_project(
-                        &slot,
-                        &indexer,
-                        &session_watchers,
-                        &project_id,
-                    );
+                    push_ai_sessions_for_project(&slot, &indexer, &session_watchers, &project_id);
                 }
             }
             let projects = AgentProjectStore::new().list();
@@ -1515,11 +1564,9 @@ fn spawn_ai_stats_poller(
                 });
             }
             last.retain(|scope_key, _| {
-                snapshot.values().any(|devices| {
-                    devices
-                        .values()
-                        .any(|scope_id| scope_key == scope_id)
-                })
+                snapshot
+                    .values()
+                    .any(|devices| devices.values().any(|scope_id| scope_key == scope_id))
             });
             if snapshot.is_empty() {
                 continue;
@@ -1633,8 +1680,12 @@ pub async fn run_host(cfg: AgentHostConfig) -> Result<(), String> {
         // ticket) so it stays small and phone-scannable — matching the desktop
         // host's format. The controller dials from nodeId + relayUrl and the full
         // ticket is exchanged after it connects.
-        let pairing =
-            pairing.publish(&(node_id.clone(), relay.clone()), &cfg.relay_authentication)?;
+        let pairing = pairing.publish(
+            &(node_id.clone(), relay.clone()),
+            &cfg.host_id,
+            &cfg.name,
+            &cfg.relay_authentication,
+        )?;
         println!("  pair:   run `codux link` or `codux qrcode`");
         if verbose_startup_output() {
             println!("pairingTicket={pairing}");
@@ -1673,20 +1724,22 @@ fn verbose_startup_output() -> bool {
 }
 
 /// Build the `codux://pair?payload=<base64url>` pairing URL the desktop
-/// controller pastes / the phone scans. Carries the minimum needed to dial —
-/// nodeId + relayUrl (+ relay auth) — NOT the bulky iroh endpoint ticket, so the
-/// QR stays small and scannable (the ticket ~doubles QR density). The random
-/// pairing credential is single-use and rotates after confirmation.
+/// controller pastes / the phone scans. Carries the minimum needed to dial plus
+/// the agent identity used by the scan preview. It omits the bulky iroh endpoint
+/// ticket so the QR stays small and scannable (the ticket ~doubles QR density).
+/// The random pairing credential is single-use and rotates after confirmation.
 fn pairing_ticket_url(
     credential: &AgentPairingCredential,
     node_id: &str,
     relay_url: &str,
+    host_id: &str,
+    host_name: &str,
     relay_authentication: &str,
 ) -> String {
     use base64::Engine;
-    // Build the dial candidate and serialize it through the SHARED payload
-    // builder so the desktop and agent hosts emit byte-identical QR transports —
-    // the ticket-free shape (nodeId + relayUrl) is defined once in codux_protocol.
+    // Build the dial candidate and serialize its transport through the shared
+    // payload builder. The agent then adds its identity so the phone can show
+    // the real machine name before it confirms the connection.
     let candidate = codux_protocol::iroh_transport_candidate_with_ticket_and_authentication(
         relay_url,
         node_id,
@@ -1694,12 +1747,16 @@ fn pairing_ticket_url(
         "",
         relay_authentication,
     );
-    let payload = codux_protocol::pairing_payload(
+    let mut payload = codux_protocol::pairing_payload(
         &credential.code,
         &credential.secret,
         &credential.pairing_id,
         &[candidate],
     );
+    if let Some(payload) = payload.as_object_mut() {
+        payload.insert("hostId".to_string(), json!(host_id));
+        payload.insert("hostName".to_string(), json!(host_name));
+    }
     let bytes = serde_json::to_vec(&payload).unwrap_or_default();
     let encoded = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes);
     format!("codux://pair?payload={encoded}")
@@ -2184,7 +2241,10 @@ mod tests {
 
         assert_eq!(
             watchers.lock().unwrap().get("project-1").cloned(),
-            Some(HashMap::from([("phone-b".to_string(), "project-1".to_string())]))
+            Some(HashMap::from([(
+                "phone-b".to_string(),
+                "project-1".to_string()
+            )]))
         );
         assert!(!watchers.lock().unwrap().contains_key("project-2"));
     }
@@ -2227,6 +2287,35 @@ mod tests {
             assert!(!locked["project-a"].contains_key("device-1"));
             assert_eq!(locked["project-b"]["device-1"], "project-b");
         }
+    }
+
+    #[test]
+    fn pairing_ticket_includes_agent_identity_for_scan_preview() {
+        use base64::Engine;
+
+        let ticket = pairing_ticket_url(
+            &AgentPairingCredential {
+                pairing_id: "pair-1".to_string(),
+                code: "123456".to_string(),
+                secret: "secret".to_string(),
+            },
+            "node-1",
+            "https://relay.example",
+            "host-1",
+            "Build Server",
+            "",
+        );
+        let encoded = ticket
+            .strip_prefix("codux://pair?payload=")
+            .expect("pairing URL");
+        let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(encoded)
+            .expect("base64 payload");
+        let payload: Value = serde_json::from_slice(&bytes).expect("JSON payload");
+        let parsed = codux_protocol::parse_pairing_payload(&payload).expect("valid payload");
+
+        assert_eq!(parsed.host_id.as_deref(), Some("host-1"));
+        assert_eq!(parsed.host_name.as_deref(), Some("Build Server"));
     }
 
     #[test]

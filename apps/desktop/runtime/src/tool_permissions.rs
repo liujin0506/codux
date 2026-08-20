@@ -165,10 +165,7 @@ impl ToolPermissionsService {
 
     pub fn synced_file_path(support_dir: PathBuf) -> Option<PathBuf> {
         let summary = Self::new(support_dir).sync();
-        summary
-            .error
-            .is_none()
-            .then(|| PathBuf::from(summary.path))
+        summary.error.is_none().then(|| PathBuf::from(summary.path))
     }
 
     pub fn sync(&self) -> ToolPermissionsSummary {
@@ -444,8 +441,10 @@ mod tests {
         let path = dir.join("tool-permissions.json");
         fs::write(&path, json!({"codexPath": "/opt/custom/codex"}).to_string()).unwrap();
         assert_eq!(
-            runtime_tools_payload(Some(&path))
-                .and_then(|value| value.get("codexPath").and_then(Value::as_str).map(str::to_string)),
+            runtime_tools_payload(Some(&path)).and_then(|value| value
+                .get("codexPath")
+                .and_then(Value::as_str)
+                .map(str::to_string)),
             Some("/opt/custom/codex".to_string())
         );
         fs::write(&path, "\"not-an-object\"").unwrap();

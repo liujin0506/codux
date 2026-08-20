@@ -147,6 +147,70 @@ void main() {
     await tester.pump();
     expect(opened, 1);
   });
+
+  testWidgets('initial sessions section opens history directly', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        _switcher(
+          terminals: const [],
+          activeTerminalId: null,
+          initialSection: TerminalSwitcherSection.sessions,
+          aiSessions: const [
+            AISessionRecord(
+              id: 'sess-long',
+              title:
+                  'A very long conversation title that should stay on one line',
+              tool: 'codex',
+              model: 'gpt-5',
+              time: 1755200000,
+              size: 12000,
+              inputTokens: 8000,
+              outputTokens: 2000,
+              cachedInputTokens: 2000,
+              requestCount: 3,
+              usageAmounts: [AIUsageAmount(unit: 'USD', value: 0.0192)],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    expect(
+      find.text('A very long conversation title that should stay on one line'),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        '12.0k · ↑ 8.0k · ↓ 2.0k · ⚡ 20% · 3 req · \$0.0192',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  test('session history parses detailed usage metrics', () {
+    final session = AISessionRecord.fromJson({
+      'id': 'sess-1',
+      'title': 'Usage',
+      'tool': 'codex',
+      'time': 1,
+      'size': 12,
+      'inputTokens': 8,
+      'outputTokens': 2,
+      'cachedInputTokens': 2,
+      'requestCount': 3,
+      'usageAmounts': [
+        {'unit': 'USD', 'value': 0.0192},
+      ],
+    });
+
+    expect(session.inputTokens, 8);
+    expect(session.outputTokens, 2);
+    expect(session.cachedInputTokens, 2);
+    expect(session.requestCount, 3);
+    expect(session.usageAmounts.single.unit, 'USD');
+  });
 }
 
 Widget _wrap(Widget child) {
@@ -169,6 +233,7 @@ TerminalSwitcherScreen _switcher({
     ProjectInfo(id: 'project-1', name: 'Project 1', path: '/tmp/p1'),
   ],
   List<AISessionRecord> aiSessions = const [],
+  TerminalSwitcherSection initialSection = TerminalSwitcherSection.terminals,
   VoidCallback? onOpenSessions,
   ValueChanged<AISessionRecord>? onOpenSession,
   ValueChanged<ProjectInfo>? onSelectProject,
@@ -203,6 +268,7 @@ TerminalSwitcherScreen _switcher({
     onRefreshTerminals: () {},
     aiSessions: aiSessions,
     onOpenSessions: onOpenSessions ?? () {},
+    initialSection: initialSection,
     onRefreshSessions: () {},
     onOpenSession: onOpenSession ?? (_) {},
     onRenameSession: (_) {},

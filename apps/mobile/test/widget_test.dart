@@ -15,6 +15,7 @@ import 'package:codux_flutter/services/remote_transport.dart';
 import 'package:codux_flutter/theme/app_theme.dart';
 import 'package:codux_flutter/widgets/components/device_home_screen.dart';
 import 'package:codux_flutter/widgets/components/terminal_switcher_screen.dart';
+import 'package:codux_flutter/widgets/components/toolbar.dart';
 import 'package:uuid/uuid.dart';
 
 void main() {
@@ -124,6 +125,58 @@ void main() {
 
     expect(find.text('全球网络'), findsOneWidget);
     expect(find.text('Iroh'), findsNothing);
+  });
+
+  testWidgets('device row shows a loading state while connecting', (
+    WidgetTester tester,
+  ) async {
+    final device = await _fakeDevice();
+    var connectTapped = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          body: AppPreferences(
+            accent: AccentChoices.cyan,
+            locale: LocaleChoices.zhCN,
+            themeMode: ThemeMode.dark,
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: DeviceHomeScreen(
+                devices: [device],
+                activeDeviceId: device.deviceId,
+                ready: false,
+                connecting: true,
+                status: '连接',
+                latencyMs: null,
+                deviceSubtitle: (_) => '全球网络',
+                topInset: 0,
+                bottomInset: 0,
+                onOpen: (_) {},
+                onConnect: (_) => connectTapped = true,
+                onAdd: () {},
+                onEdit: (_) {},
+                onDelete: (_) {},
+                onRefresh: () async {},
+                onSettings: () {},
+                onLogs: () {},
+                onCheckUpdate: () {},
+                onAbout: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('连接中'), findsOneWidget);
+
+    await tester.tap(find.text('Mac'));
+    await tester.pump();
+    expect(connectTapped, isFalse);
   });
 
   testWidgets('device row follows current direct endpoint', (
@@ -348,6 +401,7 @@ void main() {
       CoduxLog.clear();
       final sentTypes = <String>[];
       final sent = <Map<String, dynamic>>[];
+      var acknowledgeTakeOver = false;
       final device = await _fakeDevice();
       final fake = _FakeRemoteTransport(
         device: device,
@@ -408,7 +462,9 @@ void main() {
           }
           if (type == RemoteMessageType.terminalViewportClaim) {
             final payload = envelope['payload'];
-            if (payload is Map && payload['intent'] == 'force') {
+            if (acknowledgeTakeOver &&
+                payload is Map &&
+                payload['intent'] == 'force') {
               transport.emitEncrypted(
                 const RelayEnvelope(
                   type: 'terminal.viewport.state',
@@ -519,17 +575,37 @@ void main() {
           (envelope) =>
               envelope['type'] == RemoteMessageType.terminalViewportResize,
         ),
+        isEmpty,
+      );
+      expect(find.text('正在恢复终端…'), findsOneWidget);
+
+      // A backgrounded Android transport can remain logically "connected"
+      // while no frames reach the host. Missing the ownership acknowledgement
+      // must rebuild that transport and retry the force claim automatically.
+      acknowledgeTakeOver = true;
+      await tester.pump(const Duration(milliseconds: 2100));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(fake._connectCount, greaterThan(1));
+      expect(find.byKey(takeOverKey), findsNothing);
+      expect(
+        sent.where(
+          (envelope) =>
+              envelope['type'] == RemoteMessageType.terminalViewportResize,
+        ),
         isNotEmpty,
       );
 
-      // A lost transport must not leave the stale handoff placeholder in
-      // front of the reconnect UI. The placeholder's claim action cannot be
-      // delivered until the transport is back.
+      // A transient no-route report during a foreground/background or VPN
+      // handoff is probed in place instead of tearing down a healthy session.
+      final connectCountBeforePathChange = fake._connectCount;
       fake.emitState('path:path=none');
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       expect(find.byKey(takeOverKey), findsNothing);
-      expect(find.text('重连中'), findsOneWidget);
-      expect(find.text('立即重连'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('remote-terminal-body')),
+        findsOneWidget,
+      );
+      expect(fake._connectCount, connectCountBeforePathChange);
     },
   );
 
@@ -631,6 +707,120 @@ void main() {
       _lastTerminalBaselineSubscribePayload(sent, sessionId: terminalId),
       isNotNull,
     );
+  });
+
+  testWidgets('rebuild terminal replaces a single terminal', (
+    WidgetTester tester,
+  ) async {
+    final sent = <Map<String, dynamic>>[];
+    final device = await _fakeDevice();
+    final fake = _FakeRemoteTransport(
+      device: device,
+      onSent: (transport, envelope) {
+        sent.add(envelope);
+        final type = '${envelope['type'] ?? ''}';
+        if (type == 'host.info') {
+          transport.emitEncrypted(
+            const RelayEnvelope(
+              type: 'project.list',
+              payload: {
+                'selectedProjectId': 'project-1',
+                'projects': [
+                  {'id': 'project-1', 'name': 'Project 1', 'path': '/tmp/p1'},
+                ],
+              },
+            ),
+          );
+          transport.emitEncrypted(
+            const RelayEnvelope(
+              type: 'terminal.list',
+              payload: {
+                'terminals': [
+                  {
+                    'id': 'session-1',
+                    'title': 'Terminal',
+                    'projectId': 'project-1',
+                  },
+                ],
+              },
+            ),
+          );
+          transport.emitEncrypted(
+            RelayEnvelope(type: 'host.info', payload: _hostInfoPayload()),
+          );
+          return;
+        }
+        if (type == RemoteMessageType.terminalCreate) {
+          final payload = Map<String, dynamic>.from(envelope['payload'] as Map);
+          final terminalId = '${payload['terminalId'] ?? ''}';
+          transport.emitEncrypted(
+            RelayEnvelope(
+              type: RemoteMessageType.terminalCreated,
+              sessionId: terminalId,
+              payload: {
+                'id': terminalId,
+                'title': 'Terminal',
+                'projectId': 'project-1',
+              },
+            ),
+          );
+          return;
+        }
+        if (type == 'terminal.buffer' ||
+            _isTerminalBaselineSubscribe(envelope)) {
+          final sessionId = _isTerminalSubscribe(envelope)
+              ? _sessionIdForSubscribe(envelope, {'project-1': 'session-1'})
+              : '${envelope['sessionId'] ?? 'session-1'}';
+          transport.emitEncrypted(
+            RelayEnvelope(
+              type: 'terminal.output',
+              sessionId: sessionId,
+              payload: const {
+                'data': 'ready',
+                'buffer': true,
+                'offset': 0,
+                'bufferLength': 5,
+                'outputSeq': 1,
+              },
+            ),
+          );
+        }
+      },
+    );
+
+    await tester.pumpWidget(
+      CoduxFlutterApp(initialDevices: [device], transportFactory: (_) => fake),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mac'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    if (find.byKey(const ValueKey('remote-terminal-body')).evaluate().isEmpty) {
+      await tester.tap(find.text('Mac').first);
+      await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    }
+
+    await tester.tap(find.byIcon(Icons.apps_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Toolbar),
+        matching: find.byIcon(Icons.refresh_rounded),
+      ),
+    );
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+
+    final closeMessages = sent.where(
+      (envelope) => envelope['type'] == RemoteMessageType.terminalClose,
+    );
+    expect(closeMessages, hasLength(1));
+    expect(closeMessages.single['sessionId'], 'session-1');
+
+    final createPayload = _lastPayloadOf(
+      sent,
+      RemoteMessageType.terminalCreate,
+    );
+    expect(createPayload, isNotNull);
+    expect(createPayload?['terminalId'], isNot('session-1'));
   });
 
   testWidgets(
@@ -1519,7 +1709,10 @@ void main() {
         if (type == 'host.info') {
           emitLists(transport);
           transport.emitEncrypted(
-            RelayEnvelope(type: 'host.info', payload: _hostInfoPayload()),
+            RelayEnvelope(
+              type: 'host.info',
+              payload: _hostInfoPayload(app: 'codux-agent'),
+            ),
           );
           return;
         }
@@ -1547,6 +1740,24 @@ void main() {
               },
             ),
           );
+          return;
+        }
+        if (type == RemoteMessageType.terminalViewportClaim) {
+          final payload = envelope['payload'];
+          if (payload is Map && payload['intent'] == 'auto') {
+            transport.emitEncrypted(
+              const RelayEnvelope(
+                type: 'terminal.viewport.state',
+                sessionId: 'session-1',
+                payload: {
+                  'owner': 'remote:device-1',
+                  'cols': 80,
+                  'rows': 24,
+                  'generation': 1,
+                },
+              ),
+            );
+          }
         }
       },
     );
@@ -1567,6 +1778,24 @@ void main() {
     sent.clear();
 
     terminalBufferCharacters = 8;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    expect(
+      _sentTypes(sent),
+      isNot(contains(RemoteMessageType.terminalViewportRelease)),
+    );
+    await tester.pump(const Duration(milliseconds: 8100));
+    expect(
+      _lastPayloadOf(
+        sent,
+        RemoteMessageType.terminalViewportClaim,
+      )?['renewOnly'],
+      isTrue,
+    );
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
@@ -2136,15 +2365,16 @@ void main() {
   );
 
   testWidgets(
-    'none transport path keeps terminal page and shows reconnect hint',
+    'none transport path probes before rebuilding an unresponsive transport',
     (WidgetTester tester) async {
       final device = await _fakeDevice();
+      var respondToHostInfo = true;
       final fake = _FakeRemoteTransport(
         device: device,
         stallAfterInitialConnect: true,
         onSent: (transport, envelope) {
           final type = '${envelope['type'] ?? ''}';
-          if (type == 'host.info') {
+          if (type == 'host.info' && respondToHostInfo) {
             transport.emitEncrypted(
               const RelayEnvelope(
                 type: 'project.list',
@@ -2200,6 +2430,7 @@ void main() {
         findsOneWidget,
       );
 
+      respondToHostInfo = false;
       fake.emitState('path:path=none');
       await tester.pump();
 
@@ -2207,9 +2438,15 @@ void main() {
         find.byKey(const ValueKey('remote-terminal-body')),
         findsOneWidget,
       );
+      expect(fake._connectCount, 1);
+      expect(find.text('重连中'), findsNothing);
+
+      await tester.pump(const Duration(milliseconds: 4100));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(fake._connectCount, greaterThan(1));
       expect(find.text('重连中'), findsOneWidget);
       expect(find.text('立即重连'), findsOneWidget);
-      await tester.pump(const Duration(seconds: 1));
     },
   );
 
@@ -2570,7 +2807,9 @@ void main() {
       CoduxFlutterApp(initialDevices: [device], transportFactory: (_) => fake),
     );
     await tester.pump(const Duration(milliseconds: 200));
-    await tester.pumpAndSettle();
+    // The connection intentionally remains in flight until the unauthorized
+    // response below, so the device-row loading indicator never settles.
+    await tester.pump(const Duration(milliseconds: 100));
     expect(CoduxLog.snapshotText(), contains('request host.info'));
 
     fake.emit(
@@ -2975,12 +3214,12 @@ Future<void> _openTerminalSwitcher(WidgetTester tester) async {
   if (_isTerminalSwitcherOpen()) {
     return;
   }
-  if (find.byIcon(Icons.unfold_more_rounded).evaluate().isEmpty &&
+  if (find.byIcon(Icons.grid_view_rounded).evaluate().isEmpty &&
       find.text('Mac').evaluate().isNotEmpty) {
     await tester.tap(find.text('Mac').first);
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
   }
-  final headerSwitcher = find.byIcon(Icons.unfold_more_rounded);
+  final headerSwitcher = find.byIcon(Icons.grid_view_rounded);
   if (headerSwitcher.evaluate().isNotEmpty) {
     await tester.tap(headerSwitcher);
     await tester.pumpAndSettle();
@@ -3035,9 +3274,11 @@ Future<void> _tapProjectTab(
 
 Map<String, Object?> _hostInfoPayload({
   String runtimeInstanceId = 'runtime-1',
+  String? app,
 }) => {
   'protocolVersion': remoteProtocolVersion,
   'runtimeInstanceId': runtimeInstanceId,
+  'app': ?app,
   'capabilities': {
     'terminalBuffer': {
       'chunking': true,

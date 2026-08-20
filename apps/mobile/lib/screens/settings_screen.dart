@@ -229,11 +229,7 @@ void _showLogLevelPicker(
                       ),
                     ),
                   ),
-                  Divider(
-                    color: AppColors.border,
-                    height: 0.5,
-                    thickness: 0.5,
-                  ),
+                  Divider(color: AppColors.border, height: 0.5, thickness: 0.5),
                   for (final level in _logLevels) ...[
                     InkWell(
                       onTap: () {
@@ -349,11 +345,7 @@ void _showLocalePicker(
                       ),
                     ),
                   ),
-                  Divider(
-                    color: AppColors.border,
-                    height: 0.5,
-                    thickness: 0.5,
-                  ),
+                  Divider(color: AppColors.border, height: 0.5, thickness: 0.5),
                   SizedBox(
                     height: (LocaleChoices.all.length * 56.0).clamp(
                       0.0,
@@ -452,42 +444,36 @@ class _LargeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    height: AppLayout.topBarHeight + topInset,
+    height: 48 + topInset,
     padding: EdgeInsets.only(top: topInset),
-    decoration: BoxDecoration(
-      color: AppColors.bgBase,
-      border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
-    ),
-    child: Stack(
-      alignment: Alignment.center,
+    color: AppColors.bgBase,
+    child: Row(
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Padding(
-            padding: const EdgeInsets.only(left: AppSpacing.s),
-            child: IconButton(
-              onPressed: onBack,
-              icon: Icon(
-                Icons.chevron_left,
-                color: AppColors.textPrimary,
-                size: 28,
-              ),
-              visualDensity: VisualDensity.compact,
+        SizedBox(
+          width: 44,
+          height: 44,
+          child: IconButton(
+            onPressed: onBack,
+            icon: Icon(
+              Icons.arrow_back_ios_new,
+              color: AppColors.textPrimary,
+              size: 18,
             ),
           ),
         ),
-        Center(
+        Expanded(
           child: Text(
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: AppColors.textPrimary,
-              fontSize: AppTextSize.title,
+              fontSize: 15,
               fontWeight: FontWeight.w700,
             ),
           ),
         ),
+        const SizedBox(width: AppSpacing.s),
       ],
     ),
   );
@@ -600,11 +586,7 @@ class _ActionTile extends StatelessWidget {
               style: TextStyle(color: accent, fontSize: AppTextSize.body),
             ),
           ),
-          Icon(
-            Icons.chevron_right,
-            size: 18,
-            color: AppColors.textSubtle,
-          ),
+          Icon(Icons.chevron_right, size: 18, color: AppColors.textSubtle),
         ],
       ),
     ),
@@ -647,11 +629,7 @@ class _PickerTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.xs),
-          Icon(
-            Icons.chevron_right,
-            size: 18,
-            color: AppColors.textSubtle,
-          ),
+          Icon(Icons.chevron_right, size: 18, color: AppColors.textSubtle),
         ],
       ),
     ),
@@ -832,8 +810,16 @@ class _ThemeModeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final prefs = AppPreferences.of(context);
     final options = <(ThemeMode, IconData, String)>[
-      (ThemeMode.system, Icons.brightness_auto_rounded, prefs.t('settings.themeSystem')),
-      (ThemeMode.light, Icons.light_mode_rounded, prefs.t('settings.themeLight')),
+      (
+        ThemeMode.system,
+        Icons.brightness_auto_rounded,
+        prefs.t('settings.themeSystem'),
+      ),
+      (
+        ThemeMode.light,
+        Icons.light_mode_rounded,
+        prefs.t('settings.themeLight'),
+      ),
       (ThemeMode.dark, Icons.dark_mode_rounded, prefs.t('settings.themeDark')),
     ];
     return Padding(

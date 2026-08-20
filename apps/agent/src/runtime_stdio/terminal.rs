@@ -36,10 +36,7 @@ impl RuntimeStdioTerminals {
     }
 
     pub(super) fn create(&self, params: &Value) -> Result<Value, String> {
-        crate::tool_permissions::write_runtime_tools(
-            &self.data_dir,
-            params.get("runtimeTools"),
-        )?;
+        crate::tool_permissions::write_runtime_tools(&self.data_dir, params.get("runtimeTools"))?;
         let config = serde_json::from_value::<TerminalPtyConfig>(params.clone())
             .map_err(|error| format!("invalid terminal config: {error}"))?;
         let terminal = self.create_config(config)?;

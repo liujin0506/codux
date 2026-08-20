@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:codux_protocol_ffi/codux_protocol_ffi.dart';
@@ -39,6 +40,9 @@ final List<String> _terminalGlyphFallback = Platform.isIOS
         'Noto Color Emoji',
       ];
 
+final _terminalUrlPattern = RegExp(r'''https?://[^\s<>"'`]+''');
+const _terminalUrlTrailingPunctuation = '.,;:!?)]}';
+
 /// Self-drawn terminal that renders the shared Rust core's cell grid directly.
 /// The Rust `HeadlessTerminalScreen` is the single source of truth — the same
 /// snapshot the GPUI desktop draws from — so there is no second VT parser, no
@@ -55,7 +59,9 @@ class SelfDrawnTerminalView extends StatefulWidget {
     this.onSendKey,
     this.onCursorMetrics,
     this.onSelectionChanged,
+    this.selectionToolbar,
     this.onRequestKeyboard,
+    this.onOpenUrl,
     this.onRemoteViewportScroll,
     this.keyboardRequested = false,
     this.keyboardRequestSerial = 0,
@@ -80,8 +86,17 @@ class SelfDrawnTerminalView extends StatefulWidget {
   /// Selected text (null when the selection is cleared), for the copy action.
   final ValueChanged<String?>? onSelectionChanged;
 
+  /// Optional contextual actions shown next to the selected terminal cells.
+  /// The view owns the placement so the actions follow the selection instead
+  /// of being pinned to a corner of the terminal pane.
+  final Widget? selectionToolbar;
+
   /// Called when the user taps the terminal body, to bring up the keyboard.
   final VoidCallback? onRequestKeyboard;
+
+  /// Called when a single tap lands on an HTTP(S) URL rendered in the terminal.
+  /// The owner decides how to hand the URL to the platform browser.
+  final ValueChanged<Uri>? onOpenUrl;
 
   /// Requests a host-rendered viewport when local scrollback is exhausted. The
   /// callback receives the gesture delta and measured cell height so the owner
@@ -806,6 +821,92 @@ class _SelfDrawnTerminalViewState extends State<SelfDrawnTerminalView>
     widget.onSelectionChanged?.call(null);
   }
 
+  /// Return the HTTP(S) URL under a terminal-cell coordinate, if any.
+  ///
+  /// The terminal is painted from a cell grid rather than Flutter text spans,
+  /// so URL hit testing has to use the same row/column geometry as the painter.
+  Uri? _urlAtLocalPosition(Offset local) {
+    final snapshot = _snapshot;
+    if (snapshot == null || _cellWidth <= 0 || _cellHeight <= 0) return null;
+
+    final position = _cellAt(local);
+    final row = _lfbToRow(position.lfb);
+    if (row < 0 || row >= snapshot.rows || position.col >= snapshot.cols) {
+      return null;
+    }
+
+    final cellsByColumn = <int, TerminalScreenCell>{};
+    for (final cell in snapshot.cells) {
+      if (cell.row == row && cell.col >= 0 && cell.col < snapshot.cols) {
+        cellsByColumn[cell.col] = cell;
+      }
+    }
+
+    // OSC 8 links can display arbitrary text (for example, "Open" or a file
+    // name), so check the terminal's hyperlink metadata before reconstructing
+    // a visible URL from the row text.
+    final linkedUri = _httpUri(cellsByColumn[position.col]?.link);
+    if (linkedUri != null) return linkedUri;
+
+    // Keep a mapping from regex code-unit offsets back to terminal columns.
+    // URLs are ASCII, but the mapping also keeps a URL after a wide/CJK cell
+    // from being shifted by that cell's UTF-16 length.
+    final line = StringBuffer();
+    final codeUnitColumns = <int>[];
+    for (var col = 0; col < snapshot.cols; col++) {
+      final cell = cellsByColumn[col];
+      final text = cell == null || cell.hidden || cell.text.isEmpty
+          ? ' '
+          : cell.text;
+      final start = line.length;
+      line.write(text);
+      for (var index = start; index < line.length; index++) {
+        codeUnitColumns.add(col);
+      }
+    }
+
+    final text = line.toString();
+    for (final match in _terminalUrlPattern.allMatches(text)) {
+      var end = match.end;
+      while (end > match.start &&
+          _terminalUrlTrailingPunctuation.contains(text[end - 1])) {
+        end--;
+      }
+      if (end <= match.start || match.start >= codeUnitColumns.length) {
+        continue;
+      }
+      final startColumn = codeUnitColumns[match.start];
+      final endColumn = codeUnitColumns[end - 1] + 1;
+      if (position.col < startColumn || position.col >= endColumn) continue;
+
+      final uri = _httpUri(text.substring(match.start, end));
+      if (uri != null) {
+        return uri;
+      }
+    }
+    return null;
+  }
+
+  Uri? _httpUri(String? value) {
+    if (value == null || value.isEmpty) return null;
+    final uri = Uri.tryParse(value);
+    if (uri == null || uri.host.isEmpty) return null;
+    if (uri.scheme != 'http' && uri.scheme != 'https') return null;
+    return uri;
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    final uri = _urlAtLocalPosition(details.localPosition);
+    if (uri != null && widget.onOpenUrl != null) {
+      _clearSelection();
+      widget.onOpenUrl!(uri);
+      return;
+    }
+    _clearSelection();
+    _showKeyboard();
+    widget.onRequestKeyboard?.call();
+  }
+
   /// Normalize anchor/focus into (start, end) in reading order. Larger lfb is
   /// higher up the scrollback, so the start endpoint has the larger lfb.
   (({int lfb, int col}), ({int lfb, int col}))? _normalizedSelection() {
@@ -851,6 +952,43 @@ class _SelfDrawnTerminalViewState extends State<SelfDrawnTerminalView>
     final x = (endpoint.col + (end ? 1 : 0)) * _cellWidth;
     final y = (row + (end ? 1 : 0)) * _cellHeight + shift;
     return Offset(x, y);
+  }
+
+  Rect? _selectionBounds(Size size) {
+    final snapshot = _snapshot;
+    final selection = _normalizedSelection();
+    if (snapshot == null ||
+        selection == null ||
+        _cellWidth <= 0 ||
+        _cellHeight <= 0) {
+      return null;
+    }
+
+    final (start, end) = selection;
+    final startRow = _lfbToRow(start.lfb);
+    final endRow = _lfbToRow(end.lfb);
+    final firstRow = math.min(startRow, endRow);
+    final lastRow = math.max(startRow, endRow);
+    final shift = _scrollShift();
+    final rawTop = firstRow * _cellHeight + shift;
+    final rawBottom = (lastRow + 1) * _cellHeight + shift;
+    if (rawBottom <= 0 || rawTop >= size.height) return null;
+
+    final top = rawTop.clamp(0.0, size.height).toDouble();
+    final bottom = rawBottom.clamp(0.0, size.height).toDouble();
+    if (bottom <= top) return null;
+
+    final rawLeft = startRow == endRow
+        ? math.min(start.col, end.col) * _cellWidth
+        : 0.0;
+    final rawRight = startRow == endRow
+        ? (math.max(start.col, end.col) + 1) * _cellWidth
+        : size.width;
+    final left = rawLeft.clamp(0.0, size.width).toDouble();
+    final right = rawRight.clamp(0.0, size.width).toDouble();
+    if (right <= left) return null;
+
+    return Rect.fromLTRB(left, top, right, bottom);
   }
 
   Widget? _buildHandle({required bool isStart}) {
@@ -1025,62 +1163,123 @@ class _SelfDrawnTerminalViewState extends State<SelfDrawnTerminalView>
             showCursor: false,
             rendererIgnoresPointer: true,
           ),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            // Tapping clears any selection and raises the soft keyboard by
-            // focusing the hidden input. A connected hardware keyboard is then
-            // routed through the same field (Android keeps the soft IME hidden
-            // while it's attached), so CJK composition works and control keys
-            // are intercepted by the ancestor key handler.
-            onTap: () {
-              _clearSelection();
-              _showKeyboard();
-              widget.onRequestKeyboard?.call();
-            },
-            onVerticalDragStart: _onDragStart,
-            onVerticalDragUpdate: _onDragUpdate,
-            onVerticalDragEnd: _onDragEnd,
-            onLongPressStart: _onLongPressStart,
-            onLongPressMoveUpdate: _onLongPressMove,
-            onLongPressEnd: _onLongPressEnd,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                _syncGrid(constraints);
-                final selection = _normalizedSelection();
-                final selStart = selection == null
-                    ? null
-                    : (row: _lfbToRow(selection.$1.lfb), col: selection.$1.col);
-                final selEnd = selection == null
-                    ? null
-                    : (row: _lfbToRow(selection.$2.lfb), col: selection.$2.col);
-                return ColoredBox(
-                  color: AppColors.terminalBg,
-                  child: CustomPaint(
-                    size: Size(constraints.maxWidth, constraints.maxHeight),
-                    painter: _TerminalGridPainter(
-                      snapshot: _snapshot,
-                      cellWidth: _cellWidth,
-                      cellHeight: _cellHeight,
-                      glyphBaseline: _glyphBaseline,
-                      fontSize: widget.fontSize,
-                      fontFamily: _fontFamily,
-                      glyphCache: _glyphCache,
-                      selectionStart: selStart,
-                      selectionEnd: selEnd,
-                      focused: _focusNode.hasFocus,
-                      cursorBlinkOn: _cursorBlinkOn,
-                      bottomShift: _bottomWindowShift(),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              _syncGrid(constraints);
+              final size = Size(constraints.maxWidth, constraints.maxHeight);
+              final selection = _normalizedSelection();
+              final selectionBounds = _selectionBounds(size);
+              final selStart = selection == null
+                  ? null
+                  : (row: _lfbToRow(selection.$1.lfb), col: selection.$1.col);
+              final selEnd = selection == null
+                  ? null
+                  : (row: _lfbToRow(selection.$2.lfb), col: selection.$2.col);
+              final toolbarBounds =
+                  selectionBounds ??
+                  (widget.selectionToolbar == null
+                      ? null
+                      : Rect.fromCenter(
+                          center: Offset(size.width / 2, AppSpacing.l),
+                          width: 0,
+                          height: 0,
+                        ));
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    // Tapping clears any selection and raises the soft keyboard by
+                    // focusing the hidden input. A connected hardware keyboard is then
+                    // routed through the same field (Android keeps the soft IME hidden
+                    // while it's attached), so CJK composition works and control keys
+                    // are intercepted by the ancestor key handler.
+                    onTapUp: _onTapUp,
+                    onVerticalDragStart: _onDragStart,
+                    onVerticalDragUpdate: _onDragUpdate,
+                    onVerticalDragEnd: _onDragEnd,
+                    onLongPressStart: _onLongPressStart,
+                    onLongPressMoveUpdate: _onLongPressMove,
+                    onLongPressEnd: _onLongPressEnd,
+                    child: ColoredBox(
+                      color: AppColors.terminalBg,
+                      child: CustomPaint(
+                        size: size,
+                        painter: _TerminalGridPainter(
+                          snapshot: _snapshot,
+                          cellWidth: _cellWidth,
+                          cellHeight: _cellHeight,
+                          glyphBaseline: _glyphBaseline,
+                          fontSize: widget.fontSize,
+                          fontFamily: _fontFamily,
+                          glyphCache: _glyphCache,
+                          selectionStart: selStart,
+                          selectionEnd: selEnd,
+                          focused: _focusNode.hasFocus,
+                          cursorBlinkOn: _cursorBlinkOn,
+                          bottomShift: _bottomWindowShift(),
+                        ),
+                      ),
                     ),
                   ),
-                );
-              },
-            ),
+                  if (widget.selectionToolbar != null && toolbarBounds != null)
+                    CustomSingleChildLayout(
+                      delegate: _TerminalSelectionToolbarLayoutDelegate(
+                        selectionBounds: toolbarBounds,
+                        padding: AppSpacing.s,
+                      ),
+                      child: widget.selectionToolbar!,
+                    ),
+                ],
+              );
+            },
           ),
           ?startHandle,
           ?endHandle,
         ],
       ),
     );
+  }
+}
+
+class _TerminalSelectionToolbarLayoutDelegate
+    extends SingleChildLayoutDelegate {
+  _TerminalSelectionToolbarLayoutDelegate({
+    required this.selectionBounds,
+    required this.padding,
+  });
+
+  final Rect selectionBounds;
+  final double padding;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
+    return constraints.loosen();
+  }
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) {
+    final maxLeft = math.max(padding, size.width - childSize.width - padding);
+    final left = (selectionBounds.center.dx - childSize.width / 2)
+        .clamp(padding, maxLeft)
+        .toDouble();
+    final above = selectionBounds.top - childSize.height - padding;
+    final below = selectionBounds.bottom + padding;
+    final maxTop = math.max(padding, size.height - childSize.height - padding);
+    final top = above >= padding
+        ? above
+        : below + childSize.height <= size.height - padding
+        ? below
+        : maxTop;
+    return Offset(left, top.clamp(padding, maxTop).toDouble());
+  }
+
+  @override
+  bool shouldRelayout(
+    covariant _TerminalSelectionToolbarLayoutDelegate oldDelegate,
+  ) {
+    return oldDelegate.selectionBounds != selectionBounds ||
+        oldDelegate.padding != padding;
   }
 }
 

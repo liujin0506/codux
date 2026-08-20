@@ -1041,9 +1041,7 @@ fn terminal_compact_row(
         .flex()
         .items_center()
         .gap_2()
-        .when(terminal.active, |this| {
-            this.bg(task_column_highlight(0.07))
-        })
+        .when(terminal.active, |this| this.bg(task_column_highlight(0.07)))
         .cursor_pointer()
         .hover(|style| style.bg(task_column_highlight(0.07)))
         .on_click(move |_, window, cx| {
@@ -1212,9 +1210,7 @@ fn worktree_compact_row(
         .flex()
         .items_center()
         .gap_3()
-        .when(worktree.active, |this| {
-            this.bg(task_column_highlight(0.07))
-        })
+        .when(worktree.active, |this| this.bg(task_column_highlight(0.07)))
         .cursor_pointer()
         .hover(|style| style.bg(task_column_highlight(0.07)))
         .on_click(move |_, window, cx| {

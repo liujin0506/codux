@@ -304,6 +304,45 @@ mod tests {
     }
 
     #[test]
+    fn schema_13_upgrade_accepts_usage_bucket_without_active_duration() {
+        let root = std::env::temp_dir().join(format!("codux-ai-usage-store-{}", Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        let database_path = root.join("ai-usage.sqlite3");
+        let conn = Connection::open(&database_path).unwrap();
+        conn.execute_batch(
+            r#"
+            CREATE TABLE ai_history_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            INSERT INTO ai_history_meta VALUES ('normalized_history_schema_version', '13');
+            CREATE TABLE ai_history_file_usage_bucket (
+                source TEXT NOT NULL, file_path TEXT NOT NULL, project_path TEXT NOT NULL,
+                session_key TEXT NOT NULL, model TEXT NOT NULL, bucket_start REAL NOT NULL,
+                bucket_end REAL NOT NULL, input_tokens INTEGER NOT NULL,
+                output_tokens INTEGER NOT NULL, total_tokens INTEGER NOT NULL,
+                cached_input_tokens INTEGER NOT NULL, request_count INTEGER NOT NULL,
+                PRIMARY KEY (source, file_path, project_path, session_key, model, bucket_start)
+            );
+            INSERT INTO ai_history_file_usage_bucket VALUES
+                ('codex', 'session.jsonl', '/old/path', 'session', 'gpt-5',
+                 100, 200, 30, 12, 42, 0, 3);
+            "#,
+        )
+        .unwrap();
+        drop(conn);
+
+        let store = AIUsageStore::at_path(database_path);
+        let conn = store.connect().unwrap();
+        let event: (i64, i64) = conn
+            .query_row(
+                "SELECT request_count, active_duration_seconds FROM ai_history_file_usage_event WHERE request_count > 0",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(event, (3, 0));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn schema_13_upgrade_enriches_precise_events_from_buckets() {
         let root = std::env::temp_dir().join(format!("codux-ai-usage-store-{}", Uuid::new_v4()));
         fs::create_dir_all(&root).unwrap();

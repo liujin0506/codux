@@ -122,6 +122,10 @@ impl From<AISessionSummary> for codux_protocol::RemoteAISessionSummary {
             model: summary.last_model,
             time: summary.last_seen_at,
             size: summary.total_tokens,
+            input_tokens: summary.input_tokens,
+            output_tokens: summary.output_tokens,
+            cached_input_tokens: summary.cached_input_tokens,
+            request_count: summary.request_count,
             usage_amounts: summary
                 .usage_amounts
                 .into_iter()

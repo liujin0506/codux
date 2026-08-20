@@ -14,10 +14,7 @@ use crate::projects::{AgentProjectStore, agent_data_dir};
 pub fn ai_session_payload(indexer: &AIHistoryIndexer, payload: &Value) -> Result<Value, String> {
     let project_id = string_field(payload, "projectId");
     let store = AgentProjectStore::new();
-    let project = store
-        .list()
-        .into_iter()
-        .find(|item| item.id == project_id);
+    let project = store.list().into_iter().find(|item| item.id == project_id);
     let worktree_id = payload
         .get("worktreeId")
         .and_then(Value::as_str)

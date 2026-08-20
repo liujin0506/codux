@@ -98,7 +98,6 @@ extension _HomePageProtocol on HomeController {
             _resourceSubscriptionCoordinator.configure(
               RemoteResourceSubscriptionCapability.fromHostInfo(payload),
             );
-            _mobileAiTool = MobileAiToolCapability.fromHostInfo(payload);
             if (payload['name'] != null) {
               _updateDevice(
                 target.deviceId,
@@ -142,6 +141,8 @@ extension _HomePageProtocol on HomeController {
           _handleWorktreeUpdated(message);
         case final type when type == RemoteMessageType.terminalOutput:
           _handleTerminalOutput(message);
+        case final type when type == RemoteMessageType.terminalStatus:
+          _handleTerminalStatus(message);
         case final type when type == RemoteMessageType.error:
           _handleRemoteError(message);
         case final type when type == RemoteMessageType.fileList:
@@ -345,6 +346,7 @@ extension _HomePageProtocol on HomeController {
     }
     _applyRuntimePlan(plan, reason: 'missing-terminal');
     _createDefaultTerminalWhenMissing();
+    _resumePendingTerminalViewportTakeOver(reason: 'terminal-list');
   }
 
   void _handleTerminalCreated(RelayEnvelope message) {
@@ -355,6 +357,7 @@ extension _HomePageProtocol on HomeController {
     );
     final plan = _remoteRuntime.terminalCreated(terminal);
     _applyRuntimePlan(plan, reason: 'terminal-created');
+    _resumePendingTerminalViewportTakeOver(reason: 'terminal-created');
   }
 
   void _handleTerminalClosed(RelayEnvelope message) {

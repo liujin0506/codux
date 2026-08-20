@@ -56,6 +56,7 @@ class PadWorkspaceSidebar extends StatelessWidget {
   final ValueChanged<TerminalInfo> onSelectTerminal;
   final VoidCallback onCreateTerminal;
   final ValueChanged<TerminalInfo> onCloseTerminal;
+
   /// Force-refetch worktrees + sessions from the host (pull-to-refresh).
   final VoidCallback onRefresh;
 
@@ -425,7 +426,9 @@ class _HistorySessionRow extends StatelessWidget {
 
   Future<void> _openMenu(BuildContext context) async {
     final prefs = AppPreferences.of(context);
-    final title = session.title.trim().isNotEmpty ? session.title.trim() : session.id;
+    final title = session.title.trim().isNotEmpty
+        ? session.title.trim()
+        : session.id;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -495,75 +498,84 @@ class _HistorySessionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = session.title.trim().isNotEmpty ? session.title.trim() : session.id;
+    final title = session.title.trim().isNotEmpty
+        ? session.title.trim()
+        : session.id;
     final time = formatEpochSeconds(session.time);
     final tool = session.tool.trim();
+    final model = session.model?.trim() ?? '';
+    final metadata = [
+      if (tool.isNotEmpty) tool,
+      if (model.isNotEmpty) model,
+      if (time.isNotEmpty) time,
+    ].join(' · ');
+    final usage = formatSessionUsage(session);
     return InkWell(
       borderRadius: BorderRadius.circular(8),
       onTap: () => _openMenu(context),
       child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: PadColors.textPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              if (session.size > 0) ...[
-                const SizedBox(width: 8),
-                Text(
-                  formatTokenSize(session.size),
-                  style: TextStyle(
-                    color: PadColors.textSubtle,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          if (tool.isNotEmpty || time.isNotEmpty) ...[
-            const SizedBox(height: 3),
-            // Second line: tool on the left, time on the right (two-ends aligned).
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Row(
               children: [
                 Expanded(
                   child: Text(
-                    tool,
+                    title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: PadColors.textMuted,
-                      fontSize: 11,
+                      color: PadColors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-                if (time.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    time,
-                    style: TextStyle(
-                      color: PadColors.textSubtle,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
               ],
             ),
+            if (metadata.isNotEmpty || usage.isNotEmpty) ...[
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  if (metadata.isNotEmpty)
+                    Expanded(
+                      child: Text(
+                        metadata,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: PadColors.textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    )
+                  else
+                    const Spacer(),
+                  if (usage.isNotEmpty) ...[
+                  if (metadata.isNotEmpty) const SizedBox(width: 8),
+                  Flexible(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        usage,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          color: PadColors.textSubtle,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
           ],
-        ],
-      ),
+        ),
       ),
     );
   }

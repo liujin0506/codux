@@ -122,6 +122,7 @@ class RemoteProjectController {
       type: RemoteMessageType.aiStats,
       payload: {
         'projectId': project.id,
+        'projectPath': project.path,
         if (refresh) 'refresh': true,
         if (cleanWorktreeId != null && cleanWorktreeId.isNotEmpty)
           'worktreeId': cleanWorktreeId,

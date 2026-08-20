@@ -1,11 +1,7 @@
 use super::*;
 use crate::app::scroll_compat::ScrollableElement;
 use gpui::{Anchor, Rems};
-use gpui_component::{
-    Disableable, Sizable,
-    button::Button,
-    popover::Popover,
-};
+use gpui_component::{Disableable, Sizable, button::Button, popover::Popover};
 
 const CODUX_SELECT_TEXT_SIZE: Rems = Rems(0.875);
 const CODUX_SELECT_LINE_HEIGHT: Rems = Rems(1.125);
@@ -152,13 +148,7 @@ pub(in crate::app) fn codux_select(
                         } else {
                             cx.theme().transparent
                         })
-                        .hover(move |style| {
-                            if selected {
-                                style
-                            } else {
-                                style.bg(hover)
-                            }
-                        })
+                        .hover(move |style| if selected { style } else { style.bg(hover) })
                         .on_click(move |_, window, cx| {
                             cx.update_entity(&app_entity, |app, cx| {
                                 action(app, value.clone(), window, cx);
@@ -166,26 +156,15 @@ pub(in crate::app) fn codux_select(
                             });
                             popover.update(cx, |state, cx| state.dismiss(window, cx));
                         })
-                        .child(
-                            div()
-                                .w(px(12.0))
-                                .flex_shrink_0()
-                                .child(if selected {
-                                    Icon::new(HeroIconName::Check)
-                                        .size_3()
-                                        .text_color(accent_fg)
-                                        .into_any_element()
-                                } else {
-                                    div().into_any_element()
-                                }),
-                        )
-                        .child(
-                            div()
-                                .min_w_0()
-                                .flex_1()
-                                .truncate()
-                                .child(label),
-                        )
+                        .child(div().w(px(12.0)).flex_shrink_0().child(if selected {
+                            Icon::new(HeroIconName::Check)
+                                .size_3()
+                                .text_color(accent_fg)
+                                .into_any_element()
+                        } else {
+                            div().into_any_element()
+                        }))
+                        .child(div().min_w_0().flex_1().truncate().child(label))
                         .into_any_element()
                 }))
         })

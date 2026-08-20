@@ -71,31 +71,28 @@ impl TerminalFloatWindow {
 impl Render for TerminalFloatWindow {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         child_window_shell(self.title.clone(), cx).child(
-            div()
-                .flex_1()
-                .min_h_0()
-                .child(
-                    match self
-                        .restore
-                        .as_ref()
-                        .and_then(|restore| restore.slot.pane.as_ref())
-                    {
-                        Some(pane) => gpui::AnyView::from(pane.view.clone())
-                            .cached(gpui::StyleRefinement::default().flex().size_full())
-                            .into_any_element(),
-                        None => div()
-                            .size_full()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .bg(crate::theme::terminal_fill(color(
-                                crate::theme::BG_TERMINAL,
-                            )))
-                            .text_color(cx.theme().muted_foreground)
-                            .child("Terminal mounting...")
-                            .into_any_element(),
-                    },
-                ),
+            div().flex_1().min_h_0().child(
+                match self
+                    .restore
+                    .as_ref()
+                    .and_then(|restore| restore.slot.pane.as_ref())
+                {
+                    Some(pane) => gpui::AnyView::from(pane.view.clone())
+                        .cached(gpui::StyleRefinement::default().flex().size_full())
+                        .into_any_element(),
+                    None => div()
+                        .size_full()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .bg(crate::theme::terminal_fill(color(
+                            crate::theme::BG_TERMINAL,
+                        )))
+                        .text_color(cx.theme().muted_foreground)
+                        .child("Terminal mounting...")
+                        .into_any_element(),
+                },
+            ),
         )
     }
 }

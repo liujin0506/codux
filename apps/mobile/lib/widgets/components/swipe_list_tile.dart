@@ -21,6 +21,8 @@ class SwipeListTile extends StatefulWidget {
     super.key,
     required this.title,
     this.subtitle,
+    this.subtitleTrailing,
+    this.footer,
     this.leadingIcon,
     this.trailing,
     this.active = false,
@@ -31,6 +33,8 @@ class SwipeListTile extends StatefulWidget {
 
   final String title;
   final String? subtitle;
+  final Widget? subtitleTrailing;
+  final Widget? footer;
   final IconData? leadingIcon;
   final Widget? trailing;
   final bool active;
@@ -62,6 +66,8 @@ class _SwipeListTileState extends State<SwipeListTile> {
     final accent = Theme.of(context).colorScheme.secondary;
     final subtitle = widget.subtitle?.trim();
     final hasSubtitle = subtitle != null && subtitle.isNotEmpty;
+    final hasSubtitleTrailing = widget.subtitleTrailing != null;
+    final hasFooter = widget.footer != null;
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppRadius.md),
       child: SizedBox(
@@ -111,6 +117,15 @@ class _SwipeListTileState extends State<SwipeListTile> {
                     : (_) => _settle(),
                 child: Material(
                   color: AppColors.bgSurface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    side: BorderSide(
+                      color: widget.active
+                          ? accent.withValues(alpha: 0.42)
+                          : AppColors.border.withValues(alpha: 0.32),
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     onTap: widget.onTap,
                     child: Padding(
@@ -158,16 +173,42 @@ class _SwipeListTileState extends State<SwipeListTile> {
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                if (hasSubtitle) ...[
+                                if (hasSubtitle || hasSubtitleTrailing) ...[
                                   const SizedBox(height: 4),
-                                  Text(
-                                    subtitle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: AppColors.textSubtle,
-                                      fontSize: 11,
-                                    ),
+                                  Row(
+                                    children: [
+                                      if (hasSubtitle)
+                                        Expanded(
+                                          child: Text(
+                                            subtitle,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: AppColors.textSubtle,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        )
+                                      else
+                                        const Spacer(),
+                                      if (hasSubtitleTrailing) ...[
+                                        if (hasSubtitle)
+                                          const SizedBox(width: AppSpacing.s),
+                                        Flexible(
+                                          child: Align(
+                                            alignment: Alignment.centerRight,
+                                            child: widget.subtitleTrailing!,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ],
+                                if (hasFooter) ...[
+                                  const SizedBox(height: 4),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: widget.footer!,
                                   ),
                                 ],
                               ],

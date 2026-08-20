@@ -11,6 +11,7 @@ class DeviceHomeScreen extends StatelessWidget {
     required this.devices,
     required this.activeDeviceId,
     required this.ready,
+    this.connecting = false,
     required this.status,
     required this.latencyMs,
     required this.deviceSubtitle,
@@ -31,6 +32,7 @@ class DeviceHomeScreen extends StatelessWidget {
   final List<StoredDevice> devices;
   final String? activeDeviceId;
   final bool ready;
+  final bool connecting;
   final String status;
   final int? latencyMs;
   final String Function(StoredDevice device) deviceSubtitle;
@@ -155,11 +157,7 @@ class DeviceHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildList(
-    BuildContext context,
-    AppPreferences prefs,
-    Color accent,
-  ) {
+  Widget _buildList(BuildContext context, AppPreferences prefs, Color accent) {
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.zero,
@@ -169,6 +167,7 @@ class DeviceHomeScreen extends StatelessWidget {
         final device = devices[index];
         final isActive = device.deviceId == activeDeviceId;
         final isReady = isActive && ready;
+        final isConnecting = isActive && connecting && !isReady;
         final state = isActive ? status : prefs.t('app.notConnected');
         final title = device.hostName?.isNotEmpty == true
             ? device.hostName!
@@ -178,12 +177,21 @@ class DeviceHomeScreen extends StatelessWidget {
           subtitle: deviceSubtitle(device),
           leadingIcon: Icons.desktop_mac_outlined,
           active: isActive,
-          onTap: isReady ? () => onOpen(device) : () => onConnect(device),
+          onTap: isReady
+              ? () => onOpen(device)
+              : isConnecting
+              ? null
+              : () => onConnect(device),
           trailing: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _TransportText(active: isActive, ready: isReady, status: state),
+              _TransportText(
+                active: isActive,
+                ready: isReady,
+                connecting: isConnecting,
+                status: state,
+              ),
               const SizedBox(height: 7),
               _LatencyText(
                 latencyMs: isReady ? latencyMs : null,
@@ -210,11 +218,7 @@ class DeviceHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildGrid(
-    BuildContext context,
-    AppPreferences prefs,
-    Color accent,
-  ) {
+  Widget _buildGrid(BuildContext context, AppPreferences prefs, Color accent) {
     return GridView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.zero,
@@ -232,6 +236,7 @@ class DeviceHomeScreen extends StatelessWidget {
         final device = devices[index];
         final isActive = device.deviceId == activeDeviceId;
         final isReady = isActive && ready;
+        final isConnecting = isActive && connecting && !isReady;
         final state = isActive ? status : prefs.t('app.notConnected');
         final title = device.hostName?.isNotEmpty == true
             ? device.hostName!
@@ -241,10 +246,15 @@ class DeviceHomeScreen extends StatelessWidget {
           subtitle: deviceSubtitle(device),
           active: isActive,
           ready: isReady,
+          connecting: isConnecting,
           status: state,
           latencyMs: isReady ? latencyMs : null,
           accent: accent,
-          onTap: isReady ? () => onOpen(device) : () => onConnect(device),
+          onTap: isReady
+              ? () => onOpen(device)
+              : isConnecting
+              ? null
+              : () => onConnect(device),
           onEdit: () => onEdit(device),
           onDelete: () => onDelete(device),
         );
@@ -261,6 +271,7 @@ class _DeviceCard extends StatelessWidget {
     required this.subtitle,
     required this.active,
     required this.ready,
+    required this.connecting,
     required this.status,
     required this.latencyMs,
     required this.accent,
@@ -273,10 +284,11 @@ class _DeviceCard extends StatelessWidget {
   final String subtitle;
   final bool active;
   final bool ready;
+  final bool connecting;
   final String status;
   final int? latencyMs;
   final Color accent;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -326,9 +338,15 @@ class _DeviceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = active
-        ? (ready ? AppColors.success : AppColors.warning)
-        : AppColors.textSubtle;
+    final statusColor = !active
+        ? AppColors.textSubtle
+        : ready
+        ? AppColors.success
+        : connecting
+        ? AppColors.warning
+        : _isFailureStatus(context, status)
+        ? AppColors.danger
+        : AppColors.textMuted;
     // Borderless white cards; the active device is shown by its connected
     // status + latency, not a tinted background.
     return Material(
@@ -397,6 +415,7 @@ class _DeviceCard extends StatelessWidget {
                     child: _TransportText(
                       active: active,
                       ready: ready,
+                      connecting: connecting,
                       status: status,
                     ),
                   ),
@@ -560,32 +579,37 @@ class _TransportText extends StatelessWidget {
   const _TransportText({
     required this.active,
     required this.ready,
+    this.connecting = false,
     required this.status,
   });
   final bool active;
   final bool ready;
+  final bool connecting;
   final String status;
 
   @override
   Widget build(BuildContext context) {
-    final label = status;
     final prefs = AppPreferences.of(context);
+    final label = connecting ? prefs.t('app.connecting') : status;
     final relayLabel = prefs.t('connection.relay');
     final pending =
+        connecting ||
         status == prefs.t('app.connecting') ||
         status == prefs.t('app.syncing') ||
         status == prefs.t('app.reconnecting') ||
         status == prefs.t('app.reconnectingShort');
     final color = !active
-        ? AppColors.danger
+        ? AppColors.textMuted
         : pending
         ? AppColors.warning
-        : !ready
+        : ready
+        ? status == relayLabel || status.toLowerCase() == 'relay'
+              ? AppColors.cyan
+              : AppColors.success
+        : _isFailureStatus(context, status)
         ? AppColors.danger
-        : status == relayLabel || status.toLowerCase() == 'relay'
-        ? AppColors.cyan
-        : AppColors.success;
-    return Text(
+        : AppColors.textMuted;
+    final text = Text(
       label,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
@@ -596,7 +620,30 @@ class _TransportText extends StatelessWidget {
         fontWeight: FontWeight.w800,
       ),
     );
+    if (!connecting) return text;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 13,
+          height: 13,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.warning,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        text,
+      ],
+    );
   }
+}
+
+bool _isFailureStatus(BuildContext context, String status) {
+  final prefs = AppPreferences.of(context);
+  return status == prefs.t('app.connectError') ||
+      status == prefs.t('status.failed') ||
+      status == prefs.t('status.rejected');
 }
 
 class _LatencyText extends StatelessWidget {
@@ -606,8 +653,9 @@ class _LatencyText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = ready && latencyMs != null ? '${latencyMs}ms' : '-- ms';
-    final color = ready ? AppColors.textSubtle : AppColors.textMuted;
+    if (!ready || latencyMs == null) return const SizedBox.shrink();
+    final text = '${latencyMs}ms';
+    final color = AppColors.textSubtle;
     return Text(
       text,
       maxLines: 1,

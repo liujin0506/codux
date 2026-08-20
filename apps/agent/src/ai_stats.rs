@@ -89,8 +89,7 @@ pub fn ai_stats_payload(
     path: &str,
     current_session_scope_id: &str,
 ) -> Value {
-    let request =
-        ai_history_request_for_scope(project_id, name, path, current_session_scope_id);
+    let request = ai_history_request_for_scope(project_id, name, path, current_session_scope_id);
     let live_sessions = current_sessions.current_sessions(current_session_scope_id);
     match indexer.project_state(request) {
         Ok(state) => stats_payload_from_state(project_id, name, state, live_sessions),

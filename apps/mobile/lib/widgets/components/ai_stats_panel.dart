@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -21,6 +22,7 @@ class AIStatsPanel extends StatelessWidget {
     required this.stats,
     required this.loading,
     required this.onRefresh,
+    this.onShowLogs,
     this.title,
     this.contentPadding,
     this.cardBordered = false,
@@ -30,6 +32,7 @@ class AIStatsPanel extends StatelessWidget {
   final AIStatsInfo? stats;
   final bool loading;
   final VoidCallback onRefresh;
+  final VoidCallback? onShowLogs;
 
   /// When set (pad layout), the top metrics are wrapped in a card whose header
   /// is this title. When null (phone), the metrics render headerless as before.
@@ -90,7 +93,11 @@ class AIStatsPanel extends StatelessWidget {
     if (loading && stats == null) {
       return ColoredBox(
         color: colors.background,
-        child: Center(child: CircularProgressIndicator(color: accent)),
+        child: _StatsLoading(
+          accent: accent,
+          onRefresh: onRefresh,
+          onShowLogs: onShowLogs,
+        ),
       );
     }
     final data = stats;
@@ -113,6 +120,17 @@ class AIStatsPanel extends StatelessWidget {
                 AppSpacing.xxl,
               ),
           children: [
+            if (loading) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  minHeight: 2,
+                  color: accent,
+                  backgroundColor: colors.track,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.m),
+            ],
             if (data == null)
               _EmptyStats(
                 accent: accent,
@@ -121,6 +139,8 @@ class AIStatsPanel extends StatelessWidget {
                 colors: colors,
               )
             else ...[
+              _StatsContextCard(data: data, accent: accent, colors: colors),
+              const SizedBox(height: AppSpacing.m),
               _wrapWithHeader(
                 title: title,
                 bordered: cardBordered,
@@ -217,6 +237,189 @@ class AIStatsPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+class _StatsLoading extends StatefulWidget {
+  const _StatsLoading({
+    required this.accent,
+    required this.onRefresh,
+    required this.onShowLogs,
+  });
+
+  final Color accent;
+  final VoidCallback onRefresh;
+  final VoidCallback? onShowLogs;
+
+  @override
+  State<_StatsLoading> createState() => _StatsLoadingState();
+}
+
+class _StatsLoadingState extends State<_StatsLoading> {
+  Timer? _slowTimer;
+  bool _showRecoveryActions = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _slowTimer = Timer(const Duration(seconds: 7), () {
+      if (mounted) setState(() => _showRecoveryActions = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _slowTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = AppPreferences.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 26,
+              height: 26,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: widget.accent,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.l),
+            Text(
+              '${prefs.t('stats.aiTitle')} · ${prefs.t('app.syncing')}',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: AppTextSize.body,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s),
+            Text(
+              'Codex · Claude',
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: AppTextSize.small,
+              ),
+            ),
+            if (_showRecoveryActions) ...[
+              const SizedBox(height: AppSpacing.m),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: AppSpacing.s,
+                children: [
+                  TextButton.icon(
+                    onPressed: widget.onRefresh,
+                    icon: const Icon(Icons.refresh_rounded, size: 17),
+                    label: Text(prefs.t('app.refresh')),
+                  ),
+                  if (widget.onShowLogs != null)
+                    TextButton.icon(
+                      onPressed: widget.onShowLogs,
+                      icon: const Icon(Icons.receipt_long_outlined, size: 17),
+                      label: Text(prefs.t('app.debugLogs')),
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatsContextCard extends StatelessWidget {
+  const _StatsContextCard({
+    required this.data,
+    required this.accent,
+    required this.colors,
+  });
+
+  final AIStatsInfo data;
+  final Color accent;
+  final AIStatsPanelColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    final tools = <String>{
+      if (data.currentTool?.trim().isNotEmpty == true)
+        _formatToolName(data.currentTool!),
+      for (final session in data.currentSessions)
+        if (session.tool?.trim().isNotEmpty == true)
+          _formatToolName(session.tool!),
+      for (final item in data.toolBreakdown)
+        if (item.key.trim().isNotEmpty) _formatToolName(item.key),
+    };
+    final sourceLabel = tools.isEmpty ? 'Codex · Claude' : tools.join(' · ');
+    final updated = data.updatedAt?.trim();
+    return _PanelCard(
+      colors: colors,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.l,
+        vertical: AppSpacing.m,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: Icon(Icons.auto_awesome_rounded, size: 18, color: accent),
+          ),
+          const SizedBox(width: AppSpacing.m),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  data.projectName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: AppTextSize.body,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  sourceLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: AppTextSize.small,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (updated?.isNotEmpty == true)
+            Text(
+              _formatDate(updated!),
+              style: TextStyle(color: AppColors.textSubtle, fontSize: 11),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatToolName(String raw) {
+  final value = raw.trim();
+  final normalized = value.toLowerCase().replaceAll(RegExp(r'[_\s-]+'), '');
+  if (normalized.contains('claude')) return 'Claude';
+  if (normalized.contains('codex')) return 'Codex';
+  return value;
 }
 
 class _MetricTile extends StatelessWidget {
@@ -830,10 +1033,7 @@ class _CurrentSessionCard extends StatelessWidget {
                   model.isEmpty ? '-' : model,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.textSubtle,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: AppColors.textSubtle, fontSize: 12),
                 ),
               ],
             ),
@@ -853,10 +1053,7 @@ class _CurrentSessionCard extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 prefs.t('stats.sessionTotal'),
-                style: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 11,
-                ),
+                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
               ),
             ],
           ),

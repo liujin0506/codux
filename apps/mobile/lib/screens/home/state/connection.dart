@@ -68,12 +68,14 @@ extension _HomePageConnection on HomeController {
   void _cancelHostResponseProbe() {
     _hostResponseTimer?.cancel();
     _hostResponseTimer = null;
+    _transportHealthProbeActive = false;
   }
 
   void _startHostResponseProbe({
     required String reason,
     Duration duration = _remoteStartupProbeTimeout,
     bool restart = true,
+    bool allowBackground = false,
   }) {
     final device = _activeDevice;
     final generation = _transportGeneration;
@@ -85,7 +87,9 @@ extension _HomePageConnection on HomeController {
       '[codux-flutter-remote] host probe start reason=$reason timeoutMs=${duration.inMilliseconds}',
     );
     _hostResponseTimer = Timer(duration, () {
-      if (!mounted || _disposing || !_appInForeground) return;
+      if (!mounted || _disposing || (!_appInForeground && !allowBackground)) {
+        return;
+      }
       if (_transportGeneration != generation ||
           !_transportConnected ||
           _hostResponseSerial != startedAtSerial) {
@@ -93,6 +97,25 @@ extension _HomePageConnection on HomeController {
       }
       _failHostConnection(device, 'host_response_timeout:$reason');
     });
+  }
+
+  void _verifyExistingTransport({required String reason}) {
+    final device = _activeDevice;
+    if (device == null) return;
+    if (!_transportConnected || _activeTransport == null) {
+      _connect(device, true);
+      return;
+    }
+    CoduxLog.info(
+      '[codux-flutter-remote] verify existing transport reason=$reason path=$_connectionPath',
+    );
+    _startHostResponseProbe(
+      reason: reason,
+      duration: _remoteResumeProbeTimeout,
+      allowBackground: Platform.isAndroid,
+    );
+    _transportHealthProbeActive = true;
+    _sendHostInfoRequest(force: true);
   }
 
   void _markTransportOpen({String? path}) {
@@ -154,6 +177,7 @@ extension _HomePageConnection on HomeController {
     _ensureTerminalForSelectedProject();
     _bindActiveTerminalAfterProtocolReady(reason: 'protocol-ready');
     _drivePendingProjectSelect(reason: 'protocol-ready');
+    _resumePendingTerminalViewportTakeOver(reason: 'protocol-ready');
   }
 
   void _failRemoteProtocol(StoredDevice target, Object? payload) {
@@ -369,7 +393,7 @@ extension _HomePageConnection on HomeController {
       closeTerminal: false,
       notifyHost: false,
     );
-    if (_appSuspended || !_appInForeground) {
+    if (_appSuspended || (!_appInForeground && !Platform.isAndroid)) {
       CoduxLog.info(
         '[codux-flutter-remote] reconnect deferred reason=$reason appSuspended=$_appSuspended',
       );
@@ -538,15 +562,11 @@ extension _HomePageConnection on HomeController {
   }
 
   void _recoverForegroundState() {
-    if (!_transportReady) {
-      final device = _activeDevice;
-      if (device != null) _connect(device, true);
-      return;
-    }
+    _verifyExistingTransport(reason: 'foreground-resume');
+    if (!_transportReady) return;
     _backgroundConnect = false;
     _requestProjectList(resetRetry: true);
     _requestTerminalList(resetRetry: true);
-    _sendHostInfoRequest();
     _mountVisibleTerminal(reason: 'foreground');
     _terminalInputBatcher.flush();
   }
@@ -597,7 +617,6 @@ extension _HomePageConnection on HomeController {
     if (switchingDevice) {
       _hostRuntimeInstanceId = null;
       _isHeadlessAgentHost = false;
-      _mobileAiTool = MobileAiToolCapability.fallback;
       _resetRemoteRuntime(keepProjects: false);
       _terminalOutputController.resetAll();
       _terminalRepaint.tick();
@@ -640,6 +659,8 @@ extension _HomePageConnection on HomeController {
     });
     unawaited(_restoreCachedProjects(target));
     if (!_hasConnectableTransport(target)) {
+      _connectInFlight = false;
+      _connectInFlightKey = null;
       _applyState(() => _status = _t('pair.repairRequired'));
       return;
     }
@@ -804,6 +825,13 @@ extension _HomePageConnection on HomeController {
   void _handleRejectedTransportSend(RelayEnvelope message) {
     if (!mounted || _disposing || !_transportConnected) return;
     if (message.type == 'device.disconnected') return;
+    if (_transportHealthProbeActive &&
+        message.type == RemoteMessageType.hostInfo) {
+      CoduxLog.warn(
+        '[codux-flutter-remote] health probe send rejected; waiting for probe timeout',
+      );
+      return;
+    }
     final target = _activeDevice;
     if (target == null) {
       _handleTransportClosed('send_rejected:${message.type}');

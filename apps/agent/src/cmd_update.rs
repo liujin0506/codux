@@ -264,10 +264,13 @@ fn download_asset(
 }
 
 fn asset_candidates<'a>(assets: &'a [Asset], version: &str) -> Vec<&'a Asset> {
-    [versioned_agent_asset_name(version), legacy_agent_asset_name()]
-        .into_iter()
-        .filter_map(|name| assets.iter().find(|asset| asset.name == name))
-        .collect()
+    [
+        versioned_agent_asset_name(version),
+        legacy_agent_asset_name(),
+    ]
+    .into_iter()
+    .filter_map(|name| assets.iter().find(|asset| asset.name == name))
+    .collect()
 }
 
 fn versioned_agent_asset_name(version: &str) -> String {
@@ -330,9 +333,9 @@ fn is_newer(a: &str, b: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        Asset, Channel, Release, asset_candidates, is_newer, pick_asset,
+        Asset, Channel, Release, asset_candidates, is_newer, legacy_agent_asset_name, pick_asset,
         release_from_manifest_version, release_tag_is_beta, select_beta_release,
-        versioned_agent_asset_name, legacy_agent_asset_name,
+        versioned_agent_asset_name,
     };
 
     #[test]

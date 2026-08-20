@@ -945,10 +945,8 @@ fn wrapper_uses_configured_executable_path_over_path_lookup() {
     use std::os::unix::fs::PermissionsExt;
     use std::process::Command;
 
-    let dir = std::env::temp_dir().join(format!(
-        "codux-wrapper-configured-path-{}",
-        Uuid::new_v4()
-    ));
+    let dir =
+        std::env::temp_dir().join(format!("codux-wrapper-configured-path-{}", Uuid::new_v4()));
     let bridge = AIRuntimeBridge::with_paths(dir.join("root"), dir.join("temp"), dir.join("home"));
     bridge.stage_assets().unwrap();
 
@@ -992,7 +990,10 @@ fn wrapper_uses_configured_executable_path_over_path_lookup() {
         "wrapper should execute configured binary, stderr={}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "from-custom");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        "from-custom"
+    );
 
     fs::write(
         &permissions_file,

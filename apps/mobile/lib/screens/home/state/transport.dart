@@ -25,7 +25,15 @@ extension _HomePageTransport on HomeController {
       final path = event.path;
       if (path != null) {
         if (path == 'none') {
-          _handleTransportClosed('path:none');
+          // Iroh can briefly report no route while Android moves between
+          // foreground/background, VPN and Wi-Fi/mobile interfaces. Keep the
+          // live transport and cached terminal visible while an application
+          // probe verifies the host; only the probe timeout rebuilds it.
+          CoduxLog.warn(
+            '[codux-flutter-remote] path none; probing existing transport',
+          );
+          _pauseLatencyProbe();
+          _verifyExistingTransport(reason: 'path-none');
           return;
         }
         final previousPath = _connectionPath;
@@ -112,10 +120,7 @@ extension _HomePageTransport on HomeController {
       );
       if (detail == 'lost') {
         if (_latencyMs != null) _applyState(() => _latencyMs = null);
-        final target = _activeDevice;
-        if (target != null) {
-          _failHostConnection(target, 'latency_lost');
-        }
+        _verifyExistingTransport(reason: 'latency-lost');
       }
     }
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/remote_models.dart';
 import '../../models/workspace_mode.dart';
+import '../../services/worktree_utils.dart';
 import '../../widgets/pad/pad_workspace_view.dart';
 import '../../widgets/phone/remote_workspace_view.dart';
 import '../../widgets/components/workspace_controller.dart';
@@ -166,7 +167,8 @@ class HomeWorkspaceBuilder {
       connected: connected,
       latencyMs: latencyMs,
       projectName: _projectName(projects, selectedProjectId),
-      terminalTitle: _terminalTitle(shellData.terminals, activeTerminalId),
+      worktreeName: _worktreeName(shellData.worktrees, selectedWorktreeId),
+      terminalName: _terminalName(shellData.terminals, activeTerminalId),
       terminalBody: terminalBody,
       onShowStats: onOpenStats,
       onShowFiles: onOpenFiles,
@@ -190,16 +192,28 @@ class HomeWorkspaceBuilder {
     return null;
   }
 
-  String? _terminalTitle(
+  String? _worktreeName(
+    List<RemoteWorktreeInfo> worktrees,
+    String? selectedWorktreeId,
+  ) {
+    if (selectedWorktreeId == null) return null;
+    for (final worktree in worktrees) {
+      if (worktree.id == selectedWorktreeId) {
+        return worktreeTitle(worktree);
+      }
+    }
+    return null;
+  }
+
+  String? _terminalName(
     List<TerminalInfo> terminals,
     String? activeTerminalId,
   ) {
     if (activeTerminalId == null) return null;
     for (final terminal in terminals) {
-      if (terminal.id == activeTerminalId) {
-        final title = terminal.title.trim();
-        return title.isEmpty ? null : title;
-      }
+      if (terminal.id != activeTerminalId) continue;
+      final title = terminal.title.trim();
+      return title.isNotEmpty ? title : terminal.id;
     }
     return null;
   }

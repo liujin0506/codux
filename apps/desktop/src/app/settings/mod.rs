@@ -314,7 +314,8 @@ impl CoduxApp {
                             .pb(px(12.0))
                             .overflow_y_scrollbar()
                             .children(visible_panes.iter().copied().map(|item| {
-                                settings_nav_row(item, pane == item, language, cx).into_any_element()
+                                settings_nav_row(item, pane == item, language, cx)
+                                    .into_any_element()
                             })),
                     ),
             )

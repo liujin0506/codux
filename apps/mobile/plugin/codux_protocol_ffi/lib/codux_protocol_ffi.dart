@@ -1093,6 +1093,7 @@ class TerminalScreenCell {
     required this.italic,
     required this.underline,
     this.underlineColor,
+    this.link,
     required this.inverse,
     required this.hidden,
     required this.strikeout,
@@ -1111,6 +1112,9 @@ class TerminalScreenCell {
 
   /// SGR 58 underline color override; null means the text foreground.
   final Map<String, dynamic>? underlineColor;
+
+  /// OSC 8 hyperlink URI attached to this cell, when present.
+  final String? link;
   final bool inverse;
   final bool hidden;
   final bool strikeout;
@@ -1134,6 +1138,7 @@ class TerminalScreenCell {
       underlineColor: json['underlineColor'] is Map
           ? Map<String, dynamic>.from(json['underlineColor'] as Map)
           : null,
+      link: json['link'] is String ? json['link'] as String : null,
       inverse: json['inverse'] == true,
       hidden: json['hidden'] == true,
       strikeout: json['strikeout'] == true,

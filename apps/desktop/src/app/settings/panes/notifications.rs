@@ -65,29 +65,27 @@ pub(super) fn settings_notification_card(
                                     .text_color(color(theme::TEXT))
                                     .child(channel.label.clone()),
                             )
-                            .child(
-                                div().flex_shrink_0().child(settings_toggle(
-                                    format!("settings-notification-enabled-{}", channel.id),
-                                    channel.enabled,
-                                    cx,
-                                    move |app, window, cx| {
-                                        let next = !app
-                                            .state
-                                            .notifications
-                                            .channels
-                                            .iter()
-                                            .find(|item| item.id == enabled_id)
-                                            .map(|item| item.enabled)
-                                            .unwrap_or(false);
-                                        app.set_notification_channel_enabled(
-                                            enabled_id.clone(),
-                                            next,
-                                            window,
-                                            cx,
-                                        )
-                                    },
-                                )),
-                            ),
+                            .child(div().flex_shrink_0().child(settings_toggle(
+                                format!("settings-notification-enabled-{}", channel.id),
+                                channel.enabled,
+                                cx,
+                                move |app, window, cx| {
+                                    let next = !app
+                                        .state
+                                        .notifications
+                                        .channels
+                                        .iter()
+                                        .find(|item| item.id == enabled_id)
+                                        .map(|item| item.enabled)
+                                        .unwrap_or(false);
+                                    app.set_notification_channel_enabled(
+                                        enabled_id.clone(),
+                                        next,
+                                        window,
+                                        cx,
+                                    )
+                                },
+                            ))),
                     )
                     .child(
                         div()

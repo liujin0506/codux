@@ -252,9 +252,7 @@ pub fn apply_mobile_ai_args(
             config.mobile_ai_commands = entries;
         }
         (None, Some(_)) => {
-            return Err(
-                "--mobile-ai-label needs a matching --mobile-ai-command".to_string(),
-            );
+            return Err("--mobile-ai-label needs a matching --mobile-ai-command".to_string());
         }
         (None, None) => {}
     }

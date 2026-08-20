@@ -23,8 +23,9 @@ pub fn render_app_icon(style: &str, size: u32) -> AppIconImage {
 }
 
 pub fn render_windows_app_icon(style: &str, size: u32) -> AppIconImage {
-    load_bundled_app_icon(style, size, WINDOWS_ICON_CONTENT_INSET_RATIO)
-        .unwrap_or_else(|| render_app_icon_with_inset(style, size, WINDOWS_ICON_CONTENT_INSET_RATIO))
+    load_bundled_app_icon(style, size, WINDOWS_ICON_CONTENT_INSET_RATIO).unwrap_or_else(|| {
+        render_app_icon_with_inset(style, size, WINDOWS_ICON_CONTENT_INSET_RATIO)
+    })
 }
 
 fn load_bundled_app_icon(style: &str, size: u32, inset_ratio: f32) -> Option<AppIconImage> {
@@ -126,11 +127,7 @@ fn apply_icon_corner_mask(image: &mut image::RgbaImage) {
     }
 }
 
-fn fit_icon_into_canvas(
-    source: &image::RgbaImage,
-    size: u32,
-    inset_ratio: f32,
-) -> AppIconImage {
+fn fit_icon_into_canvas(source: &image::RgbaImage, size: u32, inset_ratio: f32) -> AppIconImage {
     let inset = (size as f32 * inset_ratio).round().max(0.0) as u32;
     let content = size.saturating_sub(inset.saturating_mul(2)).max(1);
     let resized = image::imageops::resize(
@@ -446,15 +443,17 @@ mod tests {
     #[test]
     fn color_styles_tint_the_bundled_png() {
         let forest = render_app_icon("forest", 128);
-        let has_green_mark = forest.pixels.chunks_exact(4).any(|pixel| {
-            pixel[3] > 80 && pixel[1] > pixel[0].saturating_add(20) && pixel[1] > 80
-        });
+        let has_green_mark = forest
+            .pixels
+            .chunks_exact(4)
+            .any(|pixel| pixel[3] > 80 && pixel[1] > pixel[0].saturating_add(20) && pixel[1] > 80);
         assert!(has_green_mark, "forest style should tint the chevron green");
 
         let sunset = render_app_icon("sunset", 128);
-        let has_warm_mark = sunset.pixels.chunks_exact(4).any(|pixel| {
-            pixel[3] > 80 && pixel[0] > pixel[2].saturating_add(20) && pixel[0] > 80
-        });
+        let has_warm_mark = sunset
+            .pixels
+            .chunks_exact(4)
+            .any(|pixel| pixel[3] > 80 && pixel[0] > pixel[2].saturating_add(20) && pixel[0] > 80);
         assert!(has_warm_mark, "sunset style should tint the chevron warm");
     }
 }

@@ -26,6 +26,7 @@ import '../../services/log_export_service.dart';
 import '../../services/local_voice_recognition_service.dart';
 import '../../services/mobile_settings_controller.dart';
 import '../../services/connection_status_presenter.dart';
+import '../../services/android_connection_keeper.dart';
 import '../../services/device_selection_service.dart';
 import '../../services/remote_device_controller.dart';
 import '../../services/remote_envelope_send_queue.dart';
@@ -86,10 +87,12 @@ part 'home_controller.dart';
 
 final String _remoteProtocolVersion = remoteProtocolVersion;
 const Duration _remoteStartupProbeTimeout = Duration(seconds: 15);
+const Duration _remoteResumeProbeTimeout = Duration(seconds: 4);
 const Duration _remoteLatencyProbeInterval = Duration(seconds: 3);
 const Duration _remoteLatencyProbeTimeout = Duration(seconds: 8);
 // Bind, focus and first layout can all request the same automatic claim.
 const Duration _viewportClaimThrottle = Duration(seconds: 2);
+const Duration _viewportTakeOverAckTimeout = Duration(seconds: 2);
 
 class CoduxHomePage extends StatefulWidget {
   const CoduxHomePage({
@@ -262,6 +265,7 @@ class _CoduxHomePageState extends State<CoduxHomePage>
       devices: c._devices,
       activeDeviceId: c._activeDevice?.deviceId,
       ready: c._isDeviceListConnected,
+      connecting: c._connectInFlight,
       status: c._deviceListStatusText,
       latencyMs: c._isConnected ? c._latencyMs : null,
       deviceSubtitle: c._deviceSubtitle,
@@ -367,6 +371,9 @@ class _CoduxHomePageState extends State<CoduxHomePage>
       onRefreshTerminals: () => c._requestTerminalList(resetRetry: true),
       aiSessions: c._aiSessions,
       onOpenSessions: () => c._requestAISessions(force: true),
+      initialSection: c._terminalSwitcherSection,
+      onSectionChanged: (section) =>
+          c._applyState(() => c._terminalSwitcherSection = section),
       onRefreshSessions: () => c._requestAISessions(force: true),
       onOpenSession: c._openSessionFromSwitcher,
       onRenameSession: c._renameAISession,
@@ -433,16 +440,27 @@ class _CoduxHomePageState extends State<CoduxHomePage>
         if (c._terminalSelectedText == text) return;
         c._applyState(() => c._terminalSelectedText = text);
       },
+      hasSelection: c._terminalSelectedText?.trim().isNotEmpty == true,
+      onSwipeTerminal: c._isPadLayout ? null : c._swipeTerminal,
       onSendKey: c._sendTerminalKey,
       onToggleKeyboard: c._toggleTerminalKeyboard,
       onRequestKeyboard: c._requestTerminalKeyboard,
+      onOpenUrl: (uri) => unawaited(c._openUrl(uri.toString())),
       onRemoteViewportScroll: c._requestRemoteTerminalViewportScroll,
       onPaste: c._pasteToTerminal,
       onCopy: c._copyTerminalSelection,
+      onCopyAndPaste: c._copyAndPasteTerminalSelection,
       onUpload: c._chooseUploadForTerminal,
-      onVoice: c._startVoiceInput,
+      onUploadAndPastePath: c._chooseUploadAndPastePathForTerminal,
+      onShowGit: c._openPhoneGit,
+      onOpenSessions: c._openSessionHistoryShortcut,
+      onShowStats: c._openPhoneStats,
+      onShowFiles: c._openPhoneFiles,
+      onRebuildTerminal: c._rebuildCurrentTerminal,
+      onEditProject: c._requestProjectEdit,
+      onAddProject: c._requestProjectAdd,
       handedAway: c._remoteHandedAway,
-      aiTool: c._mobileAiTool,
+      takeOverPending: c._terminalViewportTakeOverPending,
       handoffMessageKey: c._terminalHandoffMessageKey(),
       onTakeOver: () => c._takeOverTerminalViewport(),
     );

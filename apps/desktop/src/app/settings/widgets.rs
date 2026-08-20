@@ -273,7 +273,16 @@ pub(super) fn settings_compact_text_input(
     cx: &mut Context<CoduxApp>,
     action: impl Fn(&mut CoduxApp, String, &mut Window, &mut Context<CoduxApp>) + 'static,
 ) -> AnyElement {
-    settings_text_input_width(id, value, placeholder, false, Some(px(72.0)), window, cx, action)
+    settings_text_input_width(
+        id,
+        value,
+        placeholder,
+        false,
+        Some(px(72.0)),
+        window,
+        cx,
+        action,
+    )
 }
 
 fn settings_text_input_width(

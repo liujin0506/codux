@@ -10,14 +10,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('shows terminal body with project context header', (
-    tester,
-  ) async {
+  testWidgets('shows project header and terminal context', (tester) async {
     await tester.pumpWidget(_wrap(_terminalWorkspace()));
 
     expect(find.text('Terminal body'), findsOneWidget);
     expect(find.text('my-app'), findsOneWidget);
-    expect(find.text('bash'), findsOneWidget);
+    expect(find.text('feature/login  /  zsh'), findsOneWidget);
+    expect(find.text('42ms'), findsOneWidget);
+  });
+
+  testWidgets('tapping terminal context opens the switcher', (tester) async {
+    var opened = false;
+    await tester.pumpWidget(
+      _wrap(_terminalWorkspace(onOpenTerminalSwitcher: () => opened = true)),
+    );
+
+    await tester.tap(find.text('feature/login  /  zsh'));
+
+    expect(opened, isTrue);
   });
 
   testWidgets('phone tool route can read app preferences', (tester) async {
@@ -100,6 +110,36 @@ void main() {
 
     expect(find.text('Current project'), findsOneWidget);
     expect(find.text('2'), findsWidgets);
+  });
+
+  testWidgets('stats recovery actions appear only after a slow load', (
+    tester,
+  ) async {
+    var refreshed = false;
+    var logsOpened = false;
+    await tester.pumpWidget(
+      _wrap(
+        AIStatsPanel(
+          stats: null,
+          loading: true,
+          onRefresh: () => refreshed = true,
+          onShowLogs: () => logsOpened = true,
+        ),
+      ),
+    );
+
+    expect(find.text('AI Stats · Syncing'), findsOneWidget);
+    expect(find.text('Refresh'), findsNothing);
+    expect(find.text('Debug logs'), findsNothing);
+
+    await tester.pump(const Duration(seconds: 7));
+    expect(find.text('Refresh'), findsOneWidget);
+    expect(find.text('Debug logs'), findsOneWidget);
+
+    await tester.tap(find.text('Refresh'));
+    await tester.tap(find.text('Debug logs'));
+    expect(refreshed, isTrue);
+    expect(logsOpened, isTrue);
   });
 
   testWidgets('phone tool screen shows file panel', (tester) async {
@@ -191,13 +231,14 @@ Widget _wrap(Widget child) {
   );
 }
 
-RemoteWorkspaceView _terminalWorkspace() {
+RemoteWorkspaceView _terminalWorkspace({VoidCallback? onOpenTerminalSwitcher}) {
   return RemoteWorkspaceView(
     topInset: 0,
     connected: true,
     latencyMs: 42,
     projectName: 'my-app',
-    terminalTitle: 'bash',
+    worktreeName: 'feature/login',
+    terminalName: 'zsh',
     terminalBody: const Center(child: Text('Terminal body')),
     onShowStats: () {},
     onShowFiles: () {},
@@ -205,7 +246,7 @@ RemoteWorkspaceView _terminalWorkspace() {
     onBack: () {},
     onEditProject: () {},
     onAddProject: () {},
-    onOpenTerminalSwitcher: () {},
+    onOpenTerminalSwitcher: onOpenTerminalSwitcher ?? () {},
     onSwitchProject: () {},
     onRebuildTerminal: () {},
   );
