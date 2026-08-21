@@ -112,14 +112,20 @@ class HomeRuntimeCoordinator {
     }
     syncRuntimeViewState();
 
-    // `resetTerminalBuffer` means the current cache is not authoritative for
-    // the next bind. Mark the target stale before applying the bind so a
-    // cached terminal still gets one fresh baseline instead of a live-only
-    // subscription. When a baseline is already in flight, the request itself
-    // is the freshness marker and must be preserved above.
+    // `resetTerminalBuffer` clears the visible binding, but a retained local
+    // PTY cache is still authoritative for a known session. Only mark a
+    // cache-miss or sequence-gap target stale so switching projects can reuse
+    // its cached terminal without forcing another baseline transfer. When a
+    // baseline is already in flight, the request itself is the freshness
+    // marker and must be preserved above.
+    final bindHasUsableCache =
+        plan.bindSessionId != null &&
+        outputController.hasCachedOutput(plan.bindSessionId!) &&
+        !outputController.hasSequenceGap(plan.bindSessionId!);
     if (plan.resetTerminalBuffer &&
         plan.bindSessionId != null &&
-        !preserveInFlightBaseline) {
+        !preserveInFlightBaseline &&
+        !bindHasUsableCache) {
       terminalBindingCoordinator.markSessionBaselineStale(plan.bindSessionId!);
     }
 
