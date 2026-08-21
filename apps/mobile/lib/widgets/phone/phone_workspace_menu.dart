@@ -43,6 +43,8 @@ class PhoneWorkspaceMenu extends StatelessWidget {
         icon: Icon(Icons.more_vert, size: 22, color: AppColors.textPrimary),
         onSelected: (value) {
           switch (value) {
+            case 'switcher':
+              onSwitchProject();
             case 'stats':
               onShowStats();
             case 'git':
@@ -58,6 +60,14 @@ class PhoneWorkspaceMenu extends StatelessWidget {
           }
         },
         itemBuilder: (context) => [
+          PopupMenuItem<String>(
+            value: 'switcher',
+            height: 40,
+            child: _MenuRow(
+              icon: Icons.grid_view_rounded,
+              label: prefs.t('workspace.switcher'),
+            ),
+          ),
           PopupMenuItem<String>(
             value: 'stats',
             height: 40,
