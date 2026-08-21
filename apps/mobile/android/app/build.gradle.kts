@@ -18,7 +18,10 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.duxweb.codux"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Keep the app and the release workflow on the same toolchain. Flutter
+    // 3.47 defaults to a newer NDK, which makes Gradle download a second NDK
+    // during CI and can exhaust the Android daemon before assembleRelease.
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
