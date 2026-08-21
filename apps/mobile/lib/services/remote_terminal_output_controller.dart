@@ -79,6 +79,15 @@ class RemoteTerminalOutputController {
   TerminalScreenSnapshot? screenSnapshot(String sessionId) =>
       _router.screenSnapshot(sessionId);
 
+  /// Whether this session has a non-empty cell grid that is safe to keep on
+  /// screen while the transport is recovering. This deliberately checks the
+  /// rendered grid instead of [cachedOutput]: alternate-screen TUIs can have
+  /// an empty raw scrollback cache while their visible UI is fully rendered.
+  bool hasRenderableScreen(String sessionId) {
+    final snapshot = screenSnapshot(sessionId);
+    return snapshot?.cells.any((cell) => cell.text.isNotEmpty) ?? false;
+  }
+
   /// Monotonic render generation; bumps whenever the screen could change, so
   /// the renderer can skip re-decoding a snapshot that has not mutated.
   int renderGeneration(String sessionId) => _router.renderGeneration(sessionId);

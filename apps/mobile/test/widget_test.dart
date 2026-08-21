@@ -2451,6 +2451,34 @@ void main() {
   );
 
   testWidgets(
+    'connected path starts a health probe when the host stays silent',
+    (WidgetTester tester) async {
+      final device = await _fakeDevice();
+      final fake = _FakeRemoteTransport(
+        device: device,
+        emitHello: false,
+        stallAfterInitialConnect: true,
+        onSent: (_, _) {},
+      );
+
+      await tester.pumpWidget(
+        CoduxFlutterApp(
+          initialDevices: [device],
+          transportFactory: (_) => fake,
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(fake._connectCount, 1);
+
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(fake._connectCount, greaterThan(1));
+    },
+  );
+
+  testWidgets(
     'pending project select ack timeout retries project select and refreshes terminal list',
     (WidgetTester tester) async {
       CoduxLog.setLevelName('debug');
@@ -2986,6 +3014,7 @@ final class _FakeRemoteTransport implements RemoteTransport {
     this.onConnect,
     this.connectFuture,
     this.stallAfterInitialConnect = false,
+    this.emitHello = true,
   });
 
   final StoredDevice device;
@@ -2995,6 +3024,7 @@ final class _FakeRemoteTransport implements RemoteTransport {
   final _FakeConnectHandler? onConnect;
   final Future<void>? connectFuture;
   final bool stallAfterInitialConnect;
+  final bool emitHello;
   int _connectCount = 0;
   RemoteTransportStateHandler? _onState;
   RemoteTransportEnvelopeHandler? _onEnvelope;
@@ -3020,7 +3050,7 @@ final class _FakeRemoteTransport implements RemoteTransport {
     final future = connectFuture;
     if (future != null) await future;
     _onState?.call('connected:path=$initialPath');
-    emit(const RelayEnvelope(type: 'hello'));
+    if (emitHello) emit(const RelayEnvelope(type: 'hello'));
   }
 
   @override

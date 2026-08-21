@@ -37,12 +37,21 @@ extension _HomePageTransport on HomeController {
           return;
         }
         final previousPath = _connectionPath;
+        final wasTransportConnected = _transportConnected;
         final changed = path != _connectionPath;
         _markTransportPathDetail(
           path,
           endpoint: event.addr,
           relayUrl: event.relayUrl,
         );
+        if (path == 'unknown') {
+          // A path list can still contain entries while iroh has no selected
+          // route. Keep the cached UI, but verify the server instead of
+          // waiting indefinitely for a later closed event.
+          _pauseLatencyProbe();
+          _verifyExistingTransport(reason: 'path-unknown');
+          return;
+        }
         if (path != 'none') {
           _sendHostInfoRequest(
             force:
@@ -51,6 +60,18 @@ extension _HomePageTransport on HomeController {
                 !_projectListLoaded ||
                 !_terminalListLoaded,
           );
+          // Native connect reports `connected:path=...`, so it never reaches
+          // the generic connected branch below. Start the same health probe
+          // here for the initial dial; also probe a real direct↔relay
+          // migration so a half-open QUIC link cannot stay marked connected.
+          if (!wasTransportConnected || changed) {
+            _startHostResponseProbe(
+              reason: changed ? 'path-$previousPath-$path' : 'transport-path',
+              duration: wasTransportConnected
+                  ? _remoteResumeProbeTimeout
+                  : _remoteStartupProbeTimeout,
+            );
+          }
           if (!_projectListLoaded || !_terminalListLoaded) {
             _sendInitialTransportRequests();
           }

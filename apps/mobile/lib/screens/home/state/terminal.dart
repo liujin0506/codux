@@ -517,6 +517,18 @@ extension _HomePageTerminal on HomeController {
       send: _retryTerminalBaseline,
       hasPendingRequest: _terminalOutputController.hasActiveBufferRequest,
     );
+    // The baseline request is sent before the first response arrives. Keep
+    // the previous rendered screen underneath a translucent status overlay so
+    // a reconnect never presents an unexplained black pane while history is
+    // being restored.
+    if (sessionId == _sessionId && !_terminalBufferLoading) {
+      void markLoading() => _setTerminalBufferLoading(true);
+      if (mounted) {
+        _applyState(markLoading);
+      } else {
+        markLoading();
+      }
+    }
   }
 
   void _handleTerminalUploaded(RelayEnvelope message) {

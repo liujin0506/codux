@@ -308,6 +308,8 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
                 widget.terminalBufferLoading &&
                 widget.sessionId != null &&
                 widget.pendingBufferSessionId == widget.sessionId;
+            final showReconnectOverlay =
+                widget.showTerminal && !widget.connected && widget.reconnecting;
 
             return Stack(
               clipBehavior: Clip.none,
@@ -405,6 +407,13 @@ class _RemoteTerminalPaneState extends State<RemoteTerminalPane> {
                               message: showUploadOverlay
                                   ? widget.terminalUploadStatus
                                   : widget.terminalHistoryLoadingText,
+                              opacity: 0.72,
+                            ),
+                          if (showReconnectOverlay)
+                            _TerminalOverlay(
+                              message: AppPreferences.of(
+                                context,
+                              ).t('app.reconnectingShort'),
                               opacity: 0.72,
                             ),
                           if (widget.showTerminal &&

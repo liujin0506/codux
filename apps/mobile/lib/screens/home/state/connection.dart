@@ -29,7 +29,11 @@ extension _HomePageConnection on HomeController {
       _connect(device, true);
       return;
     }
-    _sendHostInfoRequest(force: true);
+    // A connectivity change does not necessarily produce an iroh path event
+    // (VPN and Android interface handoffs can leave the old QUIC connection
+    // looking alive for a while). Verify the existing link first; only the
+    // probe timeout tears it down and enters the reconnect backoff.
+    _verifyExistingTransport(reason: reason);
   }
 
   void _clearConnectionGrace() {
@@ -334,9 +338,18 @@ extension _HomePageConnection on HomeController {
     final device = _activeDevice;
     if (transport == null || device == null || !_transportConnected) return;
     final now = DateTime.now();
+    final expiredProbe = _latencyProbeSentAt.values.any(
+      (sentAt) => now.difference(sentAt) > _remoteLatencyProbeTimeout,
+    );
     _latencyProbeSentAt.removeWhere(
       (_, sentAt) => now.difference(sentAt) > _remoteLatencyProbeTimeout,
     );
+    if (expiredProbe && _hostResponseTimer == null) {
+      CoduxLog.warn(
+        '[codux-flutter-remote] latency probe expired; verifying transport',
+      );
+      _verifyExistingTransport(reason: 'latency-probe-timeout');
+    }
     final id = '${now.microsecondsSinceEpoch}-${++_latencyProbeCounter}';
     _latencyProbeSentAt[id] = now;
     unawaited(
@@ -388,6 +401,12 @@ extension _HomePageConnection on HomeController {
       '[codux-flutter-remote] host unavailable reason=$reason host=${target.hostId} device=${target.deviceId}',
     );
     _remoteRuntimeEpoch += 1;
+    // The native transport can report connected before the first host.info
+    // response. In that window `_connectInFlight` is still true; clear it
+    // before scheduling the replacement or `_connect` will reject its own
+    // recovery attempt as a duplicate in-flight connect.
+    _connectInFlight = false;
+    _connectInFlightKey = null;
     _disconnectTransport(
       status: _t('connection.failedRetry'),
       closeTerminal: false,

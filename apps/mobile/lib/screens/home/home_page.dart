@@ -391,9 +391,22 @@ class _CoduxHomePageState extends State<CoduxHomePage>
         ? (c._workspaceMode != WorkspaceMode.review &&
               c._editingFilePath == null)
         : true;
+    final recoveringTerminalSession = c._sessionId;
+    final keepTerminalDuringReconnect =
+        c._isRecoveringConnection &&
+        recoveringTerminalSession != null &&
+        c._terminalOutputController.hasRenderableScreen(
+          recoveringTerminalSession,
+        );
     final terminalBody = RemoteTerminalPane(
       connected: c._isConnected,
-      showTerminal: c._hasShownTerminal && c._isConnected,
+      // Keep a real rendered screen mounted during the short reconnect grace
+      // period. Unmounting it makes the next frame start from an empty Rust
+      // session before the fresh baseline arrives, which looks like a black
+      // terminal even though the connection is already recovering.
+      showTerminal:
+          c._hasShownTerminal &&
+          (c._isConnected || keepTerminalDuringReconnect),
       reconnecting:
           c._connectInFlight ||
           c._backgroundConnect ||
