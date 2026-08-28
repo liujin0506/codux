@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.30] - 2026-08-28
+
+### Added
+
+- The CNB sidebar can comment on issues and pull requests, close or reopen them, and stop running pipeline builds. These actions use `codux-cnb`.
+
 ## [2.0.29] - 2026-08-28
 
 ### Added

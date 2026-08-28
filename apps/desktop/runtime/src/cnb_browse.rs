@@ -46,6 +46,26 @@ impl CnbBrowseKind {
             Self::Builds => None,
         }
     }
+
+    pub fn comment_command(self) -> Option<&'static str> {
+        match self {
+            Self::Issues => Some("issue-comment"),
+            Self::Pulls => Some("pr-comment"),
+            Self::Builds => None,
+        }
+    }
+
+    pub fn update_command(self) -> Option<&'static str> {
+        match self {
+            Self::Issues => Some("issue-update"),
+            Self::Pulls => Some("pr-update"),
+            Self::Builds => None,
+        }
+    }
+}
+
+pub fn is_live_build(state: &str) -> bool {
+    matches!(state, "pending" | "running" | "waiting")
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -143,7 +163,11 @@ pub fn invoke_args(command: &str, positional: &[&str], remote: &CnbBrowseRemote)
     args
 }
 
-pub fn parse_list(kind: CnbBrowseKind, value: &Value, remote: &CnbBrowseRemote) -> Vec<CnbBrowseItem> {
+pub fn parse_list(
+    kind: CnbBrowseKind,
+    value: &Value,
+    remote: &CnbBrowseRemote,
+) -> Vec<CnbBrowseItem> {
     json_items(value)
         .into_iter()
         .filter_map(|item| parse_item(kind, item, remote))
@@ -162,7 +186,11 @@ fn json_items(value: &Value) -> Vec<&Value> {
     Vec::new()
 }
 
-fn parse_item(kind: CnbBrowseKind, value: &Value, remote: &CnbBrowseRemote) -> Option<CnbBrowseItem> {
+fn parse_item(
+    kind: CnbBrowseKind,
+    value: &Value,
+    remote: &CnbBrowseRemote,
+) -> Option<CnbBrowseItem> {
     let site = remote.site()?;
     match kind {
         CnbBrowseKind::Builds => {
@@ -171,10 +199,8 @@ fn parse_item(kind: CnbBrowseKind, value: &Value, remote: &CnbBrowseRemote) -> O
                 return None;
             }
             let status = json_string(value, &["status"]).to_ascii_lowercase();
-            let title = first_nonempty(&[
-                json_string(value, &["title", "commitTitle"]),
-                id.clone(),
-            ]);
+            let title =
+                first_nonempty(&[json_string(value, &["title", "commitTitle"]), id.clone()]);
             Some(CnbBrowseItem {
                 extra: first_nonempty(&[
                     json_string(value, &["sourceRef", "event"]),
@@ -194,10 +220,18 @@ fn parse_item(kind: CnbBrowseKind, value: &Value, remote: &CnbBrowseRemote) -> O
                 return None;
             }
             let mut state = json_string(value, &["state"]).to_ascii_lowercase();
-            if value.get("is_merged").and_then(Value::as_bool).unwrap_or(false) || state == "merged"
+            if value
+                .get("is_merged")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+                || state == "merged"
             {
                 state = "merged".into();
-            } else if value.get("is_wip").and_then(Value::as_bool).unwrap_or(false) {
+            } else if value
+                .get("is_wip")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            {
                 state = "draft".into();
             } else if state.is_empty() {
                 state = "open".into();
@@ -287,9 +321,7 @@ fn branch_name(value: Option<&Value>) -> String {
     } else {
         json_string(value, &["ref", "name"])
     };
-    raw.trim()
-        .trim_start_matches("refs/heads/")
-        .to_string()
+    raw.trim().trim_start_matches("refs/heads/").to_string()
 }
 
 fn first_nonempty(values: &[String]) -> String {
@@ -325,6 +357,21 @@ fn format_duration_ms(ms: i64) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn action_commands_match_kind() {
+        assert_eq!(
+            CnbBrowseKind::Issues.comment_command(),
+            Some("issue-comment")
+        );
+        assert_eq!(CnbBrowseKind::Pulls.comment_command(), Some("pr-comment"));
+        assert_eq!(CnbBrowseKind::Builds.comment_command(), None);
+        assert_eq!(CnbBrowseKind::Issues.update_command(), Some("issue-update"));
+        assert_eq!(CnbBrowseKind::Pulls.update_command(), Some("pr-update"));
+        assert!(is_live_build("running"));
+        assert!(is_live_build("pending"));
+        assert!(!is_live_build("success"));
+    }
 
     #[test]
     fn detect_prefers_origin_cnb_remote() {

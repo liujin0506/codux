@@ -1,6 +1,12 @@
 {
   "strings": {
     "de": {
+      "cnb.action.busy": "Wird ausgeführt…",
+      "cnb.action.close": "Schließen",
+      "cnb.action.comment": "Kommentieren",
+      "cnb.action.comment_placeholder": "Kommentar schreiben…",
+      "cnb.action.reopen": "Wieder öffnen",
+      "cnb.action.stop": "Stoppen",
       "cnb.detail.comments": "Kommentare",
       "cnb.detail.no_body": "Keine Beschreibung",
       "cnb.detail.no_comments": "Keine Kommentare",
@@ -33,6 +39,12 @@
       "cnb.status.loading": "CNB wird geladen…"
     },
     "en": {
+      "cnb.action.busy": "Working…",
+      "cnb.action.close": "Close",
+      "cnb.action.comment": "Comment",
+      "cnb.action.comment_placeholder": "Write a comment…",
+      "cnb.action.reopen": "Reopen",
+      "cnb.action.stop": "Stop",
       "cnb.detail.comments": "Comments",
       "cnb.detail.no_body": "No description",
       "cnb.detail.no_comments": "No comments",
@@ -65,6 +77,12 @@
       "cnb.status.loading": "Loading CNB…"
     },
     "es": {
+      "cnb.action.busy": "Trabajando…",
+      "cnb.action.close": "Cerrar",
+      "cnb.action.comment": "Comentar",
+      "cnb.action.comment_placeholder": "Escribe un comentario…",
+      "cnb.action.reopen": "Reabrir",
+      "cnb.action.stop": "Detener",
       "cnb.detail.comments": "Comentarios",
       "cnb.detail.no_body": "Sin descripción",
       "cnb.detail.no_comments": "Sin comentarios",
@@ -97,6 +115,12 @@
       "cnb.status.loading": "Cargando CNB…"
     },
     "fr": {
+      "cnb.action.busy": "En cours…",
+      "cnb.action.close": "Fermer",
+      "cnb.action.comment": "Commenter",
+      "cnb.action.comment_placeholder": "Écrire un commentaire…",
+      "cnb.action.reopen": "Rouvrir",
+      "cnb.action.stop": "Arrêter",
       "cnb.detail.comments": "Commentaires",
       "cnb.detail.no_body": "Aucune description",
       "cnb.detail.no_comments": "Aucun commentaire",
@@ -129,6 +153,12 @@
       "cnb.status.loading": "Chargement CNB…"
     },
     "ja": {
+      "cnb.action.busy": "処理中…",
+      "cnb.action.close": "クローズ",
+      "cnb.action.comment": "コメント",
+      "cnb.action.comment_placeholder": "コメントを書く…",
+      "cnb.action.reopen": "再開",
+      "cnb.action.stop": "停止",
       "cnb.detail.comments": "コメント",
       "cnb.detail.no_body": "説明なし",
       "cnb.detail.no_comments": "コメントなし",
@@ -161,6 +191,12 @@
       "cnb.status.loading": "CNB を読み込み中…"
     },
     "ko": {
+      "cnb.action.busy": "처리 중…",
+      "cnb.action.close": "닫기",
+      "cnb.action.comment": "댓글",
+      "cnb.action.comment_placeholder": "댓글을 작성하세요…",
+      "cnb.action.reopen": "다시 열기",
+      "cnb.action.stop": "중지",
       "cnb.detail.comments": "댓글",
       "cnb.detail.no_body": "설명 없음",
       "cnb.detail.no_comments": "댓글 없음",
@@ -193,6 +229,12 @@
       "cnb.status.loading": "CNB 불러오는 중…"
     },
     "pt-BR": {
+      "cnb.action.busy": "Processando…",
+      "cnb.action.close": "Fechar",
+      "cnb.action.comment": "Comentar",
+      "cnb.action.comment_placeholder": "Escreva um comentário…",
+      "cnb.action.reopen": "Reabrir",
+      "cnb.action.stop": "Parar",
       "cnb.detail.comments": "Comentários",
       "cnb.detail.no_body": "Sem descrição",
       "cnb.detail.no_comments": "Sem comentários",
@@ -225,6 +267,12 @@
       "cnb.status.loading": "Carregando CNB…"
     },
     "ru": {
+      "cnb.action.busy": "Выполняется…",
+      "cnb.action.close": "Закрыть",
+      "cnb.action.comment": "Комментарий",
+      "cnb.action.comment_placeholder": "Написать комментарий…",
+      "cnb.action.reopen": "Открыть снова",
+      "cnb.action.stop": "Остановить",
       "cnb.detail.comments": "Комментарии",
       "cnb.detail.no_body": "Нет описания",
       "cnb.detail.no_comments": "Нет комментариев",
@@ -257,6 +305,12 @@
       "cnb.status.loading": "Загрузка CNB…"
     },
     "zh-Hans": {
+      "cnb.action.busy": "处理中…",
+      "cnb.action.close": "关闭",
+      "cnb.action.comment": "评论",
+      "cnb.action.comment_placeholder": "写一条评论…",
+      "cnb.action.reopen": "重新打开",
+      "cnb.action.stop": "停止",
       "cnb.detail.comments": "评论",
       "cnb.detail.no_body": "没有描述",
       "cnb.detail.no_comments": "没有评论",
@@ -289,6 +343,12 @@
       "cnb.status.loading": "正在加载 CNB…"
     },
     "zh-Hant": {
+      "cnb.action.busy": "處理中…",
+      "cnb.action.close": "關閉",
+      "cnb.action.comment": "評論",
+      "cnb.action.comment_placeholder": "寫一條評論…",
+      "cnb.action.reopen": "重新開啟",
+      "cnb.action.stop": "停止",
       "cnb.detail.comments": "評論",
       "cnb.detail.no_body": "沒有描述",
       "cnb.detail.no_comments": "沒有評論",

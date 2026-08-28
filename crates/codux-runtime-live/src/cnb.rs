@@ -134,14 +134,12 @@ pub fn parse_git_remote(url: &str) -> Option<CnbRemote> {
     if value.is_empty() {
         return None;
     }
-    let (host, path) = if let Some(captures) = value
-        .find("://")
-        .and_then(|_| parse_http_remote(value))
-    {
-        captures
-    } else {
-        parse_scp_remote(value)?
-    };
+    let (host, path) =
+        if let Some(captures) = value.find("://").and_then(|_| parse_http_remote(value)) {
+            captures
+        } else {
+            parse_scp_remote(value)?
+        };
     let site = site_from_host(&host)?;
     let repo = path
         .trim_matches('/')
@@ -218,8 +216,9 @@ pub fn detect_cnb_remote_from_cwd() -> Result<CnbRemote, String> {
         .output()
         .map_err(|error| format!("codux-cnb: failed to read git remotes: {error}"))?;
     let stdout = String::from_utf8_lossy(&output.stdout);
-    parse_remote_list(&stdout)
-        .ok_or_else(|| "codux-cnb: current repository is not on cnb.cool or cnb.woa.com".to_string())
+    parse_remote_list(&stdout).ok_or_else(|| {
+        "codux-cnb: current repository is not on cnb.cool or cnb.woa.com".to_string()
+    })
 }
 
 pub fn invoke(args: &[String], tokens_path: &Path) -> Result<Value, String> {
@@ -285,9 +284,10 @@ fn parse_invoke_args(args: &[String]) -> Result<ParsedInvoke, String> {
             };
             match flag {
                 "site" => {
-                    site = Some(site_from_id(&value).ok_or_else(|| {
-                        "codux-cnb: --site must be cool or woa".to_string()
-                    })?);
+                    site = Some(
+                        site_from_id(&value)
+                            .ok_or_else(|| "codux-cnb: --site must be cool or woa".to_string())?,
+                    );
                 }
                 "repo" => repo = Some(value),
                 "json" | "body" => {
@@ -379,7 +379,10 @@ fn build_request(parsed: &ParsedInvoke, remote: &CnbRemote) -> Result<CnbRequest
             &parsed.flags,
             &["state", "page", "page-size", "author", "assignee", "search"],
         )),
-        "issue" => Ok(get(&format!("{base}/-/issues/{}", required_number(parsed)?))),
+        "issue" => Ok(get(&format!(
+            "{base}/-/issues/{}",
+            required_number(parsed)?
+        ))),
         "issue-create" => Ok(CnbRequest {
             method: "POST".into(),
             path: format!("{base}/-/issues"),
@@ -393,14 +396,11 @@ fn build_request(parsed: &ParsedInvoke, remote: &CnbRemote) -> Result<CnbRequest
             method: "PATCH".into(),
             path: format!("{base}/-/issues/{}", required_number(parsed)?),
             query: Map::new(),
-            body: Some(json_body(&parsed.flags)?),
+            body: Some(update_body(&parsed.flags, true)?),
         }),
         "issue-comment" => Ok(CnbRequest {
             method: "POST".into(),
-            path: format!(
-                "{base}/-/issues/{}/comments",
-                required_number(parsed)?
-            ),
+            path: format!("{base}/-/issues/{}/comments", required_number(parsed)?),
             query: Map::new(),
             body: Some(object_body(&parsed.flags, &[("body", true)])?),
         }),
@@ -409,10 +409,13 @@ fn build_request(parsed: &ParsedInvoke, remote: &CnbRemote) -> Result<CnbRequest
             &parsed.flags,
             &["state", "page", "page-size", "author", "assignee", "search"],
         )),
-        "pr" | "pull" => Ok(get(&format!(
-            "{base}/-/pulls/{}",
-            required_number(parsed)?
-        ))),
+        "pr" | "pull" => Ok(get(&format!("{base}/-/pulls/{}", required_number(parsed)?))),
+        "pr-update" | "pull-update" => Ok(CnbRequest {
+            method: "PATCH".into(),
+            path: format!("{base}/-/pulls/{}", required_number(parsed)?),
+            query: Map::new(),
+            body: Some(update_body(&parsed.flags, false)?),
+        }),
         "pr-create" => Ok(CnbRequest {
             method: "POST".into(),
             path: format!("{base}/-/pulls"),
@@ -609,11 +612,34 @@ fn json_body(flags: &Map<String, Value>) -> Result<Value, String> {
         .ok_or_else(|| "codux-cnb: missing --json body".to_string())
 }
 
+fn update_body(flags: &Map<String, Value>, include_reason: bool) -> Result<Value, String> {
+    if flags.contains_key("json") {
+        return json_body(flags);
+    }
+    let mut fields = vec![("state", false), ("title", false), ("body", false)];
+    if include_reason {
+        fields.push(("state_reason", false));
+    }
+    let body = object_body(flags, &fields)?;
+    if body.as_object().is_some_and(|object| object.is_empty()) {
+        return Err("codux-cnb: missing --state or --json body".to_string());
+    }
+    Ok(body)
+}
+
 fn pr_create_body(flags: &Map<String, Value>) -> Result<Value, String> {
     if let Some(json) = flags.get("json") {
         return Ok(json.clone());
     }
-    let mut body = object_body(flags, &[("title", true), ("head", true), ("base", true), ("body", false)])?;
+    let mut body = object_body(
+        flags,
+        &[
+            ("title", true),
+            ("head", true),
+            ("base", true),
+            ("body", false),
+        ],
+    )?;
     if let Some(object) = body.as_object_mut() {
         if let Some(head) = object.remove("head") {
             object.insert("head".into(), json!({ "ref": head }));
@@ -634,7 +660,7 @@ pub fn web_item_url(site: CnbSite, repo: &str, kind: &str, id: &str) -> String {
 }
 
 fn usage_text() -> &'static str {
-    "usage: codux-cnb status|whoami|issues|issue|issue-create|issue-update|issue-comment|issue-comments|prs|pr|pr-create|pr-comment|pr-comments|pr-merge|pr-review|pr-files|pr-commits|builds|build|build-start|build-stop|releases|members|labels|api\n\
+    "usage: codux-cnb status|whoami|issues|issue|issue-create|issue-update|issue-comment|issue-comments|prs|pr|pr-create|pr-update|pr-comment|pr-comments|pr-merge|pr-review|pr-files|pr-commits|builds|build|build-start|build-stop|releases|members|labels|api\n\
 Run `codux-cnb status` first to confirm the current CNB repo and which tokens are configured.\n\
 Tokens stay inside Codux; never print, infer, or hardcode them."
 }
@@ -729,12 +755,8 @@ fn curl_json(site: CnbSite, token: &str, request: &CnbRequest) -> Result<Value, 
         ));
     }
     if status >= 400 {
-        let detail = parse_api_error(&body).unwrap_or_else(|| {
-            body.trim()
-                .chars()
-                .take(240)
-                .collect::<String>()
-        });
+        let detail = parse_api_error(&body)
+            .unwrap_or_else(|| body.trim().chars().take(240).collect::<String>());
         return Err(format!("codux-cnb: HTTP {status}: {detail}"));
     }
     if body.trim().is_empty() {
@@ -846,7 +868,10 @@ mod tests {
         ])
         .unwrap();
         assert_eq!(parsed.command, "issues");
-        assert_eq!(parsed.flags.get("state").and_then(Value::as_str), Some("open"));
+        assert_eq!(
+            parsed.flags.get("state").and_then(Value::as_str),
+            Some("open")
+        );
         assert_eq!(parsed.flags.get("page").and_then(Value::as_str), Some("2"));
     }
 
@@ -870,6 +895,55 @@ mod tests {
         assert_eq!(request.method, "POST");
         assert_eq!(request.path, "/group/repo/-/issues/12/comments");
         assert_eq!(request.body, Some(json!({ "body": "looks good" })));
+    }
+
+    #[test]
+    fn build_issue_update_accepts_state_flag() {
+        let parsed = parse_invoke_args(&[
+            "issue-update".into(),
+            "12".into(),
+            "--state".into(),
+            "closed".into(),
+            "--state_reason".into(),
+            "completed".into(),
+        ])
+        .unwrap();
+        let request = build_request(
+            &parsed,
+            &CnbRemote {
+                site: SITE_COOL,
+                repo: "group/repo".into(),
+            },
+        )
+        .unwrap();
+        assert_eq!(request.method, "PATCH");
+        assert_eq!(request.path, "/group/repo/-/issues/12");
+        assert_eq!(
+            request.body,
+            Some(json!({ "state": "closed", "state_reason": "completed" }))
+        );
+    }
+
+    #[test]
+    fn build_pr_update_accepts_state_flag() {
+        let parsed = parse_invoke_args(&[
+            "pr-update".into(),
+            "3".into(),
+            "--state".into(),
+            "closed".into(),
+        ])
+        .unwrap();
+        let request = build_request(
+            &parsed,
+            &CnbRemote {
+                site: SITE_COOL,
+                repo: "group/repo".into(),
+            },
+        )
+        .unwrap();
+        assert_eq!(request.method, "PATCH");
+        assert_eq!(request.path, "/group/repo/-/pulls/3");
+        assert_eq!(request.body, Some(json!({ "state": "closed" })));
     }
 
     #[test]

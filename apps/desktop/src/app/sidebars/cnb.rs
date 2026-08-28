@@ -1,7 +1,7 @@
 use super::*;
 use crate::app::ui_helpers::{assistant_header_icon_button, header_icon_button_loading};
 use codux_runtime::{
-    cnb_browse::{CnbBrowseDetail, CnbBrowseItem, CnbBrowseKind, CnbBrowseRemote},
+    cnb_browse::{CnbBrowseDetail, CnbBrowseItem, CnbBrowseKind, CnbBrowseRemote, is_live_build},
     i18n::translate,
     settings::locale_from_language_setting,
 };
@@ -9,7 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub(in crate::app) fn cnb_section(
     input: CnbSectionInput<'_>,
-    _window: &mut Window,
+    window: &mut Window,
     cx: &mut Context<CoduxApp>,
 ) -> impl IntoElement {
     let locale = locale_from_language_setting(input.language);
@@ -34,12 +34,13 @@ pub(in crate::app) fn cnb_section(
                 |app, _event, _window, cx| app.refresh_cnb_panel_async(cx),
             ),
         ))
-        .child(cnb_body(input, &labels, cx))
+        .child(cnb_body(input, &labels, window, cx))
 }
 
 fn cnb_body(
     input: CnbSectionInput<'_>,
     labels: &CnbPanelLabels,
+    window: &mut Window,
     cx: &mut Context<CoduxApp>,
 ) -> impl IntoElement {
     if !input.selected_project {
@@ -47,8 +48,12 @@ fn cnb_body(
     }
 
     let Some(remote) = input.remote else {
-        return cnb_empty_state(&labels.empty_no_remote_title, Some(&labels.empty_no_remote_help), cx)
-            .into_any_element();
+        return cnb_empty_state(
+            &labels.empty_no_remote_title,
+            Some(&labels.empty_no_remote_help),
+            cx,
+        )
+        .into_any_element();
     };
 
     if !remote.token_configured {
@@ -71,7 +76,18 @@ fn cnb_body(
     }
 
     if let Some(detail) = input.detail {
-        return cnb_detail_view(detail, input.detail_loading, labels, cx).into_any_element();
+        return cnb_detail_view(
+            detail,
+            input.kind,
+            input.detail_loading,
+            input.action_busy,
+            input.comment_draft,
+            input.comment_revision,
+            labels,
+            window,
+            cx,
+        )
+        .into_any_element();
     }
 
     let kind = input.kind;
@@ -79,6 +95,7 @@ fn cnb_body(
     let items = input.items.to_vec();
     let error = input.error.map(str::to_string);
     let loading = input.loading;
+    let action_busy = input.action_busy;
 
     div()
         .flex()
@@ -116,7 +133,7 @@ fn cnb_body(
                         .flex()
                         .flex_col()
                         .children(items.into_iter().map(|item| {
-                            cnb_item_row(item, kind, labels, cx).into_any_element()
+                            cnb_item_row(item, kind, action_busy, labels, cx).into_any_element()
                         }))
                         .into_any_element()
                 }),
@@ -124,10 +141,7 @@ fn cnb_body(
         .into_any_element()
 }
 
-fn cnb_repo_row(
-    remote: &CnbBrowseRemote,
-    cx: &mut Context<CoduxApp>,
-) -> impl IntoElement {
+fn cnb_repo_row(remote: &CnbBrowseRemote, cx: &mut Context<CoduxApp>) -> impl IntoElement {
     let web = format!("{}/{}", remote.web, remote.repo);
     div()
         .px(px(12.0))
@@ -158,16 +172,14 @@ fn cnb_repo_row(
                         .child(remote.repo.clone()),
                 ),
         )
-        .child(
-            assistant_header_icon_button(
-                "cnb-open-repo",
-                HeroIconName::ArrowTopRightOnSquare,
-                cx,
-                move |app, _event, _window, _cx| {
-                    app.open_cnb_url(&web);
-                },
-            ),
-        )
+        .child(assistant_header_icon_button(
+            "cnb-open-repo",
+            HeroIconName::ArrowTopRightOnSquare,
+            cx,
+            move |app, _event, _window, _cx| {
+                app.open_cnb_url(&web);
+            },
+        ))
 }
 
 fn cnb_kind_row(
@@ -244,8 +256,7 @@ fn cnb_chip(
     label: &str,
     active: bool,
     cx: &mut Context<CoduxApp>,
-    on_click: impl Fn(&mut CoduxApp, &gpui::ClickEvent, &mut Window, &mut Context<CoduxApp>)
-    + 'static,
+    on_click: impl Fn(&mut CoduxApp, &gpui::ClickEvent, &mut Window, &mut Context<CoduxApp>) + 'static,
 ) -> impl IntoElement {
     let label = label.to_string();
     Button::new(id)
@@ -263,12 +274,16 @@ fn cnb_chip(
 fn cnb_item_row(
     item: CnbBrowseItem,
     kind: CnbBrowseKind,
+    action_busy: bool,
     labels: &CnbPanelLabels,
     cx: &mut Context<CoduxApp>,
 ) -> impl IntoElement {
     let item_id = item.id.clone();
+    let stop_id = item.id.clone();
     let hover_surface = ai_stats_track_surface(cx);
     let state_label = cnb_state_label(&item.state, kind, labels);
+    let show_stop = kind == CnbBrowseKind::Builds && is_live_build(&item.state);
+    let stop_label = labels.stop.clone();
     let meta = [
         format_item_id(kind, &item.id),
         item.author.clone(),
@@ -309,7 +324,27 @@ fn cnb_item_row(
                         .text_color(color(theme::TEXT))
                         .child(item.title.clone()),
                 )
-                .child(cnb_state_pill(&item.state, &state_label, cx)),
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(6.0))
+                        .child(cnb_state_pill(&item.state, &state_label, cx))
+                        .when(show_stop, |this| {
+                            this.child(
+                                Button::new(SharedString::from(format!("cnb-stop-{}", stop_id)))
+                                    .compact()
+                                    .ghost()
+                                    .disabled(action_busy)
+                                    .text_color(cx.theme().secondary_foreground)
+                                    .on_click(cx.listener(move |app, _event, _window, cx| {
+                                        cx.stop_propagation();
+                                        app.stop_cnb_build(stop_id.clone(), cx);
+                                    }))
+                                    .child(stop_label.clone()),
+                            )
+                        }),
+                ),
         )
         .child(
             div()
@@ -324,14 +359,22 @@ fn cnb_item_row(
 
 fn cnb_detail_view(
     detail: &CnbBrowseDetail,
+    kind: CnbBrowseKind,
     loading: bool,
+    action_busy: bool,
+    comment_draft: &str,
+    comment_revision: u64,
     labels: &CnbPanelLabels,
+    window: &mut Window,
     cx: &mut Context<CoduxApp>,
 ) -> impl IntoElement {
     let web_url = detail.item.web_url.clone();
-    let state_label = cnb_state_label(&detail.item.state, infer_kind_from_url(&detail.item.web_url), labels);
+    let state_label = cnb_state_label(&detail.item.state, kind, labels);
+    let close_action = cnb_close_action(&detail.item.state, kind);
+    let show_stop = kind == CnbBrowseKind::Builds && is_live_build(&detail.item.state);
+    let show_comments = kind != CnbBrowseKind::Builds;
     let meta = [
-        format_item_id(infer_kind_from_url(&detail.item.web_url), &detail.item.id),
+        format_item_id(kind, &detail.item.id),
         detail.item.author.clone(),
         relative_time(&detail.item.updated_at),
         detail.item.extra.clone(),
@@ -344,6 +387,11 @@ fn cnb_detail_view(
         labels.no_body.clone()
     } else {
         detail.body.clone()
+    };
+    let action_label = match close_action {
+        Some(true) => labels.close.clone(),
+        Some(false) => labels.reopen.clone(),
+        None => String::new(),
     };
 
     div()
@@ -361,25 +409,64 @@ fn cnb_detail_view(
                 .border_b_1()
                 .border_color(color(theme::BORDER_SOFT).opacity(0.5))
                 .child(
-                    Button::new("cnb-back")
-                        .compact()
-                        .ghost()
-                        .text_color(cx.theme().secondary_foreground)
-                        .on_click(cx.listener(|app, _event, _window, cx| {
-                            app.close_cnb_detail(cx);
-                        }))
-                        .child(labels.back.clone()),
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(4.0))
+                        .child(
+                            Button::new("cnb-back")
+                                .compact()
+                                .ghost()
+                                .text_color(cx.theme().secondary_foreground)
+                                .on_click(cx.listener(|app, _event, _window, cx| {
+                                    app.close_cnb_detail(cx);
+                                }))
+                                .child(labels.back.clone()),
+                        )
+                        .when_some(close_action, |this, close| {
+                            this.child(
+                                Button::new("cnb-toggle-state")
+                                    .compact()
+                                    .ghost()
+                                    .disabled(action_busy)
+                                    .text_color(cx.theme().secondary_foreground)
+                                    .on_click(cx.listener(move |app, _event, _window, cx| {
+                                        app.set_cnb_item_closed(close, cx);
+                                    }))
+                                    .child(action_label.clone()),
+                            )
+                        })
+                        .when(show_stop, |this| {
+                            let stop_id = detail.item.id.clone();
+                            this.child(
+                                Button::new("cnb-stop-detail")
+                                    .compact()
+                                    .ghost()
+                                    .disabled(action_busy)
+                                    .text_color(cx.theme().secondary_foreground)
+                                    .on_click(cx.listener(move |app, _event, _window, cx| {
+                                        app.stop_cnb_build(stop_id.clone(), cx);
+                                    }))
+                                    .child(labels.stop.clone()),
+                            )
+                        })
+                        .when(action_busy, |this| {
+                            this.child(
+                                div()
+                                    .text_size(rems(0.6875))
+                                    .text_color(color(theme::TEXT_MUTED))
+                                    .child(labels.busy.clone()),
+                            )
+                        }),
                 )
-                .child(
-                    assistant_header_icon_button(
-                        "cnb-open-item",
-                        HeroIconName::ArrowTopRightOnSquare,
-                        cx,
-                        move |app, _event, _window, _cx| {
-                            app.open_cnb_url(&web_url);
-                        },
-                    ),
-                ),
+                .child(assistant_header_icon_button(
+                    "cnb-open-item",
+                    HeroIconName::ArrowTopRightOnSquare,
+                    cx,
+                    move |app, _event, _window, _cx| {
+                        app.open_cnb_url(&web_url);
+                    },
+                )),
         )
         .child(
             div()
@@ -426,66 +513,142 @@ fn cnb_detail_view(
                                 .text_color(color(theme::TEXT))
                                 .child(body),
                         )
-                        .child(
-                            div()
-                                .mt(px(4.0))
-                                .text_size(rems(0.75))
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(color(theme::TEXT))
-                                .child(labels.comments.clone()),
-                        )
-                        .child(if loading {
-                            div()
-                                .text_size(rems(0.75))
-                                .text_color(color(theme::TEXT_MUTED))
-                                .child(labels.loading.clone())
-                                .into_any_element()
-                        } else if detail.comments.is_empty() {
-                            div()
-                                .text_size(rems(0.75))
-                                .text_color(color(theme::TEXT_MUTED))
-                                .child(labels.no_comments.clone())
-                                .into_any_element()
-                        } else {
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap(px(8.0))
-                                .children(detail.comments.iter().map(|comment| {
-                                    div()
-                                        .p(px(10.0))
-                                        .rounded(px(8.0))
-                                        .bg(ai_stats_surface(cx))
-                                        .child(
-                                            div()
-                                                .text_size(rems(0.6875))
-                                                .text_color(color(theme::TEXT_MUTED))
-                                                .child(format!(
-                                                    "{} · {}",
-                                                    comment.author,
-                                                    relative_time(&comment.created_at)
-                                                )),
-                                        )
-                                        .child(
-                                            div()
-                                                .mt(px(4.0))
-                                                .text_size(rems(0.8125))
-                                                .line_height(rems(1.125))
-                                                .text_color(color(theme::TEXT))
-                                                .child(comment.body.clone()),
-                                        )
-                                }))
-                                .into_any_element()
+                        .when(show_comments, |this| {
+                            this.child(
+                                div()
+                                    .mt(px(4.0))
+                                    .text_size(rems(0.75))
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(color(theme::TEXT))
+                                    .child(labels.comments.clone()),
+                            )
+                            .child(if loading {
+                                div()
+                                    .text_size(rems(0.75))
+                                    .text_color(color(theme::TEXT_MUTED))
+                                    .child(labels.loading.clone())
+                                    .into_any_element()
+                            } else if detail.comments.is_empty() {
+                                div()
+                                    .text_size(rems(0.75))
+                                    .text_color(color(theme::TEXT_MUTED))
+                                    .child(labels.no_comments.clone())
+                                    .into_any_element()
+                            } else {
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(px(8.0))
+                                    .children(detail.comments.iter().map(|comment| {
+                                        div()
+                                            .p(px(10.0))
+                                            .rounded(px(8.0))
+                                            .bg(ai_stats_surface(cx))
+                                            .child(
+                                                div()
+                                                    .text_size(rems(0.6875))
+                                                    .text_color(color(theme::TEXT_MUTED))
+                                                    .child(format!(
+                                                        "{} · {}",
+                                                        comment.author,
+                                                        relative_time(&comment.created_at)
+                                                    )),
+                                            )
+                                            .child(
+                                                div()
+                                                    .mt(px(4.0))
+                                                    .text_size(rems(0.8125))
+                                                    .line_height(rems(1.125))
+                                                    .text_color(color(theme::TEXT))
+                                                    .child(comment.body.clone()),
+                                            )
+                                    }))
+                                    .into_any_element()
+                            })
                         }),
                 ),
         )
+        .when(show_comments, |this| {
+            this.child(cnb_comment_composer(
+                comment_draft,
+                comment_revision,
+                action_busy,
+                labels,
+                window,
+                cx,
+            ))
+        })
 }
 
-fn cnb_empty_state(
-    title: &str,
-    help: Option<&str>,
+fn cnb_comment_composer(
+    comment_draft: &str,
+    comment_revision: u64,
+    action_busy: bool,
+    labels: &CnbPanelLabels,
+    window: &mut Window,
     cx: &mut Context<CoduxApp>,
-) -> gpui::Div {
+) -> impl IntoElement {
+    let value = comment_draft.to_string();
+    let placeholder = labels.comment_placeholder.clone();
+    let input_state = window.use_keyed_state(
+        SharedString::from(format!("cnb-comment-{comment_revision}")),
+        cx,
+        |window, cx| {
+            InputState::new(window, cx)
+                .multi_line(true)
+                .rows(2)
+                .default_value(value.clone())
+                .placeholder(placeholder)
+        },
+    );
+    cx.subscribe_in(
+        &input_state,
+        window,
+        |app, state, event, _window, cx| match event {
+            InputEvent::Change => {
+                app.set_cnb_comment_draft(state.read(cx).value().to_string());
+            }
+            InputEvent::PressEnter { shift, .. } if !*shift => {
+                app.submit_cnb_comment(cx);
+            }
+            _ => {}
+        },
+    )
+    .detach();
+
+    div()
+        .flex_shrink_0()
+        .p(px(12.0))
+        .border_t_1()
+        .border_color(color(theme::BORDER_SOFT).opacity(0.5))
+        .child(
+            Input::new(&input_state)
+                .with_size(gpui_component::Size::Medium)
+                .h(px(64.0)),
+        )
+        .child(
+            Button::new("cnb-submit-comment")
+                .compact()
+                .primary()
+                .mt(px(8.0))
+                .disabled(action_busy)
+                .on_click(cx.listener(|app, _event, _window, cx| {
+                    app.submit_cnb_comment(cx);
+                }))
+                .child(labels.comment.clone()),
+        )
+}
+
+fn cnb_close_action(state: &str, kind: CnbBrowseKind) -> Option<bool> {
+    match kind {
+        CnbBrowseKind::Builds => None,
+        _ if state == "merged" => None,
+        _ if state == "closed" => Some(false),
+        _ => Some(true),
+    }
+}
+
+fn cnb_empty_state(title: &str, help: Option<&str>, cx: &mut Context<CoduxApp>) -> gpui::Div {
     div()
         .size_full()
         .flex()
@@ -572,16 +735,6 @@ fn format_item_id(kind: CnbBrowseKind, id: &str) -> String {
     }
 }
 
-fn infer_kind_from_url(url: &str) -> CnbBrowseKind {
-    if url.contains("/-/pulls/") {
-        CnbBrowseKind::Pulls
-    } else if url.contains("/-/build/") {
-        CnbBrowseKind::Builds
-    } else {
-        CnbBrowseKind::Issues
-    }
-}
-
 fn relative_time(value: &str) -> String {
     let Some(then) = parse_unix_seconds(value) else {
         return String::new();
@@ -652,6 +805,9 @@ pub(in crate::app) struct CnbSectionInput<'a> {
     pub detail: Option<&'a CnbBrowseDetail>,
     pub loading: bool,
     pub detail_loading: bool,
+    pub action_busy: bool,
+    pub comment_draft: &'a str,
+    pub comment_revision: u64,
     pub error: Option<&'a str>,
 }
 
@@ -671,6 +827,12 @@ struct CnbPanelLabels {
     configure: String,
     back: String,
     comments: String,
+    comment: String,
+    comment_placeholder: String,
+    close: String,
+    reopen: String,
+    stop: String,
+    busy: String,
     no_body: String,
     no_comments: String,
     loading: String,
@@ -716,6 +878,16 @@ impl CnbPanelLabels {
             configure: translate(&locale, "cnb.panel.configure", "Add Token"),
             back: translate(&locale, "cnb.panel.back", "Back"),
             comments: translate(&locale, "cnb.detail.comments", "Comments"),
+            comment: translate(&locale, "cnb.action.comment", "Comment"),
+            comment_placeholder: translate(
+                &locale,
+                "cnb.action.comment_placeholder",
+                "Write a comment…",
+            ),
+            close: translate(&locale, "cnb.action.close", "Close"),
+            reopen: translate(&locale, "cnb.action.reopen", "Reopen"),
+            stop: translate(&locale, "cnb.action.stop", "Stop"),
+            busy: translate(&locale, "cnb.action.busy", "Working…"),
             no_body: translate(&locale, "cnb.detail.no_body", "No description"),
             no_comments: translate(&locale, "cnb.detail.no_comments", "No comments"),
             loading: translate(&locale, "cnb.status.loading", "Loading CNB…"),
