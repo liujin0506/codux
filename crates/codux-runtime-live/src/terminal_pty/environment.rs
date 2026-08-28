@@ -164,6 +164,10 @@ pub fn terminal_environment(
             "CODUX_DB_PROFILES_FILE".to_string(),
             support_dir.join("db_profiles.json").display().to_string(),
         );
+        values.insert(
+            "CODUX_CNB_TOKENS_FILE".to_string(),
+            support_dir.join("cnb_tokens.json").display().to_string(),
+        );
     }
     let root_project_id = context
         .map(|context| context.root_project_id.clone())

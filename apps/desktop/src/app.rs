@@ -47,6 +47,7 @@ use codux_runtime::{
     },
     runtime_activity::RuntimeActivitySummary,
     runtime_bridge::RuntimeInventory,
+    cnb_browse::{CnbBrowseDetail, CnbBrowseItem, CnbBrowseKind, CnbBrowseRemote},
     runtime_state::{FileEntry, FileKind, ProjectInfo, RuntimeService, RuntimeState},
     settings::{SettingsSummary, locale_from_language_setting},
     ssh::{SSHConnectionProfile, SSHProfileSummary, SSHProfileUpsertRequest, SSHSummary},
@@ -95,6 +96,7 @@ use std::{
 };
 
 mod about;
+mod cnb_actions;
 mod agent_display;
 mod agent_lifecycle;
 mod ai_history_mapping;

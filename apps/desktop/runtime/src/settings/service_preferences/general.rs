@@ -43,7 +43,7 @@ impl SettingsService {
             .unwrap_or(true);
         raw.insert("showsDockBadge".to_string(), Value::Bool(!current));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn toggle_developer_hud(&self) -> Result<SettingsSummary, String> {
@@ -54,7 +54,7 @@ impl SettingsService {
             .unwrap_or(false);
         raw.insert("developerHud".to_string(), Value::Bool(!current));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn toggle_wsl_enabled(&self) -> Result<SettingsSummary, String> {
@@ -65,7 +65,7 @@ impl SettingsService {
             .unwrap_or(true);
         raw.insert("wslEnabled".to_string(), Value::Bool(!current));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn toggle_memory_enabled(&self) -> Result<SettingsSummary, String> {
@@ -77,7 +77,7 @@ impl SettingsService {
             .unwrap_or(false);
         memory.insert("enabled".to_string(), Value::Bool(!current));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn set_sleep_mode(&self, mode: &str) -> Result<SettingsSummary, String> {

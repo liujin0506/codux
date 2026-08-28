@@ -1,6 +1,7 @@
 use super::*;
 
 mod ai;
+mod cnb;
 mod db;
 mod files;
 mod git;
@@ -16,6 +17,7 @@ pub(in crate::app) use files::{
 };
 pub(in crate::app) use files::{FileTreeRow, file_section};
 pub(in crate::app) use git::{GitSectionInput, git_section};
+pub(in crate::app) use cnb::{CnbSectionInput, cnb_section};
 pub(in crate::app) use ssh::ssh_section;
 
 pub(in crate::app) use files::{
@@ -36,6 +38,7 @@ pub(super) enum AssistantPanel {
     DB,
     FileManager,
     Git,
+    Cnb,
 }
 
 #[derive(Clone, PartialEq)]
@@ -352,6 +355,123 @@ impl CoduxApp {
         GitSidebarSnapshot {
             git_fingerprint: git_fingerprint(&self.state.git),
             interaction_fingerprint: git_interaction_fingerprint(self),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq)]
+pub(in crate::app) struct CnbSidebarSnapshot {
+    fingerprint: u64,
+}
+
+pub(in crate::app) struct CnbSidebarView {
+    app_entity: gpui::Entity<CoduxApp>,
+    snapshot: CnbSidebarSnapshot,
+}
+
+impl CnbSidebarView {
+    fn set_snapshot(&mut self, snapshot: CnbSidebarSnapshot, cx: &mut Context<Self>) {
+        if self.snapshot == snapshot {
+            return;
+        }
+        self.snapshot = snapshot;
+        cx.notify();
+    }
+}
+
+impl Render for CnbSidebarView {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let app_entity = self.app_entity.clone();
+        app_entity.update(cx, |app, cx| {
+            cnb_section(
+                CnbSectionInput {
+                    language: &app.state.settings.language,
+                    selected_project: app.state.selected_project.is_some(),
+                    remote: app.cnb_remote.as_ref(),
+                    kind: app.cnb_kind,
+                    state_filter: &app.cnb_state_filter,
+                    items: &app.cnb_items,
+                    detail: app.cnb_detail.as_ref(),
+                    loading: app.cnb_loading,
+                    detail_loading: app.cnb_detail_loading,
+                    error: app.cnb_error.as_deref(),
+                },
+                window,
+                cx,
+            )
+            .into_any_element()
+        })
+    }
+}
+
+impl CoduxApp {
+    pub(in crate::app) fn cnb_sidebar_view(
+        &mut self,
+        cx: &mut Context<Self>,
+    ) -> gpui::Entity<CnbSidebarView> {
+        let snapshot = self.cnb_sidebar_snapshot();
+        if let Some(view) = &self.cnb_sidebar_view {
+            view.update(cx, |view, cx| view.set_snapshot(snapshot, cx));
+            return view.clone();
+        }
+        let app_entity = cx.entity();
+        let view = cx.new(|_| CnbSidebarView {
+            app_entity,
+            snapshot,
+        });
+        self.cnb_sidebar_view = Some(view.clone());
+        view
+    }
+
+    fn cnb_sidebar_snapshot(&self) -> CnbSidebarSnapshot {
+        CnbSidebarSnapshot {
+            fingerprint: combine_sidebar_hashes(&[
+                hash_sidebar_value(&(
+                    self.state.settings.language.clone(),
+                    self.state.selected_project.as_ref().map(|project| project.id.clone()),
+                    self.cnb_kind.as_str(),
+                    self.cnb_state_filter.clone(),
+                    self.cnb_loading,
+                    self.cnb_detail_loading,
+                    self.cnb_error.clone(),
+                    self.cnb_selected_id.clone(),
+                )),
+                hash_sidebar_value(
+                    &self
+                        .cnb_remote
+                        .as_ref()
+                        .map(|remote| {
+                            (
+                                remote.site_id.clone(),
+                                remote.repo.clone(),
+                                remote.token_configured,
+                            )
+                        }),
+                ),
+                hash_sidebar_value(
+                    &self
+                        .cnb_items
+                        .iter()
+                        .map(|item| {
+                            (
+                                item.id.clone(),
+                                item.title.clone(),
+                                item.state.clone(),
+                                item.updated_at.clone(),
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                ),
+                hash_sidebar_value(
+                    &self.cnb_detail.as_ref().map(|detail| {
+                        (
+                            detail.item.id.clone(),
+                            detail.body.clone(),
+                            detail.comments.len(),
+                        )
+                    }),
+                ),
+            ]),
         }
     }
 }

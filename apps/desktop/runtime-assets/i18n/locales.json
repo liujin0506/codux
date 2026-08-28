@@ -17,6 +17,7 @@
     "locales/agent.json",
     "locales/ai.json",
     "locales/app.json",
+    "locales/cnb.json",
     "locales/common.json",
     "locales/db.json",
     "locales/diagnostics.json",

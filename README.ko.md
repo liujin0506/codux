@@ -73,10 +73,11 @@ Windows 또는 Homebrew를 쓰지 않는 경우 [다운로드](#download)를 참
 
 ## 자격 증명은 AI에 전달되지 않습니다
 
-agent는 서버와 데이터베이스가 자주 필요합니다. 하지만 비밀번호를 프롬프트에 붙여 넣거나 모델이 설정 파일을 읽게 하는 것은 자격 증명 유출로 이어집니다. Codux는 연결 프로필을 로컬에 저장하고 agent에는 안전한 두 명령만 제공합니다.
+agent는 서버와 데이터베이스가 자주 필요합니다. 하지만 비밀번호를 프롬프트에 붙여 넣거나 모델이 설정 파일을 읽게 하는 것은 자격 증명 유출로 이어집니다. Codux는 연결 프로필을 로컬에 저장하고 agent에는 안전한 명령만 제공합니다.
 
 - **`codux-ssh`**: agent는 `codux-ssh list` 를 실행해 프로필 이름과 호스트만 봅니다. 비밀번호와 키는 Codux helper 프로세스 안에서 주입되며, 모델 컨텍스트, 대화 기록, shell 히스토리에 들어가지 않습니다.
 - **`codux-db`**: MySQL / PostgreSQL / SQLite에도 같은 격리를 제공합니다. Codux에 한 번 저장하고 프로필 이름으로 쿼리합니다. 읽기 전용 프로필은 wrapper 내부의 단일 문장 allowlist로 강제되므로 모델이 스스로 권한을 확장할 수 없습니다.
+- **`codux-cnb`**: cnb.cool / cnb.woa.com 의 이슈, PR, 파이프라인. 토큰은 Codux 안에 머물며, 원격 agent는 해당 호스트에서 CNB API를 호출합니다. 데스크톱 CNB 사이드바는 현재 프로젝트 remote의 같은 데이터를 탐색합니다.
 - **프로젝트별 설정이 필요 없습니다.** 지원되는 모든 CLI는 Codux 환경 지시문을 통해 이 명령들을 자동으로 알게 됩니다.
 
 <p align="center"><img src="docs/images/credential-isolation.png" alt="codux-ssh list shows profile names and hosts only — never passwords"></p>
@@ -97,7 +98,7 @@ Codux는 non-invasive wrapper와 도구별 adapter를 사용합니다. Codux 컨
 | CodeWhale | ✓ | ✓ | ✓ | ✓ | interactive session에는 주입하지 않음 |
 | Agy | ✓ | ✓ | ✓ | ✓ | 주입하지 않음. 확인된 non-invasive prompt channel 없음 |
 
-환경 지시문에는 Codux 메모리와 `codux-ssh`, `codux-db` 같은 runtime 명령이 포함됩니다. 지원되지 않는 도구도 가능한 범위에서 세션을 추적하지만, 프로젝트 파일이나 사용자 전역 설정을 강제로 사용해 prompt를 주입하지 않습니다.
+환경 지시문에는 Codux 메모리와 `codux-ssh`, `codux-db`, `codux-cnb` 같은 runtime 명령이 포함됩니다. 지원되지 않는 도구도 가능한 범위에서 세션을 추적하지만, 프로젝트 파일이나 사용자 전역 설정을 강제로 사용해 prompt를 주입하지 않습니다.
 
 ## 하나의 워크스페이스, 모든 디바이스
 

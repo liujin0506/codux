@@ -1418,6 +1418,23 @@ impl CoduxApp {
         self.invalidate_ui_region(cx, UiRegion::Root);
     }
 
+    pub(super) fn set_cnb_token(
+        &mut self,
+        site: String,
+        token: String,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match self.runtime_service.set_cnb_token(&site, &token) {
+            Ok(settings) => {
+                self.apply_settings_summary(settings);
+                self.status_message = "CNB token saved".to_string();
+            }
+            Err(error) => self.status_message = format!("failed to save CNB token: {error}"),
+        }
+        self.invalidate_ui_region(cx, UiRegion::Root);
+    }
+
     pub(super) fn set_git_commit_style_rules(
         &mut self,
         rules: String,

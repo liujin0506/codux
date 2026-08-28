@@ -162,7 +162,7 @@ impl SettingsPane {
             Self::Appearance => &["theme", "appearance", "外观", "外觀", "テーマ"],
             Self::Pet => &["pet", "宠物", "寵物", "ペット"],
             Self::AI => &["ai", "model", "codex", "claude", "工具"],
-            Self::Git => &["git", "commit"],
+            Self::Git => &["git", "commit", "cnb"],
             Self::Memory => &["memory", "记忆", "記憶", "メモリ"],
             Self::Notifications => &["notification", "通知"],
             Self::Remote => &["remote", "ssh", "远程", "遠端"],

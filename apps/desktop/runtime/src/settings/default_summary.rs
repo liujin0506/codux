@@ -30,6 +30,8 @@ impl Default for SettingsSummary {
             git_commit_language: "application".to_string(),
             git_commit_style_rules: String::new(),
             git_commit_style_rules_chars: 0,
+            cnb_token_cool_configured: false,
+            cnb_token_woa_configured: false,
             runtime_tool_count: 9,
             memory_enabled: true,
             memory_automatic_injection_enabled: true,

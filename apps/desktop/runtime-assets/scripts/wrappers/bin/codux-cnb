@@ -1,0 +1,50 @@
+#!/bin/zsh
+set -uo pipefail
+
+usage() {
+  print -r -- "usage: codux-cnb status"
+  print -r -- "       codux-cnb whoami"
+  print -r -- "       codux-cnb issues [--state open|closed|all] [--page N]"
+  print -r -- "       codux-cnb issue <number>"
+  print -r -- "       codux-cnb issue-create --title <title> [--body <markdown>]"
+  print -r -- "       codux-cnb issue-update <number> --json '{...}'"
+  print -r -- "       codux-cnb issue-comment <number> --body <markdown>"
+  print -r -- "       codux-cnb prs [--state open|closed|merged|all]"
+  print -r -- "       codux-cnb pr <number>"
+  print -r -- "       codux-cnb pr-create --title <title> --head <branch> --base <branch> [--body <markdown>]"
+  print -r -- "       codux-cnb pr-comment <number> --body <markdown>"
+  print -r -- "       codux-cnb pr-merge <number>"
+  print -r -- "       codux-cnb pr-review <number> --event approve|comment|request_changes [--body <markdown>]"
+  print -r -- "       codux-cnb builds"
+  print -r -- "       codux-cnb build <sn>"
+  print -r -- "       codux-cnb build-start [--json '{...}']"
+  print -r -- "       codux-cnb build-stop <sn>"
+  print -r -- "       codux-cnb releases"
+  print -r -- "       codux-cnb members [--search <query>]"
+  print -r -- "       codux-cnb labels [--keyword <query>]"
+  print -r -- "       codux-cnb api <METHOD> <path> [--json '{...}']"
+  print -r -- ""
+  print -r -- "CNB tokens stay inside Codux. Run 'codux-cnb status' first."
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || "${1:-}" == "help" ]]; then
+  usage
+  exit 0
+fi
+
+wrapper_helper="${0:A:h}/../codux-wrapper-helper"
+if [[ ! -x "${wrapper_helper}" ]]; then
+  print -u2 -- "codux-cnb: bundled helper is missing"
+  exit 127
+fi
+
+tokens_file="${CODUX_CNB_TOKENS_FILE:-}"
+if [[ -z "${tokens_file}" && -n "${DMUX_APP_SUPPORT_ROOT:-}" ]]; then
+  tokens_file="${DMUX_APP_SUPPORT_ROOT}/cnb_tokens.json"
+fi
+if [[ -z "${tokens_file}" ]]; then
+  tokens_file="${HOME}/Library/Application Support/Codux/cnb_tokens.json"
+fi
+
+CODUX_CNB_TOKENS_FILE="${tokens_file}" "${wrapper_helper}" --codux-wrapper-helper cnb-invoke "$@"
+exit $?

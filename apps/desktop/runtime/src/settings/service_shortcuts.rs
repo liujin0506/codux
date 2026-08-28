@@ -8,7 +8,7 @@ impl SettingsService {
             Value::String(value.trim().chars().take(120).collect()),
         );
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn reset_shortcut(&self, shortcut_id: &str) -> Result<SettingsSummary, String> {
@@ -17,6 +17,6 @@ impl SettingsService {
         let shortcuts = shortcuts_mut(&mut raw)?;
         shortcuts.remove(&shortcut_id);
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 }

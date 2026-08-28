@@ -118,6 +118,13 @@ impl CoduxApp {
                             has_project_context,
                             cx,
                         ))
+                        .child(workspace_assistant_button(
+                            "CNB",
+                            AssistantPanel::Cnb,
+                            self.assistant_panel,
+                            has_project_context,
+                            cx,
+                        ))
                         .when(!cfg!(target_os = "macos"), |this| {
                             this.child(
                                 div()
@@ -349,6 +356,7 @@ fn workspace_assistant_button(
             AssistantPanel::DB => "workspace-assistant-db",
             AssistantPanel::FileManager => "workspace-assistant-files",
             AssistantPanel::Git => "workspace-assistant-git",
+            AssistantPanel::Cnb => "workspace-assistant-cnb",
         },
         cx,
     );
@@ -384,6 +392,7 @@ fn workspace_assistant_button(
                         AssistantPanel::DB => HeroIconName::CircleStack,
                         AssistantPanel::FileManager => HeroIconName::Folder,
                         AssistantPanel::Git => HeroIconName::Share,
+                        AssistantPanel::Cnb => HeroIconName::QueueList,
                     })
                     .size_3p5()
                     .text_color(if active {
@@ -403,6 +412,7 @@ fn workspace_assistant_button(
             AssistantPanel::DB => "workspace-assistant-db-tooltip",
             AssistantPanel::FileManager => "workspace-assistant-files-tooltip",
             AssistantPanel::Git => "workspace-assistant-git-tooltip",
+            AssistantPanel::Cnb => "workspace-assistant-cnb-tooltip",
         },
         button,
         label,

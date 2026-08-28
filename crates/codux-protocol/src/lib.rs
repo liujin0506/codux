@@ -141,6 +141,20 @@ pub const REMOTE_SSH_UPSERT: &str = "ssh.upsert";
 /// Remove a saved SSH profile by id: `{ id }`. Reply is a fresh `ssh.list.result`.
 pub const REMOTE_SSH_REMOVE: &str = "ssh.remove";
 
+/// Read whether CNB tokens are configured on the runtime that owns the
+/// terminal. Secrets are never returned.
+pub const REMOTE_CNB_TOKENS_GET: &str = "cnb.tokens.get";
+/// Write CNB tokens onto the runtime that will make the API calls.
+/// Payload is `{ tokenCool, tokenWoa }`; reply is `cnb.tokens.result`.
+pub const REMOTE_CNB_TOKENS_SET: &str = "cnb.tokens.set";
+/// Reply to CNB token get/set: `{ tokenCoolConfigured, tokenWoaConfigured }`.
+pub const REMOTE_CNB_TOKENS_RESULT: &str = "cnb.tokens.result";
+/// Run a CNB API command on the host that can reach the site.
+/// Payload is `{ args: ["issues", "--state", "open", ...] }`.
+pub const REMOTE_CNB_INVOKE: &str = "cnb.invoke";
+/// Reply to `cnb.invoke`: the parsed JSON body from the CNB API.
+pub const REMOTE_CNB_INVOKE_RESULT: &str = "cnb.invoke.result";
+
 pub const REMOTE_TRANSPORT_IROH: &str = "iroh";
 pub const REMOTE_TRANSPORT_ROLE_HOST: &str = "host";
 

@@ -8,7 +8,7 @@ impl SettingsService {
             .unwrap_or(false);
         update.insert("enabled".to_string(), Value::Bool(!current));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn cycle_update_channel(&self) -> Result<SettingsSummary, String> {
@@ -26,7 +26,7 @@ impl SettingsService {
         update.insert("channel".to_string(), Value::String(next.to_string()));
         sync_update_endpoint_for_channel(update, next);
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn set_update_channel(&self, channel: &str) -> Result<SettingsSummary, String> {
@@ -40,7 +40,7 @@ impl SettingsService {
         update.insert("channel".to_string(), Value::String(channel.to_string()));
         sync_update_endpoint_for_channel(update, channel);
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn cycle_git_refresh(&self) -> Result<SettingsSummary, String> {

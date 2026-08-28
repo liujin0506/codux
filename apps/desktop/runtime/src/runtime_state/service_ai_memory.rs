@@ -135,6 +135,23 @@ impl RuntimeService {
         project_name: &str,
         workspace_path: &str,
     ) -> Option<crate::memory::MemoryLaunchArtifacts> {
+        if let Ok(target) = ProjectStore::new(self.support_dir.clone())
+            .runtime_target_for_workspace_path(workspace_path)
+            && target.is_hosted()
+        {
+            let store = crate::cnb::CnbStore::from_support_dir(self.support_dir.clone());
+            let tokens = store.tokens();
+            let payload = serde_json::json!({
+                "tokenCool": tokens.token_cool,
+                "tokenWoa": tokens.token_woa,
+            });
+            if let Err(error) = self.upsert_cnb_tokens_for_target(&target, &payload) {
+                crate::runtime_trace::runtime_trace(
+                    "cnb",
+                    &format!("failed to sync CNB tokens before launch: {error}"),
+                );
+            }
+        }
         Self::prepare_memory_launch_artifacts_at(
             &self.support_dir,
             project_id,
@@ -164,6 +181,7 @@ impl RuntimeService {
                 Some(project_id),
                 None,
             ),
+            crate::cnb::render_cnb_launch_context_from_support_dir(support_dir.to_path_buf()),
         ])
         .flatten()
         .collect::<Vec<_>>()
@@ -595,7 +613,8 @@ You are running inside a Codux-managed terminal.\n\n\
 ## Saved Connections\n\
 - SSH: use `codux-ssh list` first to discover saved hosts, then `codux-ssh <profile-id> -- '<remote-command>'` for one-off remote commands, or `codux-ssh scp <profile-id> <src> <dst>` (mark the remote path with a leading ':') to transfer files.\n\
 - Database: use `codux-db list` first to discover saved databases for the current root project, then run `codux-db <profile-id> -- '<SQL>'`.\n\
-- Do not grep the repository to discover saved SSH or database connections.\n\
+- CNB: use `codux-cnb status` first to confirm the current cnb.cool / cnb.woa.com repository, then `codux-cnb issues`, `codux-cnb prs`, `codux-cnb builds`, and related subcommands. API calls run on this machine.\n\
+- Do not grep the repository to discover saved SSH, database, or CNB connections.\n\
 - Do not ask the user for saved credentials. Codux injects credentials into the wrappers; you cannot see them and must not print, infer, or hardcode them.\n\n\
 {}",
         codux_runtime_core::agent_worktree::agent_worktree_ai_directive()

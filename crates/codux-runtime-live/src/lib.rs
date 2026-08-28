@@ -9,6 +9,7 @@
 
 pub mod agent_worktree;
 pub mod ai_runtime;
+pub mod cnb;
 pub mod ai_runtime_state;
 pub mod host_metrics;
 pub mod remote_terminal_dispatch;

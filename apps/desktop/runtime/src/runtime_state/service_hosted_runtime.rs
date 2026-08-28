@@ -628,6 +628,69 @@ impl RuntimeService {
         }
     }
 
+    fn sync_cnb_tokens_to_hosted_runtimes(&self) -> Result<(), String> {
+        let store = crate::cnb::CnbStore::from_support_dir(self.support_dir.clone());
+        let tokens = store.tokens();
+        let payload = serde_json::json!({
+            "tokenCool": tokens.token_cool,
+            "tokenWoa": tokens.token_woa,
+        });
+        let mut seen = std::collections::HashSet::new();
+        for project in ProjectStore::new(self.support_dir.clone())
+            .snapshot()
+            .projects
+        {
+            if !project.runtime_target.is_hosted() {
+                continue;
+            }
+            let Some(identity) = project.runtime_target.identity() else {
+                continue;
+            };
+            if !seen.insert(identity) {
+                continue;
+            }
+            if let Err(error) = self.upsert_cnb_tokens_for_target(&project.runtime_target, &payload)
+            {
+                crate::runtime_trace::runtime_trace(
+                    "cnb",
+                    &format!(
+                        "failed to sync CNB tokens to {}: {error}",
+                        project.runtime_target.identity().unwrap_or_default()
+                    ),
+                );
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn hosted_cnb_invoke(
+        &self,
+        project_path: &str,
+        args: &[String],
+    ) -> Option<Result<Value, String>> {
+        let runtime = match self.hosted_runtime_for_project_path(project_path)? {
+            Ok(runtime) => runtime,
+            Err(error) => return Some(Err(error)),
+        };
+        Some(runtime.cnb_invoke(args))
+    }
+
+    fn upsert_cnb_tokens_for_target(
+        &self,
+        target: &ProjectRuntimeTarget,
+        payload: &Value,
+    ) -> Result<Value, String> {
+        match self.hosted_runtime_for_target_blocking(target)? {
+            Some(HostedProjectRuntime::Wsl(client)) => {
+                client.request("cnb.tokens.set", payload.clone())
+            }
+            Some(HostedProjectRuntime::Remote(controller)) => {
+                controller.cnb_tokens_set(payload.clone())
+            }
+            None => Err("Local runtime does not need remote CNB token sync.".to_string()),
+        }
+    }
+
     fn hosted_runtime_for_project_path(
         &self,
         project_path: &str,
@@ -994,6 +1057,14 @@ impl HostedProjectRuntime {
                 json!({ "projectPath": project_path, "op": op, "args": args }),
             ),
             Self::Remote(controller) => controller.git_read(project_id, op, project_path, args),
+        }
+    }
+
+    fn cnb_invoke(&self, args: &[String]) -> Result<Value, String> {
+        let payload = json!({ "args": args });
+        match self {
+            Self::Wsl(client) => client.request("cnb.invoke", payload),
+            Self::Remote(controller) => controller.cnb_invoke(payload),
         }
     }
 

@@ -174,6 +174,10 @@ fn terminal_environment_injects_codux_runtime_context() {
         Some("/support/Codux/db_profiles.json")
     );
     assert_eq!(
+        env.get("CODUX_CNB_TOKENS_FILE").map(String::as_str),
+        Some("/support/Codux/cnb_tokens.json")
+    );
+    assert_eq!(
         env.get("CODUX_DB_PROJECT_ID").map(String::as_str),
         Some("project-1")
     );

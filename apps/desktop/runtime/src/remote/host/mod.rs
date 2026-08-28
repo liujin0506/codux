@@ -13,7 +13,9 @@ use super::protocol::{
     REMOTE_PROJECT_REMOVE, REMOTE_PROJECT_SELECT, REMOTE_PROJECT_SELECTED, REMOTE_PROJECT_UPDATED,
     REMOTE_RESOURCE_AI_STATS, REMOTE_RESOURCE_GIT_STATUS, REMOTE_RESOURCE_PROJECTS,
     REMOTE_RESOURCE_SUBSCRIBE, REMOTE_RESOURCE_TERMINALS, REMOTE_RESOURCE_UNSUBSCRIBE,
-    REMOTE_RESOURCE_WORKTREES, REMOTE_SSH_LIST, REMOTE_SSH_LIST_RESULT, REMOTE_SSH_REMOVE,
+    REMOTE_CNB_INVOKE, REMOTE_CNB_INVOKE_RESULT, REMOTE_CNB_TOKENS_GET, REMOTE_CNB_TOKENS_RESULT,
+    REMOTE_CNB_TOKENS_SET, REMOTE_RESOURCE_WORKTREES,
+    REMOTE_SSH_LIST, REMOTE_SSH_LIST_RESULT, REMOTE_SSH_REMOVE,
     REMOTE_SSH_UPSERT, REMOTE_TERMINAL_BUFFER_MAX_CHARS, REMOTE_TERMINAL_CLOSED,
     REMOTE_TERMINAL_CREATED, REMOTE_TERMINAL_INPUT_ACK, REMOTE_TERMINAL_LIST,
     REMOTE_TERMINAL_OUTPUT, REMOTE_TERMINAL_STATUS, REMOTE_TERMINAL_UPLOADED,
@@ -183,6 +185,7 @@ pub struct RemoteHostRuntime {
 mod agent_worktree;
 mod ai_stats;
 mod authorization;
+mod cnb;
 mod files;
 mod git;
 mod memory;
@@ -629,6 +632,9 @@ impl RemoteHostRuntime {
             REMOTE_SSH_LIST => self.handle_ssh_list(&envelope),
             REMOTE_SSH_UPSERT => self.handle_ssh_upsert(&envelope),
             REMOTE_SSH_REMOVE => self.handle_ssh_remove(&envelope),
+            REMOTE_CNB_TOKENS_GET => self.handle_cnb_tokens_get(&envelope),
+            REMOTE_CNB_TOKENS_SET => self.handle_cnb_tokens_set(&envelope),
+            REMOTE_CNB_INVOKE => self.handle_cnb_invoke(&envelope),
             REMOTE_TRANSPORT_PING => {
                 self.send_plain(
                     REMOTE_TRANSPORT_PONG,

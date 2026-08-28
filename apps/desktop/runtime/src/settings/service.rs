@@ -10,14 +10,20 @@ impl SettingsService {
     }
 
     pub fn summary(&self) -> SettingsSummary {
-        summary_from_raw(&self.raw_settings())
+        self.summarize(&self.raw_settings())
+    }
+
+    fn summarize(&self, raw: &Map<String, Value>) -> SettingsSummary {
+        let mut summary = summary_from_raw(raw);
+        crate::cnb::overlay_token_flags(&mut summary, &self.settings_path);
+        summary
     }
 
     fn update_string(&self, key: &str, value: String) -> Result<SettingsSummary, String> {
         let mut raw = self.raw_settings();
         raw.insert(key.to_string(), Value::String(value));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     fn update_ai_string(&self, key: &str, value: String) -> Result<SettingsSummary, String> {
@@ -25,7 +31,7 @@ impl SettingsService {
         let ai = ai_mut(&mut raw)?;
         ai.insert(key.to_string(), Value::String(value));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     fn toggle_pet_bool(&self, key: &str, default: bool) -> Result<SettingsSummary, String> {
@@ -34,7 +40,7 @@ impl SettingsService {
         let current = pet.get(key).and_then(Value::as_bool).unwrap_or(default);
         pet.insert(key.to_string(), Value::Bool(!current));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     fn update_pet_string(&self, key: &str, value: String) -> Result<SettingsSummary, String> {
@@ -42,7 +48,7 @@ impl SettingsService {
         let pet = pet_mut(&mut raw)?;
         pet.insert(key.to_string(), Value::String(value));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     fn update_ai_pet_string(&self, key: &str, value: String) -> Result<SettingsSummary, String> {
@@ -50,7 +56,7 @@ impl SettingsService {
         let pet = ai_pet_mut(&mut raw)?;
         pet.insert(key.to_string(), Value::String(value));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     fn update_runtime_tool_string(
@@ -62,7 +68,7 @@ impl SettingsService {
         let tools = ai_runtime_tools_mut(&mut raw)?;
         tools.insert(key.to_string(), Value::String(value));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     fn toggle_ai_pet_bool(&self, key: &str, default: bool) -> Result<SettingsSummary, String> {
@@ -71,7 +77,7 @@ impl SettingsService {
         let current = pet.get(key).and_then(Value::as_bool).unwrap_or(default);
         pet.insert(key.to_string(), Value::Bool(!current));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     fn raw_settings(&self) -> Map<String, Value> {

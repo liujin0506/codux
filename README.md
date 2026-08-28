@@ -73,10 +73,11 @@ On Windows, or without Homebrew: see [Download](#download).
 
 ## Your Credentials Never Reach the AI
 
-Agents constantly need servers and databases — but pasting a password into a prompt, or letting the model read your config files, is exactly how credentials leak. Codux stores connection profiles locally and hands agents two safe commands instead:
+Agents constantly need servers and databases — but pasting a password into a prompt, or letting the model read your config files, is exactly how credentials leak. Codux stores connection profiles locally and hands agents safe commands instead:
 
 - **`codux-ssh`** — the agent runs `codux-ssh list`, sees profile names and hosts only, and connects through the wrapper. Passwords and keys are injected inside Codux's helper process; they never enter the model's context, the transcript, or your shell history.
 - **`codux-db`** — the same isolation for MySQL / PostgreSQL / SQLite: saved once in Codux, queried by profile name. Read-only profiles are enforced inside the wrapper with a single-statement allowlist, so the model can't escalate its own access.
+- **`codux-cnb`** — issues, pull requests, and pipeline builds on cnb.cool / cnb.woa.com. Tokens stay in Codux; when Codex runs on a remote agent, the API calls leave from that remote host. The desktop CNB sidebar browses the same data for the current project's remote.
 - **Zero per-project setup.** Every supported CLI learns about these commands automatically through Codux's environment directives.
 
 <p align="center"><img src="docs/images/credential-isolation.png" alt="codux-ssh list shows profile names and hosts only — never passwords"></p>
@@ -97,7 +98,7 @@ Codux uses non-invasive wrappers and per-tool adapters. It does not write projec
 | CodeWhale | ✓ | ✓ | ✓ | ✓ | Not injected for interactive sessions |
 | Agy | ✓ | ✓ | ✓ | ✓ | Not injected; no confirmed non-invasive prompt channel |
 
-Environment directives include Codux memory plus runtime commands such as `codux-ssh` and `codux-db`. For unsupported tools, Codux still tracks sessions where possible, but it will not force prompt injection through project files or user-level config.
+Environment directives include Codux memory plus runtime commands such as `codux-ssh`, `codux-db`, and `codux-cnb`. For unsupported tools, Codux still tracks sessions where possible, but it will not force prompt injection through project files or user-level config.
 
 ## One Workspace, Every Device
 

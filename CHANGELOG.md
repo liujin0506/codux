@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.29] - 2026-08-28
+
+### Added
+
+- Added `codux-cnb` so Codex and other AI CLIs can manage CNB issues, pull requests, and pipeline builds without seeing access tokens. Remote and WSL agents call the CNB API from the host where they run.
+- Added a desktop CNB sidebar for browsing issues, pull requests, and pipeline builds on the current project's cnb.cool / cnb.woa.com remote. Remote and WSL projects fetch from the host that can reach the site.
+
 ## [2.0.28] - 2026-08-21
 
 ### Fixed

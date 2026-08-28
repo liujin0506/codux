@@ -14,7 +14,7 @@ impl SettingsService {
         let memory = ai_memory_mut(&mut raw)?;
         memory.insert(key.to_string(), Value::Bool(value));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn set_ai_memory_number(&self, key: &str, value: &str) -> Result<SettingsSummary, String> {
@@ -83,7 +83,7 @@ impl SettingsService {
         let memory = ai_memory_mut(&mut raw)?;
         memory.insert(key.to_string(), Value::Number(value.into()));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn set_ai_memory_provider(&self, provider_id: &str) -> Result<SettingsSummary, String> {
@@ -94,6 +94,6 @@ impl SettingsService {
             Value::String(sanitize_provider_reference(provider_id)),
         );
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 }

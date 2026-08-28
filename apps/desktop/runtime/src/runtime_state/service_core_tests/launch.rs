@@ -55,6 +55,15 @@ fn launch_artifacts_include_tool_context_when_memory_is_disabled() {
         .to_string(),
     )
     .unwrap();
+    fs::write(
+        support_dir.join("cnb_tokens.json"),
+        serde_json::json!({
+            "tokenCool": "cnb-cool-secret",
+            "tokenWoa": "cnb-woa-secret"
+        })
+        .to_string(),
+    )
+    .unwrap();
 
     let service = RuntimeService::new(support_dir.clone());
     let workspace_id = format!("project-a-{}", uuid::Uuid::new_v4());
@@ -78,6 +87,10 @@ fn launch_artifacts_include_tool_context_when_memory_is_disabled() {
     assert!(!agents.contains("secret-passphrase"));
     assert!(agents.contains("codux-db list"));
     assert!(agents.contains("codux-db <profile-id> -- '<SQL>'"));
+    assert!(agents.contains("codux-cnb status"));
+    assert!(agents.contains("Always run `codux-cnb status` at the time of use"));
+    assert!(!agents.contains("cnb-cool-secret"));
+    assert!(!agents.contains("cnb-woa-secret"));
     assert!(agents.contains("codux-worktree create"));
     assert!(agents.contains("waits for the child agent to complete"));
     assert!(agents.contains("cast them to text"));
@@ -128,6 +141,7 @@ fn launch_artifacts_include_environment_directive_without_profiles() {
     assert!(agents.starts_with("# Codux Environment Directive"));
     assert!(agents.contains("codux-ssh list"));
     assert!(agents.contains("codux-db list"));
+    assert!(agents.contains("codux-cnb status"));
     assert!(agents.contains("codux-worktree create"));
     assert!(agents.contains("# Codux Memory"));
     assert!(!agents.contains("project active entry"));

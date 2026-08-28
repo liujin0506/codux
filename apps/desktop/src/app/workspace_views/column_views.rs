@@ -252,6 +252,9 @@ impl Render for WorkspaceAssistantView {
                         AssistantPanel::Git => app_entity.update(cx, |app, cx| {
                             gpui::AnyView::from(app.git_sidebar_view(cx)).into_any_element()
                         }),
+                        AssistantPanel::Cnb => app_entity.update(cx, |app, cx| {
+                            gpui::AnyView::from(app.cnb_sidebar_view(cx)).into_any_element()
+                        }),
                     })
             })
         })
@@ -322,6 +325,7 @@ fn assistant_panel_key(panel: Option<AssistantPanel>) -> &'static str {
         Some(AssistantPanel::DB) => "db",
         Some(AssistantPanel::FileManager) => "file_manager",
         Some(AssistantPanel::Git) => "git",
+        Some(AssistantPanel::Cnb) => "cnb",
         None => "none",
     }
 }

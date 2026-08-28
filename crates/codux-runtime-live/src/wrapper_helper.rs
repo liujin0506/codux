@@ -73,6 +73,7 @@ pub fn handle_args(args: &[String]) -> Result<bool, String> {
         "ssh-askpass" => print_ssh_askpass(&args[2..]),
         "db-list-profiles" => print_db_profiles(),
         "db-query" => print_db_query(),
+        "cnb-invoke" => print_cnb_invoke(&args[2..]),
         "agent-worktree" => run_agent_worktree_command(&args[2..]),
         "agent-worktree-launch" => launch_agent_worktree_prompt(),
         _ => return Err(format!("unknown wrapper helper subcommand: {subcommand}")),
@@ -770,6 +771,25 @@ fn ssh_askpass_response<'a>(
         return Some(password);
     }
     None
+}
+
+fn print_cnb_invoke(args: &[String]) -> Result<(), String> {
+    let tokens_path = env_value("CODUX_CNB_TOKENS_FILE");
+    let tokens_path = if tokens_path.is_empty() {
+        let support = env_value("DMUX_APP_SUPPORT_ROOT");
+        if support.is_empty() {
+            return Err("codux-cnb: missing Codux token store".to_string());
+        }
+        crate::cnb::tokens_file_path(Path::new(&support))
+    } else {
+        PathBuf::from(tokens_path)
+    };
+    let value = crate::cnb::invoke(args, &tokens_path)?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&value).map_err(|error| error.to_string())?
+    );
+    Ok(())
 }
 
 fn print_db_profiles() -> Result<(), String> {

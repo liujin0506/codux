@@ -42,7 +42,7 @@ impl SettingsService {
             Value::Bool(!current),
         );
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn set_terminal_scrollback_value(&self, lines: &str) -> Result<SettingsSummary, String> {

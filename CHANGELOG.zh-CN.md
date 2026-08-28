@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+## [2.0.29] - 2026-08-28
+
+### 新增
+
+- 新增 `codux-cnb`，让 Codex 等 AI CLI 可以管理 CNB 的 issue、PR 和流水线，且看不到访问令牌。远端和 WSL agent 会在其所在主机上访问 CNB 接口。
+- 桌面端新增 CNB 侧栏，可浏览当前项目在 cnb.cool / cnb.woa.com 上的 issue、PR 和流水线。远端和 WSL 项目会从能访问该站点的主机拉取数据。
+
 ## [2.0.28] - 2026-08-21
 
 ### 修复

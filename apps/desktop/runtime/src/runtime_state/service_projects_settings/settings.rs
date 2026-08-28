@@ -379,6 +379,12 @@ impl RuntimeService {
         })
     }
 
+    pub fn set_cnb_token(&self, site: &str, token: &str) -> Result<SettingsSummary, String> {
+        crate::cnb::CnbStore::from_support_dir(self.support_dir.clone()).set_token(site, token)?;
+        let _ = self.sync_cnb_tokens_to_hosted_runtimes();
+        Ok(SettingsService::new(self.support_dir.clone()).summary())
+    }
+
     pub fn set_ai_memory_bool(&self, key: &str, value: bool) -> Result<SettingsSummary, String> {
         self.update_settings_with_side_effects(|settings| settings.set_ai_memory_bool(key, value))
     }

@@ -103,6 +103,14 @@ const RUNTIME_ASSETS: &[(&str, &[u8])] = &[
         include_bytes!("../../../../apps/desktop/runtime-assets/scripts/wrappers/bin/codux-db.ps1"),
     ),
     (
+        "scripts/wrappers/bin/codux-cnb",
+        include_bytes!("../../../../apps/desktop/runtime-assets/scripts/wrappers/bin/codux-cnb"),
+    ),
+    (
+        "scripts/wrappers/bin/codux-cnb.ps1",
+        include_bytes!("../../../../apps/desktop/runtime-assets/scripts/wrappers/bin/codux-cnb.ps1"),
+    ),
+    (
         "scripts/wrappers/bin/codux-worktree",
         include_bytes!(
             "../../../../apps/desktop/runtime-assets/scripts/wrappers/bin/codux-worktree"
@@ -183,6 +191,10 @@ const RUNTIME_ASSETS: &[(&str, &[u8])] = &[
     (
         "scripts/wrappers/codux-db.ps1",
         include_bytes!("../../../../apps/desktop/runtime-assets/scripts/wrappers/codux-db.ps1"),
+    ),
+    (
+        "scripts/wrappers/codux-cnb.ps1",
+        include_bytes!("../../../../apps/desktop/runtime-assets/scripts/wrappers/codux-cnb.ps1"),
     ),
     (
         "scripts/wrappers/dmux-ai-state.ps1",

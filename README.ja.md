@@ -73,10 +73,11 @@ Windows、または Homebrew を使わない場合は [ダウンロード](#down
 
 ## 認証情報は AI に届きません
 
-agent はサーバーやデータベースを頻繁に必要とします。しかし、パスワードをプロンプトに貼ったり、モデルに設定ファイルを読ませたりすることは、認証情報漏えいの原因になります。Codux は接続プロファイルをローカルに保存し、agent には安全な 2 つのコマンドだけを渡します。
+agent はサーバーやデータベースを頻繁に必要とします。しかし、パスワードをプロンプトに貼ったり、モデルに設定ファイルを読ませたりすることは、認証情報漏えいの原因になります。Codux は接続プロファイルをローカルに保存し、agent には安全なコマンドだけを渡します。
 
 - **`codux-ssh`**：agent は `codux-ssh list` を実行し、プロファイル名とホストだけを見ます。パスワードや鍵は Codux の helper プロセス内で注入され、モデルのコンテキスト、会話ログ、shell 履歴には入りません。
 - **`codux-db`**：MySQL / PostgreSQL / SQLite でも同じ隔離を提供します。Codux に一度保存し、プロファイル名で問い合わせます。読み取り専用プロファイルは wrapper 内の単一ステートメント allowlist で強制されるため、モデルが自分で権限を広げることはできません。
+- **`codux-cnb`**：cnb.cool / cnb.woa.com の issue、プルリクエスト、パイプライン。トークンは Codux 内に留まり、リモート agent ではそのホストから CNB API を呼び出します。デスクトップの CNB サイドバーは、現在のプロジェクト remote と同じデータを閲覧します。
 - **プロジェクトごとの設定は不要。** 対応 CLI は Codux の環境ディレクティブからこれらのコマンドを自動で認識します。
 
 <p align="center"><img src="docs/images/credential-isolation.png" alt="codux-ssh list shows profile names and hosts only — never passwords"></p>
@@ -97,7 +98,7 @@ Codux は非侵襲の wrapper とツールごとの adapter を使います。Co
 | CodeWhale | ✓ | ✓ | ✓ | ✓ | interactive session では注入なし |
 | Agy | ✓ | ✓ | ✓ | ✓ | 注入なし。確認済みの非侵襲 prompt channel はありません |
 
-環境ディレクティブには Codux メモリに加えて、`codux-ssh` や `codux-db` などの runtime コマンドが含まれます。未対応ツールでも可能な範囲でセッション追跡を行いますが、プロジェクトファイルやユーザーレベル設定を強制的に使った prompt 注入は行いません。
+環境ディレクティブには Codux メモリに加えて、`codux-ssh`、`codux-db`、`codux-cnb` などの runtime コマンドが含まれます。未対応ツールでも可能な範囲でセッション追跡を行いますが、プロジェクトファイルやユーザーレベル設定を強制的に使った prompt 注入は行いません。
 
 ## ひとつのワークスペース、すべてのデバイス
 

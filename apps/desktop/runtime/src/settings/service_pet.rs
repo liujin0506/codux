@@ -117,7 +117,7 @@ impl SettingsService {
             pet.insert("speechQuietHoursEnd".to_string(), Value::Number(8.into()));
         }
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn toggle_pet_speech_temporary_mute(&self) -> Result<SettingsSummary, String> {
@@ -136,7 +136,7 @@ impl SettingsService {
             pet.insert("speechTemporaryMuteUntil".to_string(), Value::Null);
         }
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn set_pet_speech_mode(&self, mode: &str) -> Result<SettingsSummary, String> {

@@ -15,7 +15,9 @@ use codux_protocol::{
     REMOTE_GIT_INVOKE, REMOTE_GIT_READ, REMOTE_GIT_STATUS, REMOTE_HOST_INFO, REMOTE_HOST_METRICS,
     REMOTE_MEMORY_EXTRACT, REMOTE_MEMORY_READ, REMOTE_MEMORY_RESULT, REMOTE_PAIRING_CONFIRMED,
     REMOTE_PAIRING_REQUEST, REMOTE_PROJECT_ADD, REMOTE_PROJECT_LIST, REMOTE_PROJECT_REMOVE,
-    REMOTE_PROJECT_SELECT, REMOTE_PROJECT_SELECTED, REMOTE_SSH_LIST, REMOTE_SSH_LIST_RESULT,
+    REMOTE_CNB_INVOKE, REMOTE_CNB_INVOKE_RESULT, REMOTE_CNB_TOKENS_GET, REMOTE_CNB_TOKENS_RESULT,
+    REMOTE_CNB_TOKENS_SET, REMOTE_PROJECT_SELECT,
+    REMOTE_PROJECT_SELECTED, REMOTE_SSH_LIST, REMOTE_SSH_LIST_RESULT,
     REMOTE_SSH_REMOVE, REMOTE_SSH_UPSERT, REMOTE_TERMINAL_CLOSE, REMOTE_TERMINAL_CLOSED,
     REMOTE_TERMINAL_CREATE, REMOTE_TERMINAL_CREATED, REMOTE_TERMINAL_INPUT, REMOTE_TERMINAL_OUTPUT,
     REMOTE_TERMINAL_STATUS, REMOTE_TRANSPORT_IROH, REMOTE_TRANSPORT_PING, REMOTE_TRANSPORT_PONG,
@@ -1146,6 +1148,18 @@ fn make_handler(
             },
             REMOTE_SSH_REMOVE => match crate::ssh::remove_payload(&payload) {
                 Ok(result) => Some((REMOTE_SSH_LIST_RESULT, result)),
+                Err(error) => Some((REMOTE_ERROR, json!({ "message": error }))),
+            },
+            REMOTE_CNB_TOKENS_GET => match crate::cnb::get_payload() {
+                Ok(result) => Some((REMOTE_CNB_TOKENS_RESULT, result)),
+                Err(error) => Some((REMOTE_ERROR, json!({ "message": error }))),
+            },
+            REMOTE_CNB_TOKENS_SET => match crate::cnb::set_payload(payload) {
+                Ok(result) => Some((REMOTE_CNB_TOKENS_RESULT, result)),
+                Err(error) => Some((REMOTE_ERROR, json!({ "message": error }))),
+            },
+            REMOTE_CNB_INVOKE => match crate::cnb::invoke_payload(payload) {
+                Ok(result) => Some((REMOTE_CNB_INVOKE_RESULT, result)),
                 Err(error) => Some((REMOTE_ERROR, json!({ "message": error }))),
             },
             REMOTE_AI_STATE => {

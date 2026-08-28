@@ -67,6 +67,74 @@ pub(super) fn settings_git_pane(
             cx,
         )
         .into_any_element(),
+        settings_card(
+            Some(settings_text(language, "settings.cnb.title", "CNB")),
+            Some(settings_text(
+                language,
+                "settings.cnb.description",
+                "Personal access tokens for Codex and other AI CLIs. Tokens stay inside Codux; remote agents call the CNB API from the remote host.",
+            )),
+            vec![
+                settings_row(
+                    settings_text(language, "settings.cnb.token_cool", "cnb.cool token"),
+                    Some(settings_text(
+                        language,
+                        "settings.cnb.token_cool_help",
+                        "Used for https://api.cnb.cool. A cnb.woa.com token will not work here.",
+                    )),
+                    settings_text_input(
+                        "settings-cnb-token-cool",
+                        "",
+                        if settings.cnb_token_cool_configured {
+                            settings_text(language, "common.configured", "Configured")
+                        } else {
+                            settings_text(language, "settings.cnb.token_cool", "cnb.cool token")
+                        },
+                        true,
+                        window,
+                        cx,
+                        |app, value, window, cx| {
+                            if !value.trim().is_empty() {
+                                app.set_cnb_token("cool".to_string(), value, window, cx);
+                            }
+                        },
+                    ),
+                )
+                .into_any_element(),
+                settings_row(
+                    settings_text(language, "settings.cnb.token_woa", "cnb.woa.com token"),
+                    Some(settings_text(
+                        language,
+                        "settings.cnb.token_woa_help",
+                        "Used for https://api.cnb.woa.com. A cnb.cool token will not work here.",
+                    )),
+                    settings_text_input(
+                        "settings-cnb-token-woa",
+                        "",
+                        if settings.cnb_token_woa_configured {
+                            settings_text(language, "common.configured", "Configured")
+                        } else {
+                            settings_text(
+                                language,
+                                "settings.cnb.token_woa",
+                                "cnb.woa.com token",
+                            )
+                        },
+                        true,
+                        window,
+                        cx,
+                        |app, value, window, cx| {
+                            if !value.trim().is_empty() {
+                                app.set_cnb_token("woa".to_string(), value, window, cx);
+                            }
+                        },
+                    ),
+                )
+                .into_any_element(),
+            ],
+            cx,
+        )
+        .into_any_element(),
         settings_card_flush(
             Some(settings_text(
                 language,

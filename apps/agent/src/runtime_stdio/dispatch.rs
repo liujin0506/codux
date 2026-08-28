@@ -129,6 +129,9 @@ impl RuntimeStdioService {
             "ssh.list" => crate::ssh::list_payload(),
             "ssh.upsert" => crate::ssh::upsert_payload(params.clone()),
             "ssh.remove" => crate::ssh::remove_payload(params),
+            "cnb.tokens.get" => crate::cnb::get_payload(),
+            "cnb.tokens.set" => crate::cnb::set_payload(params.clone()),
+            "cnb.invoke" => crate::cnb::invoke_payload(params.clone()),
             "worktree.list" => Ok(crate::worktree::worktree_list_payload(
                 required_str(params, "projectId")?,
                 required_str(params, "projectPath")?,

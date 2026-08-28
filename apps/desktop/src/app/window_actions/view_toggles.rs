@@ -182,6 +182,7 @@ impl CoduxApp {
                 UiRegion::DbSidebar,
                 UiRegion::FileSidebar,
                 UiRegion::GitSidebar,
+                UiRegion::CnbSidebar,
                 UiRegion::StatusBar,
             ],
         );
@@ -212,6 +213,9 @@ impl CoduxApp {
             }
             AssistantPanel::Git => {
                 self.refresh_git_panel_state_async(cx);
+            }
+            AssistantPanel::Cnb => {
+                self.refresh_cnb_panel_async(cx);
             }
         }
     }

@@ -46,7 +46,7 @@ impl SettingsService {
             .unwrap_or(true);
         provider.insert("isEnabled".to_string(), Value::Bool(!current));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn set_git_commit_provider(&self, provider_id: &str) -> Result<SettingsSummary, String> {
@@ -75,7 +75,7 @@ impl SettingsService {
             Value::String(provider_id.to_string()),
         );
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn cycle_git_commit_tone(&self) -> Result<SettingsSummary, String> {

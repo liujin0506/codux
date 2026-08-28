@@ -21,6 +21,10 @@ const I18N_SHARDS: &[(&str, &str)] = &[
         include_str!("../../runtime-assets/i18n/locales/app.json"),
     ),
     (
+        "locales/cnb.json",
+        include_str!("../../runtime-assets/i18n/locales/cnb.json"),
+    ),
+    (
         "locales/common.json",
         include_str!("../../runtime-assets/i18n/locales/common.json"),
     ),

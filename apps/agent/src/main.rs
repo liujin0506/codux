@@ -10,6 +10,7 @@ mod cmd_pair;
 mod cmd_service;
 mod cmd_start;
 mod cmd_update;
+mod cnb;
 mod config_store;
 mod device_store;
 mod host;

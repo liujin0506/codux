@@ -137,6 +137,8 @@ fn summary_from_raw(raw: &Map<String, Value>) -> SettingsSummary {
             .and_then(Value::as_str)
             .map(|value| bounded_trimmed_chars(value, 4_000))
             .unwrap_or(0),
+        cnb_token_cool_configured: defaults.cnb_token_cool_configured,
+        cnb_token_woa_configured: defaults.cnb_token_woa_configured,
         runtime_tool_count: ai
             .and_then(|ai| ai.get("runtimeTools"))
             .map(runtime_tool_count)

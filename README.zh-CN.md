@@ -73,11 +73,12 @@ Windows 或不用 Homebrew：见[下载](#下载)。
 
 ## 凭证永远不进 AI 的上下文
 
-Agent 干活离不开服务器和数据库——但把密码贴进提示词、或让模型去读你的配置文件，正是凭证泄露的常见方式。Codux 把连接配置存在本地，只给 agent 两个安全命令：
+Agent 干活离不开服务器和数据库——但把密码贴进提示词、或让模型去读你的配置文件，正是凭证泄露的常见方式。Codux 把连接配置存在本地，只给 agent 安全命令：
 
 - **`codux-ssh`** —— agent 运行 `codux-ssh list` 只能看到配置名和主机，连接由 wrapper 代为完成。密码和密钥在 Codux 的辅助进程内部注入，永远不会进入模型上下文、会话记录或 shell 历史。
 - **`codux-db`** —— 对 MySQL / PostgreSQL / SQLite 做同样的隔离：在 Codux 里保存一次，agent 按配置名查询。只读配置由 wrapper 强制执行单语句白名单，模型无法自行提权。
-- **零项目配置。** 所有支持的 CLI 都会通过 Codux 环境指令自动知道这两个命令的存在。
+- **`codux-cnb`** —— 给 Codex 用的 CNB 能力：issues、PR、流水线。令牌只留在 Codux 里；远端 agent 会在远端主机上访问 CNB 接口。桌面端 CNB 侧栏会浏览当前项目远程上的同一份数据。
+- **零项目配置。** 所有支持的 CLI 都会通过 Codux 环境指令自动知道这些命令的存在。
 
 <p align="center"><img src="docs/images/credential-isolation.png" alt="codux-ssh list 只显示配置名和主机——没有任何密码"></p>
 
@@ -97,7 +98,7 @@ Codux 使用非侵入式 wrapper 和各工具适配器。为了注入 Codux 上�
 | CodeWhale | ✓ | ✓ | ✓ | ✓ | 不注入交互式会话 |
 | Agy | ✓ | ✓ | ✓ | ✓ | 不注入；暂无已确认的非侵入提示词通道 |
 
-环境指令包含 Codux 记忆，以及 `codux-ssh`、`codux-db` 等运行时命令说明。对暂不支持注入的工具，Codux 仍会尽可能追踪会话状态，但不会为了提示词注入去强写项目文件或用户级配置。
+环境指令包含 Codux 记忆，以及 `codux-ssh`、`codux-db`、`codux-cnb` 等运行时命令说明。对暂不支持注入的工具，Codux 仍会尽可能追踪会话状态，但不会为了提示词注入去强写项目文件或用户级配置。
 
 ## 一套工作区，多端互联
 

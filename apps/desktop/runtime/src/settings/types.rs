@@ -41,6 +41,8 @@ pub struct SettingsSummary {
     pub git_commit_language: String,
     pub git_commit_style_rules: String,
     pub git_commit_style_rules_chars: usize,
+    pub cnb_token_cool_configured: bool,
+    pub cnb_token_woa_configured: bool,
     pub runtime_tool_count: usize,
     pub memory_enabled: bool,
     pub memory_automatic_injection_enabled: bool,

@@ -26,7 +26,7 @@ impl SettingsService {
         provider.insert("priority".to_string(), Value::Number(priority.into()));
         providers.push(Value::Object(provider));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn remove_ai_provider(&self, provider_id: &str) -> Result<SettingsSummary, String> {
@@ -86,7 +86,7 @@ impl SettingsService {
                 );
             }
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn update_ai_provider_string(
@@ -120,7 +120,7 @@ impl SettingsService {
         };
         provider.insert(key.to_string(), Value::String(value));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn set_ai_provider_bool(
@@ -138,7 +138,7 @@ impl SettingsService {
         let provider = ai_provider_mut(&mut raw, provider_id)?;
         provider.insert(key.to_string(), Value::Bool(value));
         self.save_raw_settings(&raw)?;
-        Ok(summary_from_raw(&raw))
+        Ok(self.summarize(&raw))
     }
 
     pub fn test_ai_provider(&self, provider_id: &str) -> Result<LLMProviderTestResult, String> {

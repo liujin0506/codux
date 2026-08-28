@@ -312,6 +312,7 @@ impl CoduxApp {
         self.git_expanded_dirs.clear();
         self.git_tree_children.clear();
         self.record_ui_state_clear("git_tree");
+        self.reset_cnb_panel_state();
         self.git_diff_preview = "select a changed file to preview its diff".to_string();
         self.clear_git_review_derived_content();
         self.normalize_selected_git_branch();
@@ -322,6 +323,9 @@ impl CoduxApp {
         self.git_review = GitReviewSummary::default();
         self.clear_current_worktree_ui_state();
         self.load_current_file_editor_layout_async(cx);
+        if self.assistant_panel == Some(AssistantPanel::Cnb) {
+            self.refresh_cnb_panel_async(cx);
+        }
     }
 
     fn current_worktree_initial_git(&self) -> GitSummary {

@@ -94,6 +94,11 @@ impl AIRuntimeBridge {
                 &wrapper_dir.join("codux-db.ps1"),
                 false,
             )?;
+            stage_runtime_asset(
+                "scripts/wrappers/codux-cnb.ps1",
+                &wrapper_dir.join("codux-cnb.ps1"),
+                false,
+            )?;
         }
         stage_runtime_dir(
             "scripts/wrappers/opencode-config",
@@ -106,6 +111,7 @@ impl AIRuntimeBridge {
             .collect::<Vec<_>>();
         bin_names.push("codux-ssh");
         bin_names.push("codux-db");
+        bin_names.push("codux-cnb");
         bin_names.push("codux-worktree");
         for stale_bin_name in [
             "kiro",
@@ -412,7 +418,7 @@ case "$cmd" in
     [ -n "$first" ] || exit 0
     printf '%s' "${HOOK_PAYLOAD:-}" | sed -n "s/.*\"$first\"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p" | head -n 1
     ;;
-  hook-notification-type|claude-memory-context|opencode-session-state|ssh-list-profiles|ssh-profile-shell)
+  hook-notification-type|claude-memory-context|opencode-session-state|ssh-list-profiles|ssh-profile-shell|cnb-invoke)
     ;;
 esac
 "#

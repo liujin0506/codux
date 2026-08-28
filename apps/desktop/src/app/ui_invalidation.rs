@@ -14,6 +14,7 @@ pub(in crate::app) enum UiRegion {
     DbSidebar,
     FileSidebar,
     GitSidebar,
+    CnbSidebar,
     StatusBar,
 }
 
@@ -148,6 +149,12 @@ impl CoduxApp {
                     let _ = self.git_history_panel_view(cx);
                 }
             }
+            UiRegion::CnbSidebar => {
+                self.record_ui_performance_event("invalidate", region.label());
+                if self.cnb_sidebar_view.is_some() {
+                    let _ = self.cnb_sidebar_view(cx);
+                }
+            }
         }
     }
 
@@ -180,6 +187,7 @@ impl CoduxApp {
                 UiRegion::DbSidebar,
                 UiRegion::FileSidebar,
                 UiRegion::GitSidebar,
+                UiRegion::CnbSidebar,
                 UiRegion::StatusBar,
             ],
         );
@@ -199,6 +207,7 @@ impl CoduxApp {
                 UiRegion::WorkspaceAssistant,
                 UiRegion::FileSidebar,
                 UiRegion::GitSidebar,
+                UiRegion::CnbSidebar,
                 UiRegion::StatusBar,
             ],
         );
@@ -231,6 +240,7 @@ impl CoduxApp {
                 UiRegion::DbSidebar,
                 UiRegion::FileSidebar,
                 UiRegion::GitSidebar,
+                UiRegion::CnbSidebar,
                 UiRegion::StatusBar,
             ],
         );
@@ -279,6 +289,21 @@ impl CoduxApp {
                 UiRegion::WorkspaceAssistant,
                 UiRegion::GitSidebar,
                 UiRegion::WorkspaceBody,
+                UiRegion::StatusBar,
+            ],
+        );
+    }
+
+    pub(in crate::app) fn invalidate_cnb_panel(&mut self, cx: &mut Context<Self>) {
+        if self.window_mode != AppWindowMode::Main {
+            self.invalidate_ui_region(cx, UiRegion::Root);
+            return;
+        }
+        self.invalidate_ui(
+            cx,
+            [
+                UiRegion::WorkspaceAssistant,
+                UiRegion::CnbSidebar,
                 UiRegion::StatusBar,
             ],
         );
@@ -336,6 +361,7 @@ impl CoduxApp {
                 UiRegion::SshSidebar,
                 UiRegion::DbSidebar,
                 UiRegion::GitSidebar,
+                UiRegion::CnbSidebar,
                 UiRegion::StatusBar,
             ],
         );
@@ -392,6 +418,7 @@ impl UiRegion {
             UiRegion::DbSidebar => "db_sidebar",
             UiRegion::FileSidebar => "file_sidebar",
             UiRegion::GitSidebar => "git_sidebar",
+            UiRegion::CnbSidebar => "cnb_sidebar",
             UiRegion::StatusBar => "status_bar",
         }
     }
