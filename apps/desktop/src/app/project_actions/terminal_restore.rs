@@ -108,6 +108,15 @@ impl CoduxApp {
         self.active_terminal_id = active_terminal_id;
         self.next_terminal_index = next_terminal_index;
         self.restore_collapsed_panes_for_layout(true, cx);
+        self.cache_current_terminal_layout_state();
+        if let Some(storage_key) =
+            super::ai_runtime_status::current_terminal_layout_storage_key(&self.state)
+        {
+            self.spawn_persist_terminal_layout_snapshot(
+                Some(storage_key),
+                self.terminal_layout_snapshot(),
+            );
+        }
         let pending_terminals =
             self.mount_visible_terminal_views_for_restore(&restore_plan, &base_pty_config, cx);
         let pending_count = pending_terminals.len();
@@ -158,6 +167,10 @@ impl CoduxApp {
     ) -> Vec<(TerminalPtyConfig, crate::terminal::PendingTerminalAttach)> {
         let terminal_config = self.terminal_config_from_settings();
         let terminal_pane_registry = self.terminal_pane_registry.clone();
+        let mount_slot = restore_focus_slot_indices(
+            &self.terminals,
+            restore_plan.active_terminal_id.as_deref(),
+        );
         let mut pending = Vec::new();
         let mut registrations = Vec::new();
         for (tab_index, tab) in self.terminals.iter_mut().enumerate() {
@@ -165,7 +178,10 @@ impl CoduxApp {
                 continue;
             };
             let _ = tab_plan;
-            for slot in tab.panes.iter_mut() {
+            for (slot_index, slot) in tab.panes.iter_mut().enumerate() {
+                if mount_slot.is_some_and(|target| target != (tab_index, slot_index)) {
+                    continue;
+                }
                 if slot.pane.is_some() {
                     continue;
                 }

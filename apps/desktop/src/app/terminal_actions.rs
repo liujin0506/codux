@@ -193,7 +193,12 @@ impl CoduxApp {
             Vec::new();
 
         // New top split panes -> append to the main (Top) tab.
+        let mut remaining_splits = codux_runtime::terminal_layout::TERMINAL_SPLIT_CAP
+            .saturating_sub(self.main_terminal().map(|tab| tab.panes.len()).unwrap_or(0));
         for pane in &layout.top_panes {
+            if remaining_splits == 0 {
+                break;
+            }
             let raw_id = pane.terminal_id.trim();
             if raw_id.is_empty() {
                 continue;
@@ -233,6 +238,7 @@ impl CoduxApp {
                 });
             }
             pending.push((pty_config, attach));
+            remaining_splits = remaining_splits.saturating_sub(1);
         }
 
         if pending.is_empty() {

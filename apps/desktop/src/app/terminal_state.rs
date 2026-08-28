@@ -15,8 +15,8 @@ use codux_runtime::{
     settings::{SettingsSummary, locale_from_language_setting},
     terminal_layout::{
         SplitAxis, TerminalLayoutSummary, TerminalPaneSummary, TerminalSplitNode, TerminalTopGrid,
-        normalize_split_ratios, normalize_split_tree, normalize_top_grid, single_row_top_grid,
-        split_tree_leaf_count, top_grid_from_split_tree,
+        collapse_runaway_terminal_layout, normalize_split_ratios, normalize_split_tree,
+        normalize_top_grid, single_row_top_grid, split_tree_leaf_count, top_grid_from_split_tree,
     },
     terminal_pty::{TerminalManager, TerminalOutputSnapshot, TerminalPtyConfig},
     terminal_runtime::{TerminalRuntimeSessionSummary, TerminalRuntimeSummary},
@@ -182,6 +182,11 @@ pub(in crate::app) fn normalize_terminal_restore_state(
     layout.tabs.clear();
     if layout.top_panes.is_empty() {
         layout = default_terminal_layout_for_owner(Some(owner_id), language);
+    } else {
+        let preferred = runtime.active_terminal_id.trim();
+        let preferred = (!preferred.is_empty()).then_some(preferred);
+        layout = collapse_runaway_terminal_layout(layout, preferred);
+        layout = structural_terminal_layout(layout);
     }
     layout.active_terminal_id.clear();
 
@@ -932,12 +937,15 @@ where
     } = input;
     let (mut tabs, active_terminal_id, next_id) =
         restore_terminal_tabs_skeleton(plan, launch_context);
+    let mount_slot = restore_focus_slot_indices(&tabs, plan.active_terminal_id.as_deref());
     for tab_index in 0..tabs.len() {
         let Some(tab) = tabs.get_mut(tab_index) else {
             continue;
         };
         mount_terminal_tab_panes(
             tab,
+            tab_index,
+            mount_slot,
             terminal_manager.clone(),
             base_pty_config,
             &terminal_config,
@@ -951,6 +959,8 @@ where
 
 fn mount_terminal_tab_panes<C>(
     tab: &mut TerminalTab,
+    tab_index: usize,
+    mount_slot: Option<(usize, usize)>,
     terminal_manager: Arc<TerminalManager>,
     base_pty_config: &TerminalPtyConfig,
     terminal_config: &TerminalConfig,
@@ -961,7 +971,10 @@ fn mount_terminal_tab_panes<C>(
 where
     C: gpui::AppContext,
 {
-    for slot in tab.panes.iter_mut() {
+    for (slot_index, slot) in tab.panes.iter_mut().enumerate() {
+        if mount_slot.is_some_and(|target| target != (tab_index, slot_index)) {
+            continue;
+        }
         if slot.pane.is_some() {
             continue;
         }
@@ -1101,6 +1114,30 @@ pub(in crate::app) fn restore_terminal_tabs_skeleton(
         .map(|tab| tab.id)
         .unwrap_or(1);
     (tabs, active_terminal_id, next_id)
+}
+
+/// Restore only the last focused pane (or the first pane when none is remembered).
+/// Other splits stay in the layout and mount when the user clicks them.
+pub(in crate::app) fn restore_focus_slot_indices(
+    terminals: &[super::types::TerminalTab],
+    active_terminal_id: Option<&str>,
+) -> Option<(usize, usize)> {
+    let active_terminal_id = active_terminal_id.map(str::trim).unwrap_or("");
+    if !active_terminal_id.is_empty() {
+        for (tab_index, tab) in terminals.iter().enumerate() {
+            if let Some(slot_index) = tab
+                .panes
+                .iter()
+                .position(|slot| slot.terminal_id.as_deref() == Some(active_terminal_id))
+            {
+                return Some((tab_index, slot_index));
+            }
+        }
+    }
+    terminals
+        .iter()
+        .enumerate()
+        .find_map(|(tab_index, tab)| (!tab.panes.is_empty()).then_some((tab_index, 0)))
 }
 pub(in crate::app) fn terminal_launch_context(
     state: &RuntimeState,

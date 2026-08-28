@@ -106,7 +106,9 @@ impl TerminalLayoutService {
             };
         };
         if let Some(layout) = self.cache_layout(project_id) {
-            return sanitize_terminal_layout(layout).unwrap_or_default();
+            return sanitize_terminal_layout(layout)
+                .map(|layout| collapse_runaway_terminal_layout(layout, None))
+                .unwrap_or_default();
         }
         TerminalLayoutSummary {
             bottom_ratio: default_bottom_ratio(),
@@ -144,6 +146,9 @@ impl TerminalLayoutService {
             .any(|pane| pane.terminal_id == terminal_id)
             || layout.tabs.iter().any(|tab| tab.terminal_id == terminal_id)
         {
+            return Ok(layout);
+        }
+        if layout.top_panes.len() >= TERMINAL_SPLIT_CAP {
             return Ok(layout);
         }
         layout.error = None;
@@ -221,6 +226,7 @@ impl TerminalLayoutService {
         layout: TerminalLayoutSummary,
     ) -> Result<TerminalLayoutSummary, String> {
         let layout = sanitize_terminal_layout(layout)
+            .map(|layout| collapse_runaway_terminal_layout(layout, None))
             .ok_or_else(|| "Terminal layout is empty.".to_string())?;
         crate::persistent_cache::PersistentCacheStore::for_support_dir(self.support_dir.clone())?
             .put_json(TERMINAL_LAYOUT_NAMESPACE, project_id, &layout)?;
@@ -231,6 +237,19 @@ impl TerminalLayoutService {
         crate::persistent_cache::PersistentCacheStore::for_support_dir(self.support_dir.clone())?
             .delete_json(TERMINAL_LAYOUT_NAMESPACE, project_id)
     }
+
+    pub fn compact_runaway(&self, project_id: &str) -> Result<bool, String> {
+        let Some(layout) = self.cache_layout(project_id) else {
+            return Ok(false);
+        };
+        if layout.top_panes.len() <= TERMINAL_SPLIT_CAP {
+            return Ok(false);
+        }
+        let preferred = layout.top_panes.first().map(|pane| pane.terminal_id.clone());
+        let layout = collapse_runaway_terminal_layout(layout, preferred.as_deref());
+        self.save_summary(project_id, layout)?;
+        Ok(true)
+    }
 }
 
 pub(crate) fn terminal_layout_cache_namespace() -> &'static str {
@@ -239,6 +258,38 @@ pub(crate) fn terminal_layout_cache_namespace() -> &'static str {
 
 fn default_bottom_ratio() -> f64 {
     DEFAULT_BOTTOM_RATIO
+}
+
+/// Drop accumulated panes that exceed the desktop split cap.
+/// Keeps `preferred_id` when it is already in the layout; otherwise the first pane.
+pub fn collapse_runaway_terminal_layout(
+    mut layout: TerminalLayoutSummary,
+    preferred_id: Option<&str>,
+) -> TerminalLayoutSummary {
+    if layout.top_panes.len() <= TERMINAL_SPLIT_CAP {
+        return layout;
+    }
+    let preferred = preferred_id.map(str::trim).filter(|id| !id.is_empty());
+    let keep = preferred
+        .and_then(|id| {
+            layout
+                .top_panes
+                .iter()
+                .find(|pane| pane.terminal_id == id)
+                .cloned()
+        })
+        .or_else(|| layout.top_panes.first().cloned());
+    let Some(pane) = keep else {
+        return layout;
+    };
+    layout.top_panes = vec![pane];
+    layout.collapsed_panes.clear();
+    layout.tabs.clear();
+    layout.split_tree = None;
+    layout.top_grid = TerminalTopGrid::default();
+    layout.top_ratios = vec![1.0];
+    layout.active_terminal_id.clear();
+    sanitize_terminal_layout(layout).unwrap_or_default()
 }
 
 fn sanitize_terminal_layout(mut layout: TerminalLayoutSummary) -> Option<TerminalLayoutSummary> {
@@ -943,5 +994,59 @@ mod tests {
         assert_eq!(restored.top_grid.columns.len(), 1);
         assert_eq!(restored.top_grid.columns[0].rows, 2);
         assert_eq!(restored.top_grid.columns[0].row_ratios, vec![0.4, 0.6]);
+    }
+
+    #[test]
+    fn collapse_runaway_keeps_preferred_pane() {
+        let layout = TerminalLayoutSummary {
+            top_panes: (0..=TERMINAL_SPLIT_CAP)
+                .map(|index| TerminalPaneSummary {
+                    title: format!("Pane {index}"),
+                    terminal_id: format!("terminal-{index}"),
+                })
+                .collect(),
+            ..Default::default()
+        };
+
+        let collapsed = collapse_runaway_terminal_layout(layout, Some("terminal-3"));
+        assert_eq!(collapsed.top_panes.len(), 1);
+        assert_eq!(collapsed.top_panes[0].terminal_id, "terminal-3");
+    }
+
+    #[test]
+    fn ensure_terminal_does_not_grow_past_split_cap() {
+        let support_dir = std::env::temp_dir().join(format!(
+            "codux-terminal-layout-cap-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&support_dir).expect("create support dir");
+        let service = TerminalLayoutService::new(support_dir.clone());
+        let panes = (0..TERMINAL_SPLIT_CAP)
+            .map(|index| TerminalPaneSummary {
+                title: format!("Pane {index}"),
+                terminal_id: format!("terminal-{index}"),
+            })
+            .collect();
+        service
+            .save_from_gpui(
+                "project-1::worktree-1",
+                Vec::new(),
+                panes,
+                vec![1.0; TERMINAL_SPLIT_CAP],
+                0.24,
+            )
+            .expect("save full layout");
+
+        let layout = service
+            .ensure_terminal("project-1::worktree-1", "terminal-overflow", "Overflow")
+            .expect("ensure at cap");
+        assert_eq!(layout.top_panes.len(), TERMINAL_SPLIT_CAP);
+        assert!(
+            layout
+                .top_panes
+                .iter()
+                .all(|pane| pane.terminal_id != "terminal-overflow")
+        );
+        let _ = std::fs::remove_dir_all(support_dir);
     }
 }

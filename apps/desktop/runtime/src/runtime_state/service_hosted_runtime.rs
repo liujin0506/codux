@@ -132,21 +132,34 @@ impl RuntimeService {
                 }
                 let layout_service = TerminalLayoutService::new(self.support_dir.clone());
                 let mut changed = false;
+                let mut live_by_layout: std::collections::HashMap<
+                    String,
+                    Vec<(String, String)>,
+                > = std::collections::HashMap::new();
                 for (project_id, worktree_id, terminal_id, title) in updates {
                     let layout_key = crate::terminal_layout::terminal_layout_storage_key(
                         &project_id,
                         &worktree_id,
                     );
-                    let layout = layout_service.load(Some(&layout_key));
-                    if layout
-                        .top_panes
-                        .iter()
-                        .any(|pane| pane.terminal_id == terminal_id)
-                        || layout.tabs.iter().any(|tab| tab.terminal_id == terminal_id)
-                    {
+                    live_by_layout
+                        .entry(layout_key)
+                        .or_default()
+                        .push((terminal_id, title));
+                }
+                for layout_key in live_by_layout.keys() {
+                    if layout_service.compact_runaway(layout_key)? {
+                        changed = true;
+                    }
+                }
+                for (layout_key, terminals) in &live_by_layout {
+                    let layout = layout_service.load(Some(layout_key));
+                    if !layout.top_panes.is_empty() || !layout.tabs.is_empty() {
                         continue;
                     }
-                    layout_service.ensure_terminal(&layout_key, &terminal_id, &title)?;
+                    let Some((terminal_id, title)) = terminals.first() else {
+                        continue;
+                    };
+                    layout_service.ensure_terminal(layout_key, terminal_id, title)?;
                     changed = true;
                 }
                 if complete_snapshot {
@@ -166,6 +179,9 @@ impl RuntimeService {
                                 &project.id,
                                 &worktree_id,
                             );
+                            if layout_service.compact_runaway(&layout_key)? {
+                                changed = true;
+                            }
                             let mut layout = layout_service.load(Some(&layout_key));
                             let before = layout.top_panes.len()
                                 + layout.tabs.len()
@@ -182,6 +198,14 @@ impl RuntimeService {
                             layout.collapsed_panes.retain(|pane| {
                                 live_terminal_ids.contains(&pane.terminal_id)
                             });
+                            let preferred = layout
+                                .top_panes
+                                .first()
+                                .map(|pane| pane.terminal_id.clone());
+                            layout = crate::terminal_layout::collapse_runaway_terminal_layout(
+                                layout,
+                                preferred.as_deref(),
+                            );
                             let after = layout.top_panes.len()
                                 + layout.tabs.len()
                                 + layout.collapsed_panes.len();
@@ -1606,6 +1630,63 @@ mod hosted_runtime_payload_tests {
         let layout = TerminalLayoutService::new(support_dir.clone()).load(Some(&layout_key));
         assert_eq!(layout.top_panes.len(), 1);
         assert_eq!(layout.top_panes[0].terminal_id, "agent-terminal-1");
+
+        drop(service);
+        std::fs::remove_dir_all(support_dir).ok();
+    }
+
+    #[test]
+    fn remote_terminal_list_does_not_append_extra_live_terminals() {
+        let (service, support_dir) = remote_runtime_service();
+        let first = json!({
+            "terminals": [{
+                "id": "keep-terminal",
+                "projectId": "project-1",
+                "worktreeId": "worktree-current",
+                "title": "Keep",
+                "isRunning": true
+            }]
+        });
+        service
+            .apply_hosted_workspace_update(
+                "device-1",
+                codux_protocol::REMOTE_TERMINAL_LIST,
+                &first,
+            )
+            .expect("seed one terminal");
+
+        let events = service
+            .apply_hosted_workspace_update(
+                "device-1",
+                codux_protocol::REMOTE_TERMINAL_LIST,
+                &json!({
+                    "terminals": [
+                        {
+                            "id": "keep-terminal",
+                            "projectId": "project-1",
+                            "worktreeId": "worktree-current",
+                            "title": "Keep",
+                            "isRunning": true
+                        },
+                        {
+                            "id": "ghost-terminal",
+                            "projectId": "project-1",
+                            "worktreeId": "worktree-current",
+                            "title": "Ghost",
+                            "isRunning": true
+                        }
+                    ]
+                }),
+            )
+            .expect("apply extra live terminals");
+        assert!(events.is_empty());
+        let layout_key = crate::terminal_layout::terminal_layout_storage_key(
+            "project-1",
+            "worktree-current",
+        );
+        let layout = TerminalLayoutService::new(support_dir.clone()).load(Some(&layout_key));
+        assert_eq!(layout.top_panes.len(), 1);
+        assert_eq!(layout.top_panes[0].terminal_id, "keep-terminal");
 
         drop(service);
         std::fs::remove_dir_all(support_dir).ok();

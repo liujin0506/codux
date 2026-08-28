@@ -9,8 +9,9 @@ use crate::{
         },
         shortcuts::{normalized_shortcut_text, shortcut_matches},
         terminal_state::{
-            TerminalSplitDirection, normalize_terminal_restore_state, structural_terminal_layout,
-            terminal_pane_terminal_id, terminal_panes_are_foreign_to_owner, terminal_restore_plan,
+            TerminalSplitDirection, normalize_terminal_restore_state, restore_focus_slot_indices,
+            structural_terminal_layout, terminal_pane_terminal_id,
+            terminal_panes_are_foreign_to_owner, terminal_restore_plan,
             terminal_restore_plan_for_language, terminal_split_tree_insert_pane,
             terminal_split_tree_insert_pane_root, terminal_split_tree_remove_pane,
             terminal_split_tree_update_ratios,
@@ -241,6 +242,51 @@ fn terminal_restore_state_rebuilds_invalid_layout_without_compat_fallback() {
     assert!(layout.tabs.is_empty());
     assert_eq!(layout.top_panes[0].title, "终端 1");
     assert_eq!(layout.active_terminal_id, "");
+}
+
+#[test]
+fn terminal_restore_state_collapses_runaway_split_layout() {
+    let pane_count = codux_runtime::terminal_layout::TERMINAL_SPLIT_CAP + 1;
+    let layout = TerminalLayoutSummary {
+        active_terminal_id: String::new(),
+        top_panes: (0..pane_count)
+            .map(|index| TerminalPaneSummary {
+                title: format!("分屏 {}", index + 1),
+                terminal_id: format!("gpui-term-worktree-1-{index}"),
+            })
+            .collect(),
+        tabs: Vec::new(),
+        top_ratios: vec![1.0; pane_count],
+        top_grid: TerminalTopGrid::default(),
+        split_tree: None,
+        bottom_ratio: 0.32,
+        collapsed_panes: Vec::new(),
+        error: None,
+    };
+    let runtime = TerminalRuntimeSummary {
+        active_terminal_id: "gpui-term-worktree-1-3".to_string(),
+        ..Default::default()
+    };
+
+    let (layout, _) = normalize_terminal_restore_state(
+        Some("worktree-1"),
+        layout,
+        runtime,
+        "simplifiedChinese",
+    );
+
+    assert_eq!(layout.top_panes.len(), 1);
+    assert_eq!(layout.top_panes[0].terminal_id, "gpui-term-worktree-1-3");
+}
+
+#[test]
+fn restore_focus_slot_indices_picks_remembered_pane() {
+    let tabs = terminal_focus_test_tabs();
+    assert_eq!(
+        restore_focus_slot_indices(&tabs, Some("top-2")),
+        Some((0, 1))
+    );
+    assert_eq!(restore_focus_slot_indices(&tabs, None), Some((0, 0)));
 }
 
 #[test]

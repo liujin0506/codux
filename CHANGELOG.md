@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.31] - 2026-08-28
+
+### Fixed
+
+- Desktop terminal restore now remounts only the focused pane, drops runaway split layouts, and no longer turns every live host session into another split.
+
 ## [2.0.30] - 2026-08-28
 
 ### Added
